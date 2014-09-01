@@ -1,0 +1,59 @@
+    <ul>
+        <li><a href="#ParallelizationofCholeskyFactorization">Parallelization of Cholesky Factorization</a>
+        <li><a href="#ClassKernels">Class: Kernels</a>
+      <ul>
+        <li><a href="#ClassCholesky">Class: Cholesky</a>
+        <li><a href="#ClassLU">Class: LU</a>
+      </ul>
+        <li><a href="#DeviceFunctions">Device Functions</a>
+      <ul>
+        <li><a href="#DeviceFunctionlex_index_2D">Device Function: lex_index_2D</a>
+        <li><a href="#DeviceFunctionglobal_pos">Device Function: global_pos</a>
+        <li><a href="#DeviceFunctioninv_sqrt">Device Function: inv_sqrt</a>
+      </ul>
+        <li><a href="#CholeskyKernels">Cholesky Kernels</a>
+      <ul>
+        <li><a href="#Kernel__single_thread">Kernel: __single_thread</a>
+        <li><a href="#Kernelfactorize_diag_block">Kernel: factorize_diag_block</a>
+        <li><a href="#Kernelstrip_update">Kernel: strip_update</a>
+        <li><a href="#Kerneldiag_update">Kernel: diag_update</a>
+        <li><a href="#Kernello_update">Kernel: lo_update</a>
+      </ul>
+        <li><a href="#Wrapperfunctions">Wrapper functions</a>
+      <ul>
+        <li><a href="#Functionblackbox">Function: blackbox</a>
+        <li><a href="#Functionsingle_thread">Function: single_thread</a>
+        <li><a href="#Functionfactorize_diag_block">Function: factorize_diag_block</a>
+        <li><a href="#Functionstrip_update">Function: strip_update</a>
+        <li><a href="#Functiondiag_update">Function: diag_update</a>
+        <li><a href="#Functionlo_update">Function: lo_update</a>
+      </ul>
+        <li><a href="#ClassCUDADriver">Class: CUDADriver</a>
+      <ul>
+        <li><a href="#ConstructorCUDADriver">Constructor: CUDADriver</a>
+        <li><a href="#Functionfactorize">Function: factorize</a>
+        <li><a href="#Functionchol_fac">Function: chol_fac</a>
+        <li><a href="#Functionsingle_thread_cholesky">Function: single_thread_cholesky</a>
+      </ul>
+        <li><a href="#ClassSimParams">Class: SimParams</a>
+      <ul>
+        <li><a href="#Functiondeclare">Function: declare</a>
+        <li><a href="#Functionget">Function: get</a>
+      </ul>
+        <li><a href="#ClassCholeskyTest">Class: CholeskyTest</a>
+        <li><a href="#ClassCholesky">Class: Cholesky</a>
+      <ul>
+        <li><a href="#ConstructorCholeskyTest">Constructor: CholeskyTest</a>
+        <li><a href="#Functionsetup_and_assemble_test_matrix">Function: setup_and_assemble_test_matrix</a>
+        <li><a href="#Functionrun">Function: run</a>
+        <li><a href="#Functioncpu_tiled">Function: cpu_tiled</a>
+        <li><a href="#FunctionLLtMult">Function: LLtMult</a>
+      </ul>
+        <li><a href="#ClassMyFancySimulation">Class: MyFancySimulation</a>
+      <ul>
+        <li><a href="#Constructor">Constructor</a>
+        <li><a href="#Functionprecision_id">Function: precision_id</a>
+        <li><a href="#Functionrun">Function: run</a>
+        <li><a href="#Funktionmain">Funktion: main</a>
+      </ul>
+      </ul>

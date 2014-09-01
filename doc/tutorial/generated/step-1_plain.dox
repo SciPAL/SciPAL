@@ -1,0 +1,1685 @@
+ * <a name="PlainProg"></a>
+ * <h1> The plain program</h1>
+ * 
+ * (If you are looking at a locally installed CUDA HPC Praktikum version, then the
+ * program can be found at <i>
+ *  .. /.. /testsite / /step-1 /step-cu.cc
+ * </i>. Otherwise, this is only
+ * the path on some remote server.)
+ @code
+
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * / *
+ *    Copyright 2010,2011,2012,2013 Stephan Kramer, as of 2013: Dr. Stephan Kramer
+ * 
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ * 
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ * 
+ *    This file includes
+ * 
+ *    - the CUDA kernels for computing a Cholesky factorization
+ *      of a real, symmetric (and hopefully positive definite) matrix.
+ * 
+ *    - device functions needed by the kernels for mapping thread and block indices
+ *      to row and column indices of the matrix which is to be factorized or
+ *      to the positions in the linear array holding the matrix entries.
+ * 
+ *    - the definitions of the wrapper functions for the kernels. These wrapper functions
+ *      are declared in a separate header file and either allow to call
+ *      the kernels individually or to execute the complete factorization
+ *      via the 'blackbox' function.
+ * 
+ *    All kernels and wrapper functions are enclosed in a namespace 'step1'
+ * * /
+ * #ifndef CUDA_KERNEL_STEP_1_CU_H
+ * #define CUDA_KERNEL_STEP_1_CU_H
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-ParallelizationofCholeskyFactorization"></a>
+@code
+ * 
+ * 
+ * 
+ * namespace step1 {
+ * 
+ * static const int DEFAULT_TILE_SIZE = 16;
+ * 
+@endcode
+ <a name="plain-ClassKernels"></a>
+@code
+ * template<typename T>
+ * class Kernels {
+ * 
+@endcode
+ <a name="plain-ClassCholesky"></a>
+@code
+ *     struct Cholesky {
+ * 
+ *         void single_thread(T * A, int n_cols, int leading_dim);
+ * 
+ *         cudaError_t factorize_diag_block(T *A,
+ *                                          int n_blocks_done, int n_cols, int leading_dim );
+ * 
+ *         void strip_update(T *A,
+ *                           int n_blocks_done, int n_remaining_blocks, int n_cols, int leading_dim);
+ * 
+ *         void diag_update(T *A,
+ *                          int n_blocks_done, int n_remaining_blocks, int n_cols, int leading_dim);
+ * 
+ *         void lo_update(T *A,
+ *                        int n_blocks_done, int n_blocks, int n_remaining_blocks, int n_cols, int leading_dim);
+ * 
+ *         void blackbox(T *A, int n_cols, int leading_dim);
+ * 
+ *     };
+ * 
+@endcode
+ <a name="plain-ClassLU"></a>
+@code
+ * 
+ * 
+ * public:
+ *     Cholesky cholesky;
+ * 
+ * };
+ * 
+ * } // namespace step1 END
+ * 
+ * #endif // CUDA_KERNEL_STEP_1_CU_H
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * / *
+ *      This file includes
+ * 
+ *    - the CUDA kernels for computing a Cholesky factorization
+ *      of a real, symmetric (and hopefully positive definite) matrix.
+ * 
+ *    - device functions needed by the kernels for mapping thread and block indices
+ *      to row and column indices of the matrix which is to be factorized or
+ *      to the positions in the linear array holding the matrix entries.
+ * 
+ *    - the definitions of the wrapper functions for the kernels. These wrapper functions
+ *      are declared in a separate header file and either allow to call
+ *      the kernels individually or to execute the complete factorization
+ *      via the 'blackbox' function.
+ * 
+ *    All kernels and wrapper functions are enclosed in a namespace 'step1'
+ * * /
+ * #ifdef USE_CU_C
+ * 
+ * #include <stdio.h>
+ * 
+ * #include <step-1/cuda_kernel_wrapper_step-1.cu.h>
+ * 
+ * namespace step1 {
+ * 
+@endcode
+ <a name="plain-DeviceFunctions"></a>
+@code
+@endcode
+ <a name="plain-DeviceFunctionlex_index_2D"></a>
+@code
+ * __forceinline__
+ * __device__ int lex_index_2D(int r, int c, int leading_dim)
+ * {
+ *     return c +  r*leading_dim;
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-DeviceFunctionglobal_pos"></a>
+@code
+ * template<int TILE_SIZE>
+ * __forceinline__
+ * __device__ int global_pos(int t_pos, int n_blocks_done)
+ * {
+ *     return t_pos + TILE_SIZE*n_blocks_done;
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-DeviceFunctioninv_sqrt"></a>
+@code
+ * __device__ float inv_sqrt(float x)
+ * {
+ *     return rsqrtf(x);
+ * }
+ * 
+ * 
+ * __device__ double inv_sqrt(double x)
+ * {
+ *     return rsqrt(x);
+ * }
+ * 
+@endcode
+ <a name="plain-CholeskyKernels"></a>
+@code
+ * namespace Chol {
+ * 
+@endcode
+ <a name="plain-Kernel__single_thread"></a>
+@code
+ * template<typename T>
+ * __global__
+ * void
+ * __single_thread(T *A, const int n_rows, const int leading_dim)
+ * {
+ *     for (unsigned int r = 0; r < n_rows; ++r)
+ *     {
+ *         T sum = 0.;
+ *         unsigned int idx;
+ *         unsigned int idx_c;
+ *         for (unsigned int u = 0; u < r; ++u)
+ *         {
+ *             idx = lex_index_2D(r, u, leading_dim);
+ *             sum += A[idx] * A[idx];
+ *         }
+ *         idx = lex_index_2D(r, r, leading_dim);
+ *         A[idx] = sqrt(A[idx] - sum);
+ * 
+ *         for (unsigned int c = r+1; c < n_rows; ++c)
+ *         {
+ *             sum = 0.;
+ * 
+ *             for (unsigned int u = 0; u < r; ++u)
+ *             {
+ *                 idx_c = lex_index_2D(c, u, leading_dim);
+ *                 idx   = lex_index_2D(r, u, leading_dim);
+ *                 sum += A[idx_c]*A[idx];
+ *             }
+ * 
+ *             idx_c = lex_index_2D(c, r, leading_dim);
+ *             idx   = lex_index_2D(r, c, leading_dim);
+ *             A[idx_c]  = A[idx] - sum;
+ * 
+ *             idx   = lex_index_2D(r, r, leading_dim);
+ *             A[idx_c] /= A[idx];
+ *         }
+ *     }
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Kernelfactorize_diag_block"></a>
+@code
+ * 
+ * template<typename T, int TILE_SIZE>
+ * __global__
+ * void
+ * __factorize_diag_block(T *A, int n_blocks_done,
+ *                        int n_cols, int leading_dim)
+ * {
+ *     int col = threadIdx.x;
+ * 
+ *     int row = threadIdx.y;
+ * 
+ *     int global_row = global_pos<TILE_SIZE>(row, n_blocks_done);
+ *     int global_col = global_pos<TILE_SIZE>(col, n_blocks_done);
+ * 
+ *     if ((global_row >= n_cols) || (global_col >= n_cols))
+ *         return;
+ * 
+ *     int idx = lex_index_2D(global_row, global_col, leading_dim);
+ * 
+ * #ifdef INDEX_BOUND_DEBUG
+ *     if (row == 0 && col == 0)
+ *     printf("%s:\n------------------------\n", __FUNCTION__);
+ *     __syncthreads();
+ * 
+ *     printf("row, col : (%d, %d), g_row,g_col : (%d, %d), idx : %d\n ",
+ *            row, col, global_row, global_col, idx);
+ * #endif
+ * 
+ *     __shared__ T L[TILE_SIZE][TILE_SIZE+1];
+ * 
+ *     L[row][col]= A[idx];
+ *     __syncthreads();
+ * 
+ *     T fac;
+ * 
+ *     int k_max = TILE_SIZE;
+ *     if (n_cols - global_pos<TILE_SIZE>(0, n_blocks_done) < TILE_SIZE)
+ *         k_max = n_cols%TILE_SIZE;
+ * 
+ * #ifdef INDEX_BOUND_DEBUG
+ *       printf("k_max : %d\n", k_max);
+ * #endif
+ * 
+ *     for(int k=0; k < k_max; k++)
+ *     {
+ *         __syncthreads();
+ *         fac = inv_sqrt(L[k][k]);
+ *         __syncthreads();
+ * 
+ *         if ((row==k)&&(col>=k)) L[col][row]=(L[col][row])*fac;
+ * 
+ *         __syncthreads();
+ * 
+ * 
+ *         if ((row>=col)&&(col>k)) L[row][col] -= L[col][k]*L[row][k];
+ *     }
+ * 
+ *     __syncthreads();
+ * 
+ *     if (row>=col) A[idx] = L[row][col];
+ * 
+ * 
+ * #ifdef INDEX_BOUND_DEBUG
+ *     printf("A_%d : %f\n", idx,  L[row][col]);
+ * #endif
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Kernelstrip_update"></a>
+@code
+ * template<typename T, int TILE_SIZE>
+ * __global__
+ * void
+ * __strip_update(T *A, int n_blocks_done, int n_cols, int leading_dim)
+ * {
+ *     int boffy=n_blocks_done;
+ * 
+ *     int boffx = blockIdx.x + boffy + 1;
+ * 
+ *     int col = threadIdx.x;
+ *     int row = threadIdx.y;
+ * 
+ *     __shared__ T topleft[TILE_SIZE][TILE_SIZE+1];
+ *     __shared__ T workingmat[TILE_SIZE][TILE_SIZE+1];
+ * 
+ *     int global_row = global_pos<TILE_SIZE>(row,n_blocks_done);
+ *     int global_col = global_pos<TILE_SIZE>(col,n_blocks_done);
+ * 
+ *     if ((global_row >= n_cols) || (global_col >= n_cols))
+ *         return;
+ * 
+ *     int idx = lex_index_2D(global_row, global_col, leading_dim);
+ * 
+ *     topleft[row][col]=A[idx];
+ * 
+ *     global_row = global_pos<TILE_SIZE>(row,boffx);
+ *     int idx_w = lex_index_2D(global_row, global_col, leading_dim);
+ * 
+ *     workingmat[col][row] = A[idx_w];
+ * 
+ *     __syncthreads();
+ * 
+ * 
+ *     int k_max = TILE_SIZE;
+ * 
+ *     if(row==0)
+ *         for (int k=0; k < k_max; k++)
+ *         {
+ *             T sum=0.;
+ *             for (int m = 0; m < k; m++)
+ *                 sum += topleft[k][m]*workingmat[m][col];
+ * 
+ *             workingmat[k][col] = (workingmat[k][col] - sum)/topleft[k][k];
+ *         }
+ * 
+ *     __syncthreads();
+ * 
+ *     A[idx_w] = workingmat[col][row];
+ * }
+ * 
+@endcode
+ <a name="plain-Kerneldiag_update"></a>
+@code
+ * template<typename T, int TILE_SIZE>
+ * __global__
+ * void
+ * __diag_update(T *A, int n_blocks_done, int n_cols, int leading_dim)
+ * {
+ *     int boffx = blockIdx.x + n_blocks_done + 1;
+ * 
+ *     int col = threadIdx.x;
+ *     int row = threadIdx.y;
+ * 
+ *     int global_row = global_pos<TILE_SIZE>(row, boffx);
+ *     int global_col = global_pos<TILE_SIZE>(col, n_blocks_done);
+ * 
+ *     if ((global_row >= n_cols) || (global_col >= n_cols))
+ *         return;
+ * 
+ *     int idx = lex_index_2D(global_row, global_col, leading_dim);
+ * 
+ *     __shared__ T left[TILE_SIZE][TILE_SIZE+1];
+ * 
+ *     left[row][col]= A[idx];
+ * 
+ *     __syncthreads();
+ * 
+ *     T sum = 0.f;
+ * 
+ * 
+ *     int k_max = TILE_SIZE;
+ * 
+ *     if(row>=col)
+ *     {
+ *         for(int kk=0; kk<k_max; kk++) sum += left[row][kk]*left[col][kk];
+ * 
+ *         global_col = global_pos<TILE_SIZE>(col, boffx);
+ *         idx = lex_index_2D(global_row, global_col, leading_dim);
+ * 
+ *         A[idx] -= sum;
+ *     }
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Kernello_update"></a>
+@code
+ * template<typename T, int TILE_SIZE>
+ * __global__
+ * void
+ * __lo_update(T *A, int n_blocks_done, int n_blocks, int n_cols, int leading_dim)
+ * {
+ * 
+ *     int col = threadIdx.x;
+ *     int row = threadIdx.y;
+ * 
+ *     int boffy=blockIdx.y+n_blocks_done+1;
+ *     int boffx=boffy+1;
+ * 
+ *     __shared__ T left[TILE_SIZE][TILE_SIZE];
+ * 
+ *     __shared__ T upt[TILE_SIZE][TILE_SIZE+1];
+ * 
+ * 
+ *     int global_row_src = global_pos<TILE_SIZE>(row, boffy);
+ *     int global_col_src = global_pos<TILE_SIZE>(col, n_blocks_done);
+ * 
+ *     if ((global_row_src >= n_cols) || (global_col_src >= n_cols))
+ *         return;
+ * 
+ *     int idx = lex_index_2D(global_row_src, global_col_src, leading_dim);
+ * 
+ *     upt[row][col]=A[idx];
+ *     __syncthreads();
+ * 
+ * 
+ * #ifdef nSCHUR_DEBUG
+ *     if (row == 0 && col == 0)
+ *     printf("%s block (%d,%d):\n------------------------\n",
+ *            __FUNCTION__, blockIdx.x, blockIdx.y);
+ *     __syncthreads();
+ * 
+ * #endif
+ * 
+ *     for (;boffx<n_blocks;boffx++)
+ *     {
+ *         int global_row = global_pos<TILE_SIZE>(row, boffx);
+ *         idx = lex_index_2D(global_row, global_col_src, leading_dim);
+ * 
+ *         left[row][col]= 0.;
+ *         left[row][col]=A[idx];
+ * 
+ * #ifdef SCHUR_DEBUG
+ *         printf("loading  left[%d][%d]=A[%d] == %f\n", row, col, idx, A[idx]);
+ * #endif
+ *         __syncthreads();
+ * 
+ *         if (global_row < n_cols)
+ *         {
+ *             T matrixprod=0.f;
+ * 
+ *             int k_max = TILE_SIZE;
+ * 
+ *             for (int kk=0;kk<k_max;kk++)
+ *             {
+ *                 matrixprod+=left[row][kk]*upt[col][kk];
+ * 
+ * #ifdef SCHUR_DEBUG
+ *                 printf("row, col : (%d, %d), g_row,g_col : (%d, %d), idx : %d, mprod : %f, L_r%d : %f, U_1c : %f \n ",
+ *                        row, col, global_row, global_col_src, idx, matrixprod, kk, left[row][kk], upt[col][kk]);
+ * #endif
+ *             }
+ * 
+ *             int global_col = global_pos<TILE_SIZE>(col, boffy);
+ * 
+ *             if (global_col < n_cols)
+ *             {
+ *                 idx = lex_index_2D(global_row, global_col, leading_dim);
+ *                 A[idx] -= matrixprod;
+ * 
+ * #ifdef SCHUR_DEBUG
+ *                 if (row == 0 && col == 0)
+ *                     printf("%s:\n------------------------\n", __FUNCTION__);
+ *                 __syncthreads();
+ * 
+ *                 printf("row, col : (%d, %d), g_row,g_col : (%d, %d), idx : %d, mprod : %f\n ",
+ *                        row, col, global_row, global_col, idx, matrixprod);
+ * #endif
+ *             }
+ *         }
+ *     }
+ * 
+ * }
+ * 
+ * } // namespace Chol END
+ * 
+ * } // namespace step1 END
+ * 
+ * 
+@endcode
+ <a name="plain-Wrapperfunctions"></a>
+@code
+@endcode
+ <a name="plain-Functionblackbox"></a>
+@code
+ * template<typename T>
+ * void step1::Kernels<T>::Cholesky::blackbox(T * a_d, int n_cols, int leading_dim)
+ * {
+ *     cudaError_t error;
+ * 
+ *     int n_blocks = (n_cols+int(DEFAULT_TILE_SIZE)-1)/int(DEFAULT_TILE_SIZE);
+ * 
+ *     dim3 threads(DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
+ * 
+ *     dim3 logrid;
+ * 
+ *     for(int i=n_blocks; i>2; --i)
+ *     {
+ *         logrid.x=1;
+ *         logrid.y=i-2;
+ * 
+ *         dim3 stripgrid(i-1);
+ * 
+ *         Chol::__factorize_diag_block<T, DEFAULT_TILE_SIZE>
+ *                 <<<1, threads>>>(a_d, n_blocks-i, n_cols, leading_dim);
+ *         cudaThreadSynchronize();
+ * 
+ *         Chol::__strip_update<T, DEFAULT_TILE_SIZE>
+ *                 <<<stripgrid, threads>>>(a_d, n_blocks-i, n_cols, leading_dim);
+ *         cudaThreadSynchronize();
+ * 
+ *         Chol::__diag_update<T, DEFAULT_TILE_SIZE>
+ *                 <<<stripgrid, threads>>>(a_d, n_blocks-i, n_cols, leading_dim);
+ *         cudaThreadSynchronize();
+ *         Chol::__lo_update<T, DEFAULT_TILE_SIZE>
+ *                 <<< logrid, threads >>>(a_d, n_blocks-i, n_blocks, n_cols, leading_dim);
+ *         cudaThreadSynchronize();
+ *     }
+ * 
+ *     if(n_blocks>1)
+ *     {
+ *         Chol::__factorize_diag_block<T, DEFAULT_TILE_SIZE><<<1, threads>>>(a_d, n_blocks-2, n_cols,
+ *                                                    leading_dim);
+ *         cudaThreadSynchronize();
+ * 
+ *         Chol::__strip_update<T, DEFAULT_TILE_SIZE><<<1, threads>>>(a_d, n_blocks-2, n_cols, leading_dim);
+ *         cudaThreadSynchronize();
+ * 
+ *         Chol::__diag_update<T, DEFAULT_TILE_SIZE><<<1, threads>>>(a_d, n_blocks-2, n_cols, leading_dim);
+ *         cudaThreadSynchronize();
+ * 
+ *     }
+ * 
+ *     Chol::__factorize_diag_block<T, DEFAULT_TILE_SIZE><<<1, threads>>>(a_d, n_blocks-1, n_cols, leading_dim);
+ * 
+ *     cudaThreadSynchronize();
+ * 
+ *     error=cudaGetLastError();
+ *     if (error != cudaSuccess)
+ *     {
+ *         printf("     Error code %d: %s.\n",error,cudaGetErrorString(error));
+ *         exit(-1);
+ *     }
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Functionsingle_thread"></a>
+@code
+ * template<typename T>
+ * void step1::Kernels<T>::Cholesky::single_thread(T * a_d, int n_cols, int leading_dim)
+ * {
+ *     Chol::__single_thread<<<1,1>>>(a_d, n_cols, leading_dim);
+ * }
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionfactorize_diag_block"></a>
+@code
+ * template<typename T>
+ * cudaError_t step1::Kernels<T>::Cholesky::factorize_diag_block(T * a_d,
+ *                                                               int n_blocks_done,
+ *                                                               int n_cols,
+ *                                                               int leading_dim)
+ * {
+ *     dim3 threads(DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
+ *     Chol::__factorize_diag_block<T, DEFAULT_TILE_SIZE><<<1, threads>>>(a_d, n_blocks_done,  n_cols, leading_dim);
+ *     cudaThreadSynchronize();
+ * 
+ *     return cudaGetLastError();
+ * }
+ * 
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionstrip_update"></a>
+@code
+ * template<typename T>
+ * void
+ * step1::Kernels<T>::Cholesky::strip_update(T *a_d,
+ *                                           int n_blocks_done,
+ *                                           int n_remaining_blocks, int n_cols,
+ *                                           int leading_dim)
+ * {
+ *     cudaError_t error;
+ *     dim3 stripgrid(n_remaining_blocks-1);
+ *     dim3 threads(DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
+ * 
+ *     Chol::__strip_update<T, DEFAULT_TILE_SIZE><<<stripgrid, threads>>>(a_d,
+ *                                                  n_blocks_done, n_cols,
+ *                                                  leading_dim);
+ * 
+ *     cudaThreadSynchronize();
+ * 
+ *     error=cudaGetLastError();
+ *     if (error != cudaSuccess)
+ *     {
+ *         printf("     Error code %d: %s.\n",error,cudaGetErrorString(error));
+ * 
+ *         exit(-1);
+ *     }
+ * }
+ * 
+ * 
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functiondiag_update"></a>
+@code
+ * template<typename T>
+ * void step1::Kernels<T>::Cholesky::diag_update(T *a_d,
+ *                                               int n_blocks_done,
+ *                                               int n_remaining_blocks,
+ *                                               int n_cols,
+ *                                               int leading_dim)
+ * {
+ *     cudaError_t error;
+ *     dim3 stripgrid(n_remaining_blocks-1);
+ *     dim3 threads(DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
+ * 
+ *     Chol::__diag_update<T, DEFAULT_TILE_SIZE><<<stripgrid, threads>>>(a_d,
+ *                                                 n_blocks_done, n_cols,
+ *                                                 leading_dim);
+ * 
+ *     cudaThreadSynchronize();
+ *     error=cudaGetLastError();
+ *     if (error != cudaSuccess)
+ *     {
+ *         printf("     Error code %d: %s.\n",error,cudaGetErrorString(error));
+ *         exit(-1);
+ *     }
+ * }
+ * 
+ * 
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionlo_update"></a>
+@code
+ * template<typename T>
+ * void step1::Kernels<T>::Cholesky::lo_update(T *a_d,
+ *                                             int n_blocks_done,
+ *                                             int n_blocks,
+ *                                             int n_remaining_blocks ,
+ *                                             int n_cols,
+ *                                             int leading_dim)
+ * {
+ *     cudaError_t error;
+ *     dim3 logrid;
+ *     logrid.x=1;
+ *     logrid.y=n_remaining_blocks-2;
+ *     dim3 threads(DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
+ * 
+ *     Chol::__lo_update<T, DEFAULT_TILE_SIZE><<< logrid, threads >>>(a_d,
+ *                                              n_blocks_done, n_blocks,  n_cols, leading_dim);
+ *     cudaThreadSynchronize();
+ *     error=cudaGetLastError();
+ *     if (error != cudaSuccess)
+ *     {
+ *         printf("     Error code %d: %s.\n",error,cudaGetErrorString(error));
+ *         exit(-1);
+ *     }
+ * }
+ * 
+ * 
+ * 
+ * template class step1::Kernels<float>;
+ * template class step1::Kernels<double>;
+ * 
+ * #endif
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #ifndef CUDADriver_STEP_1_H
+ * #define CUDADriver_STEP_1_H
+ * 
+ * #include <step-1/SimParams.h>
+ * 
+ * #include <lac/FullMatrixAccessor.h>
+ * #include <lac/blas++.h>
+ * 
+ * #include <step-1/cuda_kernel_wrapper_step-1.cu.h>
+ * 
+ * 
+ * 
+ * namespace step1 {
+ * 
+@endcode
+ <a name="plain-ClassCUDADriver"></a>
+@code
+ * template<typename T>
+ * class CUDADriver : private Kernels<T> {
+ * 
+ * public:
+ *     typedef typename blas_pp<T, cublas>::blas_wrapper_type BW;
+ *     typedef typename blas_pp<T, cublas>::FullMatrixAccessor FullMatrixAccessor;
+ *     typedef typename blas_pp<T, cublas>::Matrix Matrix;
+ *     typedef typename blas_pp<T, cublas>::SubMatrix SubMatrix;
+ *     typedef typename blas_pp<T, cublas>::MatrixSubCol MatrixSubCol;
+ *     typedef typename blas_pp<T, cublas>::Vector Vector;
+ *     typedef typename blas_pp<T, cublas>::SubColVector SubColVector;
+ *     typedef typename blas_pp<T, cublas>::SubVectorBase SubVectorBase;
+ * 
+ *     typedef std::map<std::string,double> TimerName2Value;
+ * 
+ * 
+ * 
+ *     CUDADriver(const SimParams &p);
+ * 
+ * 
+ * 
+ *     double factorize(FullMatrixAccessor& A);
+ * 
+ *     double factorize(dealii::FullMatrix<T> &A);
+ * 
+ *     void chol_fac(FullMatrixAccessor& A, TimerName2Value& times);
+ * 
+ *     void lu_fac(FullMatrixAccessor& A, TimerName2Value& times);
+ * 
+ *     void single_thread_cholesky(FullMatrixAccessor& A);
+ * 
+ * 
+ * private:
+ *     Matrix A_d;
+ * 
+ *     const SimParams * params;
+ * };
+ * 
+ * } // namespace step1 END
+ * 
+ * #endif // CUDADriver_STEP_1_H
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #ifndef CUDA_DRIVER_STEP_1_HH
+ * #define CUDA_DRIVER_STEP_1_HH
+ * 
+ * #include <base/CUDATimer.h>
+ * 
+ * #include <step-1/cuda_driver_step-1.h>
+ * 
+ * #include <step-1/cuda_kernel_wrapper_step-1.cu.h>
+ * 
+ * 
+ * 
+ * #include <QTime>
+ * 
+ * 
+@endcode
+ <a name="plain-ConstructorCUDADriver"></a>
+@code
+ * template<typename T>
+ * step1::CUDADriver<T>::CUDADriver(const SimParams &p)
+ *     :
+ *       params(&p)
+ * {}
+ * 
+ * 
+@endcode
+ <a name="plain-Functionfactorize"></a>
+@code
+ * template<typename T>
+ * double
+ * step1::CUDADriver<T>::factorize(FullMatrixAccessor& A)
+ * {
+ *     this->A_d = A;
+ * 
+ *     QTime t;
+ *     t.start();
+ *     this->cholesky.blackbox(this->A_d.array().val(), this->A_d.n_cols(), this->A_d.leading_dim );
+ * 
+ *     double kernel_time = t.elapsed()/1000.;
+ * 
+ *     A = this->A_d;
+ * 
+ *     return kernel_time;
+ * }
+ * 
+@endcode
+ <a name="plain-Functionchol_fac"></a>
+@code
+ * template<typename T>
+ * void
+ * step1::CUDADriver<T>::chol_fac(FullMatrixAccessor& A, TimerName2Value& times)
+ * {
+ *     this->A_d = A;
+ * 
+ *     QTime t;
+ * 
+ *     T* a_d = this->A_d.array().val();
+ * 
+ *     int n_rows = this->A_d.n_rows();
+ * 
+ *     int leading_dim = this->A_d.leading_dim;
+ * 
+ * 
+ *     int n_blocks = (A.n_rows()+int(DEFAULT_TILE_SIZE)-1)/int(DEFAULT_TILE_SIZE);
+ * 
+ *     times["factorize_diagonal_block"] = 0.;
+ *     times["strip_update"] = 0.;
+ *     times["diag_update"] = 0.;
+ *     times["lo_update"] = 0.;
+ * 
+ *     for(int i = n_blocks; i > 2; --i)
+ *     {
+ *         t.restart();
+ * 
+ * 
+ *         cudaError_t error = this->cholesky.factorize_diag_block(a_d, n_blocks-i, n_rows, leading_dim);
+ * 
+ *         times["factorize_diagonal_block"]+=t.elapsed();
+ * 
+ *         AssertThrow(error == cudaSuccess, dealii::ExcMessage( cudaGetErrorString(error) ) );
+ * 
+ * 
+ *         t.restart();
+ *         this->cholesky.strip_update(a_d, n_blocks-i, i, n_rows, leading_dim);
+ * 
+ *         times["strip_update"]+=t.elapsed();
+ * 
+ * 
+ *         t.restart();
+ *         this->cholesky.diag_update(a_d, n_blocks-i, i, n_rows, leading_dim);
+ * 
+ *         times["diag_update"]+=t.elapsed();
+ * 
+ * 
+ *         t.restart();
+ *         this->cholesky.lo_update(a_d, n_blocks-i, n_blocks, i, n_rows, leading_dim);
+ * 
+ *         times["lo_update"]+=t.elapsed();
+ *     }
+ * 
+ *     if(n_blocks>1)
+ *     {
+ *         this->cholesky.factorize_diag_block(a_d, n_blocks-2, n_rows, leading_dim);
+ * 
+ *         this->cholesky.strip_update(a_d, n_blocks-2, 2, n_rows, leading_dim);
+ * 
+ *         this->cholesky.diag_update(a_d, n_blocks-2, 2,  n_rows, leading_dim);
+ *     }
+ * 
+ * 
+ *     std::cout << "Cholesky decomposition..." << std::endl;
+ *     this->cholesky.factorize_diag_block(a_d, n_blocks-1, n_rows, leading_dim);
+ * 
+ *     A = this->A_d;
+ * }
+ * 
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionsingle_thread_cholesky"></a>
+@code
+ * template<typename T>
+ * void
+ * step1::CUDADriver<T>::single_thread_cholesky(FullMatrixAccessor& A)
+ * {
+ *     this->A_d = A;
+ * 
+ *     this->cholesky.single_thread(this->A_d.array().val(),
+ *                                  this->A_d.n_rows(), this->A_d.leading_dim );
+ * 
+ *     A = this->A_d;
+ * }
+ * 
+ * #endif // CUDA_DRIVER_STEP_1_HH
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #ifndef SIM_PARAMETER_H
+ * #define SIM_PARAMETER_H
+ * 
+ * #include <deal.II/base/parameter_handler.h>
+ * 
+ * #include <QDir>
+ * 
+ * namespace step1 {
+ * 
+@endcode
+ <a name="plain-ClassSimParams"></a>
+@code
+ * struct SimParams {
+ * 
+ *     SimParams() {}
+ * 
+ *     static void declare(dealii::ParameterHandler & prm);
+ * 
+ *     void get(dealii::ParameterHandler & prm);
+ * 
+ *     int
+ *     device,
+ *     matrix_low,
+ *     matrix_high,
+ *     step_size,
+ *     average_runs;
+ * 
+ *     bool use_double;
+ * 
+ *     QDir run_dir;
+ * 
+ * private:
+ *     SimParams(const SimParams& / *other* /) {}
+ * 
+ *     SimParams& operator= (const SimParams& / *other* /)
+ *     {
+ *         return *this;
+ *     }
+ * 
+ * };
+ * }
+ * 
+ * 
+ * #endif
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #ifndef SIM_PARAMETER_HH
+ * #define SIM_PARAMETER_HH
+ * 
+ * #include <deal.II/base/parameter_handler.h>
+ * #include <step-1/SimParams.h>
+ * 
+ * 
+@endcode
+ <a name="plain-Functiondeclare"></a>
+@code
+ * void
+ * step1::SimParams::declare(dealii::ParameterHandler & prm)
+ * {
+ *     prm.enter_subsection("Simulation basics");
+ * 
+ *     prm.declare_entry("Run directory", "./test_me",
+ *                       dealii::Patterns::Anything(),
+ *                       "Specify a directory where results of "
+ *                       "the test are to be stored. This can be either "
+ *                       "an absolute path or path relative to the directory "
+ *                       "where the program has been started. The default is "
+ *                       "subdir called test_me-<date> where <date> will be replaced "
+ *                       "by the date at which the program has been started. "
+ *                       "this simplifies keeping the projects directory clean "
+ *                       "");
+ * 
+ *     prm.leave_subsection();
+ * 
+ * 
+ *     prm.enter_subsection("CUDA parameters");
+ * 
+ * 
+ *     prm.declare_entry("Device", "0",
+ *                       dealii::Patterns::Integer(),
+ *                       "which CUDA-enabled GPU should be used");
+ * 
+ *     prm.declare_entry("Shared Memory", "true",
+ *                       dealii::Patterns::Bool(),
+ *                       "Whether shared (true) or L1 (false) memory should be used.");
+ * 
+ * 
+ *     prm.leave_subsection();
+ * 
+ *     prm.enter_subsection("Testcase parameters");
+ * 
+ *     prm.declare_entry("Double-Precision","true",
+ *                       dealii::Patterns::Bool(),
+ *                       "Decide between double (true) or float (false) precision");
+ * 
+ *     prm.declare_entry("Matrix size - lower limit", "256",
+ *                       dealii::Patterns::Integer(),
+ *                       "Start value of the range of matrix sizes tested by the simulation");
+ * 
+ * 
+ *     prm.declare_entry("Matrix size - upper limit", "513",
+ *                       dealii::Patterns::Integer(),
+ *                       "End value of the range of matrix sizes tested by the simulation");
+ * 
+ *     prm.declare_entry("Matrix size - step size", "1024",
+ *                       dealii::Patterns::Integer(),
+ *                       "Increment for the size of the test matrices");
+ * 
+ *     prm.declare_entry("Average - runs", "10",
+ *                       dealii::Patterns::Integer(),
+ *                       "Number of runs being used for averaging");
+ * 
+ *     prm.leave_subsection();
+ * 
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Functionget"></a>
+@code
+ * void
+ * step1::SimParams::get(dealii::ParameterHandler & prm)
+ * {
+ *     prm.enter_subsection("Simulation basics");
+ * 
+ *     run_dir.setPath(prm.get("Run directory").c_str());
+ *     run_dir.makeAbsolute();
+ * 
+ *     if (!run_dir.exists())
+ *         run_dir.mkpath(".");
+ * 
+ *     prm.leave_subsection();
+ * 
+ *     prm.enter_subsection("CUDA parameters");
+ * 
+ *     device        = prm.get_integer("Device");
+ * 
+ *     prm.leave_subsection();
+ * 
+ *     prm.enter_subsection("Testcase parameters");
+ * 
+ * 
+ *     use_double   = prm.get_bool("Double-Precision");
+ * 
+ *     matrix_low   = prm.get_integer("Matrix size - lower limit");
+ * 
+ *     matrix_high  = prm.get_integer("Matrix size - upper limit");
+ * 
+ *     step_size    = prm.get_integer("Matrix size - step size");
+ * 
+ *     average_runs = prm.get_integer("Average - runs");
+ * 
+ * 
+ *     prm.leave_subsection();
+ * 
+ * 
+ * }
+ * 
+ * 
+ * #endif
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #include <iostream>
+ * #include <vector>
+ * 
+ * #include <QThread>
+ * #include <QTime>
+ * 
+ * #include <deal.II/base/convergence_table.h>
+ * #include <deal.II/base/parameter_handler.h>
+ * #include <deal.II/lac/full_matrix.h>
+ * 
+ * #include <QDir>
+ * 
+ * 
+ * #include <step-1/SimParams.h>
+ * 
+ * #include <step-1/cuda_driver_step-1.h>
+ * #include <step-1/cuda_driver_step-1.hh>
+ * 
+ * #include <lac/FullMatrixAccessor.h>
+ * #include <lac/MatrixCreator.h>
+ * 
+ * 
+ * namespace step1 {
+ * 
+@endcode
+ <a name="plain-ClassCholeskyTest"></a>
+@code
+ * template<typename Number>
+ * class CholeskyTest : public QThread
+ * {
+ *     static const unsigned int max_display_size = 20;
+ * 
+ * public:
+ * 
+ *     CholeskyTest(int n_r,
+ *                  dealii::ConvergenceTable& s_table,
+ *                  const SimParams &_params);
+ * 
+ * protected:
+ * 
+ *     void setup_and_assemble_test_matrix();
+ * 
+ *     void factorize();
+ * 
+ *     void check_results();
+ * 
+ *     void run();
+ * 
+ * 
+ * 
+ *     int n_rows;
+ * 
+ *     dealii::ConvergenceTable & speedup_table;
+ * 
+ *     dealii::FullMatrix<Number> A, L, L_T;
+ * 
+ * private:
+ * 
+ *     const SimParams * params;
+ * };
+ * 
+ * 
+@endcode
+ <a name="plain-ClassCholesky"></a>
+@code
+ * class Cholesky {
+ * 
+ * public:
+ *     template<typename T> static void cpu(std::vector<std::vector<T> > & A);
+ * 
+ *     template<typename T> static void cpu_tiled(T* A, int tile_size);
+ * 
+ *     template<typename T> static void LLtMult(T * A, const T * L, int n_rows);
+ * };
+ * 
+ * 
+@endcode
+ <a name="plain-ConstructorCholeskyTest"></a>
+@code
+ * template<typename Number>
+ * CholeskyTest<Number>::CholeskyTest(int n_r,
+ *                                    dealii::ConvergenceTable& s_table,
+ *                                    const SimParams &_params)
+ *     :
+ *       n_rows(n_r),
+ *       speedup_table(s_table),
+ *       params(&_params)
+ * {}
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionsetup_and_assemble_test_matrix"></a>
+@code
+ * template<typename Number>
+ * void CholeskyTest<Number>::setup_and_assemble_test_matrix()
+ * {
+ *     this->A.reinit(n_rows, n_rows);
+ *     this->L.reinit(n_rows, n_rows);
+ *     this->L_T.reinit(n_rows, n_rows);
+ * 
+ *     QTime t;
+ * 
+ *     this->speedup_table.add_value("n rows", n_rows);
+ * 
+ *     std::cout << "Initial Cholesky factor deal.II :" << std::endl;
+ *     std::cout << "----------------------------------------------------"
+ *               << std::endl;
+ * 
+ * #ifdef USE_HADAMARD
+ *     MatrixCreator::extended_hadamard(n_rows, A);
+ * #else
+ *     t.start();
+ * 
+ *     for (unsigned int r = 0; r < n_rows; ++r)
+ *         for (unsigned int c = r; c <n_rows; ++c)
+ *             L(r,c) = 1e-0*(r+2)*(c+2);
+ * 
+ * 
+ *     if(false)
+ *     qDebug("Time for CPU-based setup of Cholesky factor : %f s",
+ *            t.elapsed()/1000.);
+ * 
+ *     if ( L.n_rows() < max_display_size)
+ *         L.print(std::cout, 10, 5);
+ *     if ( L.n_rows() < max_display_size)
+ *         std::cout << std::endl;std::cout << std::endl;
+ * 
+ *     {
+ *         t.restart();
+ *         L_T.copy_from(L);
+ *         if(false)
+ *         qDebug("Time for CPU-based copying of Cholesky factor : %f s",
+ *                t.elapsed()/1000.);
+ * 
+ *         t.restart();
+ *         L_T.Tmmult(A, L, false);
+ *         if(false)
+ *         qDebug("Time for CPU-based multiplication of Cholesky factor"
+ *                " : %f s",
+ *                t.elapsed()/1000.);
+ *         L_T.copy_from(A);
+ *     }
+ * 
+ *     if ( A.n_rows() < max_display_size)
+ *     {
+ *         std::cout << "Matrix to factorize :" << std::endl;
+ *         std::cout << "----------------------------------------------------"
+ *                   << std::endl;
+ * 
+ *         A.print(std::cout, 10, 5);
+ * 
+ *         std::cout << std::endl;std::cout << std::endl;
+ *     }
+ * #endif
+ * 
+ * }
+ * 
+@endcode
+ <a name="plain-Functionrun"></a>
+@code
+ * template<typename Number>
+ * void CholeskyTest<Number>::run()
+ * {
+ *     this->setup_and_assemble_test_matrix();
+ * 
+ *     QTime t;
+ *     double cpu_time, gpu_time;
+ * 
+ *     FullMatrixAccessor<Number> A_h_cpu(A, true);
+ *     {
+ *         t.restart();
+ * 
+ * 
+ *         Cholesky::cpu_tiled<Number>(A_h_cpu.val(), A_h_cpu.n_rows() );
+ * 
+ * 
+ *         cpu_time =  t.elapsed()/1000.;
+ *         if (false)
+ *         qDebug("Time for CPU-based Cholesky factorization : %f s",
+ *                cpu_time);
+ * 
+ *         this->speedup_table.add_value("CPU factorization", cpu_time);
+ *         this->speedup_table.set_precision("CPU factorization", 10);
+ * 
+ * 
+ *         std::cout << "CPU-factorized Matrix (lower triangle contains "
+ *                   << "transposed Cholesky factor) :" << std::endl;
+ *         std::cout << "----------------------------------------------------"
+ *                   << std::endl;
+ * 
+ *         if ( A.n_rows() < max_display_size)
+ *             A_h_cpu.print(); //std::cout, 10, 5);
+ * 
+ *     }
+ * 
+ *     std::cout << std::endl;std::cout << std::endl;
+ * 
+ * 
+ *     Assert( A.n_rows() == A.n_cols(),
+ *             dealii::ExcMessage("Matrix not square! Cholesky impossible"));
+ * 
+ * 
+ *     double kernel_time = 0;
+ * 
+ *     CUDADriver<Number> run(*params);
+ *     t.restart();
+ *     {
+ *         FullMatrixAccessor<Number> A_h(A, true);
+ *         kernel_time = run.factorize(A_h);
+ * 
+ *         gpu_time =  t.elapsed()/1000.;
+ * 
+ *         if (false)
+ *         qDebug("Time for GPU-based Cholesky factorization %f"
+ *                " including data transfer : %f s\n"
+ *                "speed up factor factorization : %f netto : %f n_rows : %d\n",
+ *                kernel_time,
+ *                gpu_time,
+ *                cpu_time/kernel_time,
+ *                cpu_time/gpu_time,
+ *                n_rows);
+ * 
+ * 
+ *         std::cout << "GPU-factorized Matrix (lower triangle contains "
+ *                   << "transposed Cholesky factor) :" << std::endl;
+ *         std::cout << "----------------------------------------------------"
+ *                   << std::endl;
+ * 
+ *         if ( A_h.n_rows() < max_display_size)
+ *             A_h.print(); //std::cout, 10, 5);
+ * 
+ *         A_h_cpu -= A_h;
+ * 
+ *         std::cout << "difference of factorized matrices "
+ *                         << " :" << std::endl;
+ *               std::cout << "----------------------------------------------------"
+ *                         << std::endl;
+ * 
+ *               if ( A_h_cpu.n_rows() < max_display_size)
+ *                   A_h_cpu.print(); //std::cout, 10, 5);
+ * 
+ *               double F_norm =  A_h_cpu.frobenius_norm();
+ * 
+ *         std::cout << "||A_cpu - A_d ||_F = " << F_norm << "\n"
+ *                   << "||A_cpu - A_d ||_F/n_el = " << F_norm/A_h_cpu.n_elements() << "\n"
+ *                   << "||A_cpu - A_d ||_F/||A_d||_F = " << F_norm/A_h.frobenius_norm() << std::endl;
+ * 
+ *     }
+ * 
+ *     this->speedup_table.add_value("pure GPU fac", kernel_time);
+ *     this->speedup_table.set_precision("pure GPU fac", 10);
+ * 
+ *     this->speedup_table.add_value("GPU fac incl data transfer", gpu_time);
+ *     this->speedup_table.set_precision("GPU fac incl data transfer", 10);
+ * 
+ *     FullMatrixAccessor<Number> A_h(A, true);
+ *     FullMatrixAccessor<Number> A_original = A_h;
+ * 
+ *     {
+ *         typename CUDADriver<Number>::TimerName2Value times;
+ * 
+ *         run.chol_fac(A_h, times);
+ * 
+ * 
+ *         typename CUDADriver<Number>::TimerName2Value::const_iterator
+ *                 e=times.begin(),
+ *                 end_t=times.end();
+ * 
+ *         for( ; e != end_t ; ++e)
+ *         {
+ *             this->speedup_table.add_value(e->first, e->second);
+ *             this->speedup_table.set_precision(e->first,10);
+ *         }
+ *     }
+ *     return;
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Functioncpu_tiled"></a>
+@code
+ * template<typename T>
+ * void Cholesky::cpu_tiled(T* A,
+ *                          int tile_size)
+ * {
+ * 
+ *     for (int r = 0; r < tile_size; ++r)
+ *     {
+ *         T sum = 0.;
+ *         int idx;
+ *         int idx_c;
+ * 
+ *         for (int u = 0; u < r; ++u)
+ *         {
+ *             idx = r*tile_size + u;
+ *             sum += A[idx] * A[idx];
+ *         }
+ *         idx = r*tile_size + r;
+ *         A[idx] = sqrt(A[idx] - sum);
+ * 
+ *         for (int c = r+1; c < tile_size; ++c)
+ *         {
+ *             T tmp = 0.;
+ * 
+ *             for (int u = 0; u < r; ++u)
+ *             {
+ *                 idx_c = c*tile_size + u;
+ *                 idx   = r*tile_size + u;
+ *                 tmp += A[idx_c]*A[idx];
+ *             }
+ * 
+ *             idx_c = c*tile_size + r;
+ *             idx   = r*tile_size + c;
+ *             A[idx_c]  = A[idx] - tmp;
+ *             A[idx_c] /= A[r*tile_size + r];
+ *         }
+ *     }
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-FunctionLLtMult"></a>
+@code
+ * template<typename T>
+ * void Cholesky::LLtMult(T * A, const T * L, int n_rows)
+ * {
+ *     for (unsigned int r = 0; r < n_rows; ++r)
+ *         for (unsigned int c = 0; c <=r; ++c)
+ *         {
+ *             unsigned int idx = c + (r*(r+1))/2;
+ *             unsigned int k_max = std::min(r,c);
+ * 
+ *             A[idx] = 0.;
+ * 
+ *             for (unsigned int k = 0; k < k_max; ++k)
+ *             {
+ *                 unsigned int idx_k   = k + (r*(r+1))/2;
+ *                 unsigned int idx_k_T = k + (c*(c+1))/2;
+ * 
+ *                 A[idx] += L[idx_k]*L[idx_k_T];
+ *             }
+ *         }
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-ClassMyFancySimulation"></a>
+@code
+ * template<typename Number>
+ * class MyFancySimulation {
+ * 
+ * public:
+ * 
+ *     MyFancySimulation(SimParams &p);
+ * 
+ *     void run();
+ * 
+ *     static std::string precision_id();
+ * 
+ * private:
+ *     const SimParams * params;
+ * 
+ * };
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Constructor"></a>
+@code
+ * template <typename Number>
+ * step1::MyFancySimulation<Number>::MyFancySimulation(SimParams &p)
+ *     :
+ *       params(&p)
+ * {
+ *     cudaSetDevice(params->device); 
+ * }
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionprecision_id"></a>
+@code
+ * template<>
+ * std::string MyFancySimulation<float>::precision_id()
+ * {
+ *     return "float";
+ * }
+ * 
+ * template<>
+ * std::string MyFancySimulation<double>::precision_id()
+ * {
+ *     return "double";
+ * }
+ * 
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Functionrun"></a>
+@code
+ * template<typename Number>
+ * void step1::MyFancySimulation<Number>::run()
+ * {   
+ * 
+ *     std::ostringstream filename;
+ * 
+ *     filename << "chol_fac_times_" << params->matrix_low << "_" << precision_id().c_str() << ".dat";
+ * 
+ * 
+ *     dealii::ConvergenceTable factorization_times;
+ * 
+ *     for (int n = params->matrix_low; n < params->matrix_high; n+=params->step_size)
+ *     {
+ *         CholeskyTest<Number> driver(n, factorization_times, *params);
+ * 
+ *         driver.start();
+ *         / * driver.run();* /
+ *         driver.wait();
+ * 
+ *         std::ofstream out(filename.str().c_str());
+ *         factorization_times.write_text(out);
+ *     }
+ * 
+ *     std::cout << "Done." << std::endl;
+ * }
+ * 
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Funktionmain"></a>
+@code
+ * int main(int argc, char *argv[])
+ * {
+ *     using namespace step1;
+ * 
+ *     SimParams params;
+ * 
+ *     dealii::ParameterHandler prm_handler;
+ * 
+ *     QDir cwd = QDir::current();
+ * 
+ *     const QDir launch_dir = cwd;
+ *     cwd.setPath("../step-1");
+ * 
+ *     std::string prm_filename;
+ *     if (argc == 1)
+ *     {
+ *         std::string tmp = argv[0];
+ *         int found=tmp.find_last_of('/');
+ *         prm_filename = tmp.substr(found+1);
+ *         prm_filename += "-Decomp.prm";
+ * 
+ *         cwd.setPath("./prm");
+ *     }
+ *     else
+ *     {
+ *         QFileInfo tmp(argv[1]);
+ * 
+ *         QString prm_path = tmp.absolutePath();
+ *         cwd.setPath(prm_path);
+ *         cwd.makeAbsolute();
+ *         prm_filename = tmp.fileName().toStdString();
+ * 
+ *         std::cout << "chosen prm file : " << tmp.absoluteFilePath().toStdString().c_str() << std::endl;
+ *     }
+ * 
+ *     if (!cwd.exists() )
+ *         launch_dir.mkpath( cwd.absolutePath() );
+ * 
+ *     QDir::setCurrent(cwd.absolutePath());
+ *     SimParams::declare(prm_handler);
+ *     prm_handler.read_input (prm_filename);
+ * 
+ *     QDir::setCurrent(launch_dir.absolutePath());
+ * 
+ *     params.get(prm_handler);
+ * 
+ *     cwd.setPath(params.run_dir.absolutePath());
+ *     if (!cwd.exists())
+ *         cwd.mkpath( "." );
+ * 
+ *     QDir::setCurrent(cwd.absolutePath());
+ * 
+ *     cwd.setPath("./log");
+ *     cwd.makeAbsolute();
+ *     if (!cwd.exists())
+ *         cwd.mkpath(".");
+ * 
+ *     QDir::setCurrent(cwd.absolutePath());
+ * 
+ *     prm_filename += ".log";
+ *     std::ofstream log_out_text(prm_filename.c_str());
+ *     prm_handler.print_parameters (log_out_text,
+ *                                   dealii::ParameterHandler::Text);
+ * 
+ *     QDir::setCurrent(params.run_dir.absolutePath());
+ * 
+ * 
+ *     if (!params.use_double) {
+ * 
+ *         MyFancySimulation<float> machma_float(params);
+ * 
+ *         machma_float.run();
+ *     }
+ *     else {
+ * 
+ *         MyFancySimulation<double> machma_double(params);
+ * 
+ *         machma_double.run();
+ *     }
+ * }
+ * 
+ * 
+ * 
+ @endcode

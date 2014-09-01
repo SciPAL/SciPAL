@@ -1,0 +1,737 @@
+ * <a name="PlainProg"></a>
+ * <h1> The plain program</h1>
+ * 
+ * (If you are looking at a locally installed CUDA HPC Praktikum version, then the
+ * program can be found at <i>
+ *  .. /.. /testsite / /step-42 /step-cu.cc
+ * </i>. Otherwise, this is only
+ * the path on some remote server.)
+ @code
+
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #include <iostream>
+ * #include <vector>
+ * 
+ * #include <cuda_driver_step-42.h>
+ * #include <cuda_driver_step-42.hh>
+ * 
+ * #include <SimParams.h>
+ * 
+ * 
+ * #include <deal.II/lac/vector.h>
+ * 
+ * 
+ * namespace step42 {
+ * 
+@endcode
+ <a name="plain-ClassGPUInfo"></a>
+@code
+ * struct GPUInfo {
+ * 
+ *     int n_CUDA_devices;
+ * 
+ *     int current_device_id;
+ * 
+ *     cudaDeviceProp prop;
+ * 
+ * 
+ *     GPUInfo(int DevNo)
+ *         :
+ *           current_device_id(DevNo)
+ *     {
+ * 
+ *     }
+ * 
+@endcode
+ <a name="plain-Functionget"></a>
+@code
+ *     void get()
+ *     {
+ *         static const int KB = 1024;
+ *         static const int MB = KB*KB;
+ * 
+ *         std::cout << "current device ID : " << this->current_device_id << std::endl;
+ * 
+ *         cudaGetDeviceProperties(&prop, this->current_device_id);
+ * 
+ *         printf("Currently used GPU: %s \n",prop.name);
+ *         printf("Compute Capability: %d.%d \n",prop.major,prop.minor);
+ *         printf("ClockRate: %uMHz \n",prop.clockRate/1000);
+ *         printf("Warpsize: %d \n",prop.warpSize);
+ *         printf("Number of Multiprocessors: %d \n",prop.multiProcessorCount);
+ * 
+ *         printf("Shared Memory: %luKB\n",prop.sharedMemPerBlock/KB);
+ *         printf("Constant Memory: %luKB \n",prop.totalConstMem/KB);
+ *         printf("Global Memory: %luMB \n",prop.totalGlobalMem/MB);
+ *         printf("the device %s concurrently copy memory between host and device while executing a kernel\n",
+ *                (prop.deviceOverlap? "can": "cannot"));
+ *     }
+ * 
+ * private:
+ *     GPUInfo (const GPUInfo & / *other* /) {}
+ * 
+ *     GPUInfo & operator = (const GPUInfo & / *other* /) { return *this; }
+ * 
+ * };
+ * 
+ * 
+@endcode
+ <a name="plain-ClassMyFancySimulation"></a>
+@code
+ * class MyFancySimulation {
+ * 
+ * public:
+ * 
+ *     MyFancySimulation(int argc, char *argv[], GPUInfo &g);
+ * 
+ *     void run();
+ * 
+ * private:
+ *     GPUInfo & gpuinfo;
+ * 
+ * protected:
+ *     SimParams params;
+ * };
+ * 
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-ConstructorMyFancySimulation"></a>
+@code
+ * step42::MyFancySimulation::MyFancySimulation(int argc,
+ *                                                    char *argv[],
+ *                                                    step42::GPUInfo &g)
+ *     : gpuinfo(g)
+ * {
+ *     cudaGetDeviceCount(&gpuinfo.n_CUDA_devices);
+ *     std::cout
+ *             << "N available CUDA devices : "
+ *             << gpuinfo.n_CUDA_devices << std::endl;
+ * 
+ *     dealii::ParameterHandler prm_handler;
+ * 
+ *    SimParams::declare(prm_handler);
+ * 
+ *     QDir cwd = QDir::current();
+ * 
+ *     QDir launch_dir = cwd;
+ * 
+ *     std::string prm_filename;
+ *     if (argc == 1)
+ *     {
+ *         prm_filename  = argv[0];
+ *         prm_filename += ".prm";
+ * 
+ *         cwd.setPath("./prm");
+ *     }
+ *     else
+ *     {
+ *         std::cout << "Given parameter file : " << argv[1] << std::endl;
+ * 
+ *         QFileInfo tmp(argv[1]);
+ * 
+ *         if(!tmp.exists())
+ *         {
+ *             std::cerr << "The following parameter file does not exist:\n"
+ *                       << argv[1] << std::endl;
+ * 
+ *             qFatal("Cannot proceed without proper path to paramter file");
+ *         }
+ * 
+ *         QString prm_path = tmp.absolutePath();
+ *         cwd.setPath(prm_path);
+ *         cwd.makeAbsolute();
+ *         prm_filename = tmp.fileName().toStdString();
+ * 
+ *         std::cout << "Parameter file path : "
+ *                   << tmp.absolutePath().toStdString().c_str()
+ *                   << std::endl;
+ *     }
+ * 
+ *     std::cout << "Parameter file : " << prm_filename  << std::endl;
+ * 
+ *     if (!cwd.exists() )
+ *         launch_dir.mkpath( cwd.absolutePath() );
+ * 
+ *     QDir::setCurrent(cwd.absolutePath());
+ * 
+ *     prm_handler.read_input (prm_filename);
+ * 
+ *     QDir::setCurrent(launch_dir.absolutePath());
+ * 
+ *     this->params.get(prm_handler);
+ * 
+ *     cwd.setPath(this->params.run_dir.absolutePath());
+ * 
+ *     if (!cwd.exists())
+ *         cwd.mkpath( "." );
+ * 
+ *     QDir::setCurrent(cwd.absolutePath());
+ * 
+ *     cwd.setPath("./log");
+ *     cwd.makeAbsolute();
+ *     if (!cwd.exists())
+ *         cwd.mkpath(".");
+ * 
+ *     QDir::setCurrent(cwd.absolutePath());
+ * 
+ *     prm_filename += ".log";
+ *     std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
+ *     prm_handler.print_parameters (log_out_text,
+ *                                   dealii::ParameterHandler::Text);
+ * 
+ *     QDir::setCurrent(this->params.run_dir.absolutePath());
+ * }
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionrun"></a>
+@code
+ * void step42::MyFancySimulation::run()
+ * {
+ * 
+ *     step42::CUDADriver testcase;
+ * 
+ *     testcase.gemm_tests();
+ * 
+ *     testcase.gemv_tests();
+ * 
+ *     testcase.complex_tests();
+ * 
+ *     testcase.feature_demonstration();
+ * 
+ *     std::cout << "Done." << std::endl;
+ * }
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functionmain"></a>
+@code
+ * int main(int argc, char *argv[])
+ * {
+ *     using namespace step42;
+ * 
+ *     int n_CUDA_devices;
+ * 
+ *     cudaGetDeviceCount(&n_CUDA_devices);
+ *     std::cout
+ *             << "N available CUDA devices : "
+ *             <<  n_CUDA_devices
+ *             << std::endl;
+ * 
+ *     int DevNo = 0;
+ *     cudaSetDevice(DevNo);
+ *     GPUInfo gpu_info(DevNo);
+ * 
+ *     gpu_info.get();
+ * 
+ *     MyFancySimulation machma(argc, argv, gpu_info);
+ * 
+ *     machma.run();
+ * 
+ * }
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #ifndef CUDADriver_STEP_42_H
+ * #define CUDADriver_STEP_42_H
+ * 
+ * #include <lac/release/blas_wrapper.hh>
+ * #include <lac/release/cublas_wrapper.hh>
+ * #include <base/CudaComplex.h>
+ * 
+ * namespace step42 {
+ * 
+@endcode
+ <a name="plain-ClassCUDADriver"></a>
+@code
+ * class CUDADriver {
+ * 
+ *     typedef double Number;
+ *     typedef SciPAL::CudaComplex<Number> cplxNumber;
+ * 
+ *     typedef cublas BW;
+ * 
+ * public:
+ * 
+ *     CUDADriver();
+ * 
+ *     ~CUDADriver() { BW::Shutdown(); }
+ * 
+ *     void gemm_tests();
+ * 
+ *     void gemv_tests();
+ * 
+ *     void complex_tests();
+ * 
+ *     void feature_demonstration();
+ * 
+ * private:
+ * 
+ * 
+ * };
+ * 
+ * } // namespace step42 END
+ * 
+ * #endif // CUDADriver_STEP_42_H
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * #ifndef CUDA_DRIVER_STEP_42_HH
+ * #define CUDA_DRIVER_STEP_42_HH
+ * 
+ * 
+ * #include <cuda_driver_step-42.h>
+ * #include <cuda_kernel_wrapper_step-42.cu.h>
+ * 
+ * 
+ * 
+ * #include <lac/development/cublas_Matrix.h>
+ * 
+ * 
+ * #include <lac/development/cublas_Vector.h>
+ * #include <lac/blas++.h>
+ * #include <base/CudaComplex.h>
+ * 
+ * #include <cuda_runtime_api.h>
+ * 
+ * 
+@endcode
+ <a name="plain-ConstructorCUDADriver"></a>
+@code
+ * step42::CUDADriver::CUDADriver() {
+ * 
+ *     BW::Init();
+ * }
+ * 
+ * 
+ * 
+ * 
+@endcode
+ <a name="plain-Functiongemm_tests"></a>
+@code
+ * void step42::CUDADriver::gemm_tests()
+ * {
+ * 
+ *     const unsigned int n_rows = 4;
+ *     const unsigned int n_cols = 3;
+ *     const unsigned int n_elements = n_rows * n_cols;
+ * 
+ *     std::vector<Number>
+ *             a(n_elements, 1.),
+ *             b(n_elements, 2.),
+ *             c(n_rows * n_rows, 1.23);
+ * 
+ *     for (unsigned int i = 0; i < b.size(); i++ )
+ *         b[i] = i+1;
+ * 
+ * 
+ *     SciPAL::Matrix<Number, BW>
+ *             A(n_rows, n_cols, a),
+ *             B(n_cols, n_rows, b),
+ *             C(n_rows, n_rows, c);
+ * 
+ *      Number alpha = 1.1;
+ *      Number beta = 2.;
+ * 
+ *      std::cout << "A : " << std::endl;
+ *      A.print();
+ * 
+ *      std::cout << "B : " << std::endl;
+ *      B.print();
+ * 
+ *      std::cout << "C : " << std::endl;
+ *      C.print();
+ * 
+ * 
+ * 
+ *      std::cout << " ============ C = " << alpha << " * A ======" << std::endl;
+ *      C = alpha * A; // * B + beta * C;
+ *        std::cout << "C : " << std::endl;
+ *      C.print();
+ * 
+ *      std::cout << " ============ C = A * B ======" << std::endl;
+ *      C = A * B;   std::cout << "C : " << std::endl; C.print();
+ * 
+ *      std::cout << " ============ C = B * A ======" << std::endl;
+ *      C = B * A;   std::cout << "C : " << std::endl; C.print();
+ * 
+ *      std::cout << " ============ C = alpha * A * B ======" << std::endl;
+ *      C = alpha * A * B; std::cout << "C : " << std::endl; C.print();
+ * 
+ * 
+ *      std::cout << " ============ C = " << alpha << " * A * B + "<<"C======" << std::endl;
+ *      c.clear();
+ *      c.resize(n_rows * n_rows, 1.);
+ *      SciPAL::Matrix<Number, BW>
+ *              D(n_rows, n_rows, c);
+ * 
+ * 
+ * 
+ *      C = D;
+ *      std::cout << "C : " << std::endl; C.print();
+ *      C = alpha * A * B + // beta *
+ *              C; std::cout << "C : " << std::endl; C.print();
+ * 
+ * 
+ *      std::cout << " ============ C = " << alpha << " * A * B + "  << beta  << " * C======" << std::endl;
+ *      C = D;
+ *      std::cout << "C : " << std::endl; C.print();
+ * 
+ *      C = alpha * A * B + beta * C;
+ *      std::cout << "C : " << std::endl; C.print();
+ * }
+ * 
+ * 
+@endcode
+ <a name="plain-Functiongemv_tests"></a>
+@code
+ * void step42::CUDADriver::gemv_tests()
+ * {
+ * #ifndef nUSE_ARRAY_EXPRESSIONS
+ *      const unsigned int n_rows = 4;
+ *      const unsigned int n_cols = 4;
+ *      const unsigned int n_elements = n_rows * n_cols;
+ * 
+ *      Number alpha = 1.1;
+ *      Number beta = 2.;
+ * 
+ *      std::vector<Number>
+ *                 a(n_elements, 1.),
+ *                 b(n_elements, 2.);
+ * 
+ * 
+ *      for (unsigned int i = 0; i < a.size(); i++ )
+ *          a[i] = i+1;
+ * 
+ *      SciPAL::Vector<Number, BW> vA, vB(n_elements), vC;
+ *        vA = a;
+ *        vB = SciPAL::Literal<Number>(2.3);
+ *        vC = a;
+ * 
+ * 
+ *        std::cout << "vA : " << std::endl;
+ *        vA.print();
+ * 
+ *        std::cout << "vB : " << std::endl;
+ *        vB.print();
+ * 
+ *        std::cout << " ============ vC = " << alpha << " * vA ======" << std::endl;
+ *        vC = alpha * vA;
+ *          std::cout << "vC : " << std::endl;
+ *        vC.print();
+ * 
+ *        std::cout << " ============ vC = " << alpha << " * vA + vB ======" << std::endl;
+ *        vC = alpha * vA + vB;
+ *          std::cout << "vC : " << std::endl;
+ *        vC.print();
+ * 
+ *        std::cout << " ============ vA = sin(vC) ======" << std::endl;
+ *        const unsigned int n_sin_elements = n_elements;
+ *        std::vector<Number> d(n_sin_elements);
+ *        for(uint i = 0; i < d.size(); i++)
+ *            d[i] = i* 2.* M_PI / d.size();
+ * 
+ *        SciPAL::Vector<Number, BW> vD; vD = d; //(n_sin_elements, 1, d);
+ *       vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
+ *          std::cout << "sin(vD) : " << std::endl;
+ *        vD.print();
+ * 
+ * 
+ *        SciPAL::Matrix<Number, BW>
+ *                A(n_rows, n_cols, d);
+ *        A = sin(A);
+ *        A.print();
+ * 
+ * 
+ *        std::cout << " ============ linear combination test ======" << std::endl;
+ *        vC = 2.0 * vA;
+ *        std::cout << "vC = 2.0 * vA" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ *        vC = vA + vB;
+ *        std::cout << "vC = vA + vB" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ *        vC = vA + 2.0 * vB;
+ *        std::cout << "vC = vA + 2.0 * vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = 2.0 * vA + 3.0 * vB;
+ *        std::cout << "vC = 2.0 * vA + 3.0 * vB" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ *        vC =sin(2.0 * vA + 3.0 * vB);
+ *        std::cout << "vC = sin(2.0 * vA + 3.0 * vB)" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = sqrt(vC);
+ *        std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = vA && vB;
+ *        std::cout << "vC = vA .* vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = vA || vB;
+ *        std::cout << "vC = vA ./ vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = (vA + vB) || (vA - vB);
+ *        std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ * #endif
+ * }
+ * 
+ * void step42::CUDADriver::complex_tests()
+ * {
+ *     std::cout<<"Entering tests for complex number array exptessions."<<std::endl;
+ * #ifndef nUSE_ARRAY_EXPRESSIONS
+ *      const unsigned int n_rows = 4;
+ *      const unsigned int n_cols = 4;
+ *      const unsigned int n_elements = n_rows * n_cols;
+ * 
+ *      SciPAL::CudaComplex<Number> alpha(1.1);
+ *      SciPAL::CudaComplex<Number> beta (2.);
+ * 
+ *      std::vector<std::complex<Number> >
+ *                 a(n_elements, 1.),
+ *                 b(n_elements, std::complex<Number>(2., 2.0));
+ * 
+ * 
+ *      for (unsigned int i = 0; i < a.size(); i++ )
+ *          a[i] = std::complex<Number>(i+1, (i+1)/2.); //generate some inputs
+ * 
+ *        SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vA, vB, vC;
+ *        vA = a;
+ *        vB = b;
+ *        vC = a;
+ * 
+ *        std::cout << "vA : " << std::endl;
+ *        vA.print();
+ * 
+ *        std::cout << "vB : " << std::endl;
+ *        vB.print();
+ * 
+ *        std::cout << " ============ vC = " << alpha.real() << " * vA ======" << std::endl;
+ *        vC = alpha * vA;
+ *          std::cout << "vC : " << std::endl;
+ *        vC.print();
+ * 
+ *        std::cout << " ============ vC = " << alpha.real() << " * vA + vB ======" << std::endl;
+ *        vC = alpha * vA + vB;
+ *          std::cout << "vC : " << std::endl;
+ *        vC.print();
+ * 
+ *        std::cout << " ============ vA = sin(vC) ======" << std::endl;
+ *        const unsigned int n_sin_elements = n_elements;
+ *        std::vector<std::complex<Number> > d(n_sin_elements);
+ *        for(uint i = 0; i < d.size(); i++)
+ *            d[i] = std::complex<Number>(i* 2.* M_PI / d.size(), i* 4.* M_PI / d.size()) ;
+ * 
+ *        SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vD; vD = d; //(n_sin_elements, 1, d);
+ *       vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
+ *          std::cout << "sin(vD) : " << std::endl;
+ *        vD.print();
+ * 
+ *        std::cout << " ============ Matrix A = sin(A) ======" << std::endl;
+ *        SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW>
+ *                A(n_rows, n_cols, d);
+ *        A = sin(A);
+ *        A.print();
+ * 
+ *        std::cout << " ============ Matrix B = sqrt(A) ======" << std::endl;
+ *        SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW>
+ *                B(A);
+ *        B = sqrt(A);
+ *        B.print();
+ * 
+ *        std::cout << " ============ Matrix A = .exp(B) ======" << std::endl;
+ *        A = exp(B);
+ *        A.print();
+ * 
+ *        std::cout << " ============ Matrix A = B*C ======" << std::endl;
+ *        SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW>
+ *                C(A);
+ *        A = B*C;
+ *        A.print();
+ * 
+ * 
+ *        std::cout << " ============ linear combination test ======" << std::endl;
+ * 
+ *        vC = beta * vA; ;
+ *        std::cout << "vC = 2.0 * vA" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ *        vC = vA + vB;
+ *        std::cout << "vC = vA + vB" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ *        vC = vA + beta * vB;
+ *        std::cout << "vC = vA + 2.0 * vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = cplxNumber(2.0) * vA + cplxNumber(3.0) * vB;
+ *        std::cout << "vC = 2.0 * vA + 3.0 * vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC =sin(cplxNumber(2.0) * vA + cplxNumber(3.0) * vB);
+ *        std::cout << "vC = sin(2.0 * vA + 3.0 * vB)" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = sqrt(vC);
+ *        std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = vA && vB;
+ *        std::cout << "vC = vA .* vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = vA || vB;
+ *        std::cout << "vC = vA ./ vB" << std::endl;
+ *        vC.print();
+ * 
+ *        vC = (vA + vB) || (vA - vB);
+ *        std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
+ *        vC.print();
+ * 
+ * 
+ * #endif
+ * }
+ * 
+ * 
+ * void step42::CUDADriver::feature_demonstration()
+ * {
+ *     Number * bla = new Number[3];
+ *     Number * bla2 = new Number[3];
+ *     Number * bla3 = new Number[3];
+ *     std::vector<Number*> h_testV(5);
+ *     h_testV[0] = bla; std::cout<<"ptr1 " << bla << std::endl;
+ *     h_testV[1] = bla2;std::cout<<"ptr2 " << bla2 << std::endl;
+ *     h_testV[2] = bla3;std::cout<<"ptr3 " << bla3 << std::endl;
+ * 
+ *     SciPAL::Vector<Number*, cublas> d_testV(5);
+ * 
+ *  d_testV = h_testV;
+ *  d_testV.print();
+ * 
+ * 
+ * 
+ * 
+ * }
+ * 
+ * #endif // CUDA_DRIVER_STEP_42_HH
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * 
+ * 
+ * 
+ * / *This file is part of SciPAL.
+ * 
+ *     SciPAL is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * 
+ *     SciPAL is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Lesser General Public License for more details.
+ * 
+ *     You should have received a copy of the GNU Lesser General Public License
+ *     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
+ * * /
+ * 
+ * 
+ * 
+ * 
+ * 
+ @endcode

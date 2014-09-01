@@ -1,0 +1,50 @@
+    <ul>
+      <ul>
+        <li><a href="#plain-Functionmain">Function: main</a>
+      </ul>
+        <li><a href="#plain-ClassMyFancySimulation">Class: MyFancySimulation</a>
+      <ul>
+        <li><a href="#plain-ConstructorMyFancySimulation">Constructor: MyFancySimulation</a>
+        <li><a href="#plain-Functionrun">Function: run</a>
+        <li><a href="#plain-Functionsave_results">Function: save_results</a>
+      </ul>
+        <li><a href="#plain-EnumMVCase">Enum: MVCase</a>
+        <li><a href="#plain-structSimUIParams">struct: SimUIParams</a>
+        <li><a href="#plain-ClassTestUIParamsBase">Class: TestUIParamsBase</a>
+        <li><a href="#plain-ClassMVTestUIParams">Class: MVTestUIParams</a>
+        <li><a href="#plain-ClassMVTest">Class: MVTest</a>
+      <ul>
+        <li><a href="#plain-Constructor">Constructor</a>
+        <li><a href="#plain-Destructor">Destructor</a>
+        <li><a href="#plain-Functionrun">Function: run</a>
+        <li><a href="#plain-Functionsetup_and_assemble">Function: setup_and_assemble</a>
+      </ul>
+        <li><a href="#plain-ClassMVMultDriverInterface">Class: MVMultDriverInterface</a>
+      <ul>
+        <li><a href="#plain-Functionmvmult">Function: mvmult</a>
+      </ul>
+        <li><a href="#plain-ClassCpuBlasDriver">Class: CpuBlasDriver</a>
+      <ul>
+        <li><a href="#plain-Functionmvmult">Function: mvmult</a>
+      </ul>
+        <li><a href="#plain-ClassCUBlasDriver">Class: CUBlasDriver</a>
+      <ul>
+        <li><a href="#plain-ConstructorCUBlasDriver">Constructor: CUBlasDriver</a>
+        <li><a href="#plain-DestructorCUBlasDriver">Destructor: CUBlasDriver</a>
+        <li><a href="#plain-Functionmvmult">Function: mvmult</a>
+      </ul>
+        <li><a href="#plain-ClassFujimotoDriver">Class: FujimotoDriver</a>
+      <ul>
+        <li><a href="#plain-Functionmvmult">Function: mvmult</a>
+      </ul>
+        <li><a href="#plain-DeclarationofCUDAInterface">Declaration of CUDA Interface</a>
+        <li><a href="#plain-ClassKernels">Class: Kernels</a>
+        <li><a href="#plain-Kernels">Kernels</a>
+      <ul>
+        <li><a href="#plain-Kernel_mv_fujimoto">Kernel: _mv_fujimoto</a>
+        <li><a href="#plain-Kernel_mv_fujimoto_T">Kernel: _mv_fujimoto_T</a>
+        <li><a href="#plain-Kernel_mv_fujimoto_T2">Kernel: _mv_fujimoto_T2</a>
+        <li><a href="#plain-Kernel_mv_fujimoto_T3">Kernel: _mv_fujimoto_T3</a>
+        <li><a href="#plain-Functionmv_fujimoto">Function: mv_fujimoto</a>
+      </ul>
+      </ul>

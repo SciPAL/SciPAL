@@ -1,0 +1,78 @@
+    <ul>
+        <li><a href="#plain-ClassWaveForms">Class: WaveForms</a>
+      <ul>
+        <li><a href="#plain-Functiongenerate_waveforms">Function: generate_waveforms</a>
+        <li><a href="#plain-Functionnormalize_waveforms">Function: normalize_waveforms</a>
+        <li><a href="#plain-Functionoriginal_waveforms">Function: original_waveforms</a>
+      </ul>
+        <li><a href="#plain-Declarationsofthekernelwrapperfunctions">Declarations of the kernel-wrapper-functions</a>
+        <li><a href="#plain-Kernel__subtract_array_from_matrix">Kernel: __subtract_array_from_matrix</a>
+        <li><a href="#plain-Kernel__MM_scalar">Kernel: __MM_scalar</a>
+        <li><a href="#plain-Kernel__Det">Kernel: __Det</a>
+        <li><a href="#plain-Kernel__P_ij">Kernel: __P_ij</a>
+        <li><a href="#plain-Kernel__u_ij">Kernel: __u_ij</a>
+        <li><a href="#plain-Kernel__z_ij">Kernel: __z_ij</a>
+      <ul>
+        <li><a href="#plain-Functionreduction">Function: reduction</a>
+      </ul>
+        <li><a href="#plain-Kernel__sum_array">Kernel: __sum_array</a>
+        <li><a href="#plain-Kernel__sum_log_array">Kernel: __sum_log_array</a>
+        <li><a href="#plain-Kernel__sum_array2D">Kernel: __sum_array2D</a>
+        <li><a href="#plain-Kernel__y">Kernel: __y</a>
+        <li><a href="#plain-Kernel__MxM">Kernel: __MxM</a>
+        <li><a href="#plain-Kernel__SMX">Kernel: __SMX</a>
+      <ul>
+        <li><a href="#plain-Functionsubtract_array_from_matrix">Function:subtract_array_from_matrix</a>
+        <li><a href="#plain-FunctionMM_scalar">Function: MM_scalar</a>
+        <li><a href="#plain-FunctionDet">Function: Det</a>
+        <li><a href="#plain-Functionassemble_P_ij">Function: assemble_P_ij</a>
+        <li><a href="#plain-Functionassemble_u_ij">Function: assemble_u_ij</a>
+        <li><a href="#plain-Functionassemble_z_ij">Function: assemble_z_ij</a>
+        <li><a href="#plain-Functioncalculate_y">Function: calculate_y</a>
+        <li><a href="#plain-Functionsum_array">Function: sum_array</a>
+        <li><a href="#plain-Functionsum_matrix_cols">Function: sum_matrix_cols</a>
+        <li><a href="#plain-Functionsum_array2D">Function: sum_array2D</a>
+        <li><a href="#plain-FunctionMxM">Function: MxM</a>
+        <li><a href="#plain-FunctionSMX">Function: SMX</a>
+      </ul>
+        <li><a href="#plain-ClassShohamEM">Class: ShohamEM</a>
+        <li><a href="#plain-ClassKernelTest">Class: KernelTest</a>
+        <li><a href="#plain-StructRightMSolve">Struct: RightMSolve</a>
+      <ul>
+        <li><a href="#plain-Operator">Operator: = </a>
+      </ul>
+        <li><a href="#plain-StructRightMSolveTr">Struct: RightMSolveTr</a>
+      <ul>
+        <li><a href="#plain-Operator">Operator: = </a>
+        <li><a href="#plain-Operator">Operator: *</a>
+        <li><a href="#plain-Operator">Operator: *</a>
+        <li><a href="#plain-ConstructorShohamEM">Constructor: ShohamEM</a>
+        <li><a href="#plain-Functiondump">Function: dump</a>
+        <li><a href="#plain-Functionrun_Shoham">Function: run_Shoham</a>
+        <li><a href="#plain-Functioninitialize_Shoham">Function: initialize_Shoham</a>
+        <li><a href="#plain-Functione_step_Shoham">Function: e_step_Shoham</a>
+        <li><a href="#plain-Functionm_step_Shoham">Function: m_step_Shoham</a>
+        <li><a href="#plain-Functionpurge_step_Shoham">Function: purge_step_Shoham</a>
+        <li><a href="#plain-DestructorShohamEM">Destructor : ~ShohamEM</a>
+        <li><a href="#plain-ConstructorKernelTest">Constructor: KernelTest</a>
+        <li><a href="#plain-Functionrun">Function: run</a>
+        <li><a href="#plain-DestructorKernelTest">Destructor : ~KernelTest</a>
+      </ul>
+        <li><a href="#plain-ClassSimParams">Class: SimParams</a>
+        <li><a href="#plain-ClassPCA">Class: PCA</a>
+        <li><a href="#plain-ClassMyFancySimulation">Class: MyFancySimulation</a>
+      <ul>
+        <li><a href="#plain-ConstructorPCA">Constructor: PCA</a>
+        <li><a href="#plain-Functionrun">Function: run</a>
+        <li><a href="#plain-Functionfactorize">Function: factorize</a>
+        <li><a href="#plain-Functiondeclare">Function: declare</a>
+        <li><a href="#plain-Functionget">Function: get</a>
+        <li><a href="#plain-Functiongenerate_waveforms">Function: generate_waveforms</a>
+        <li><a href="#plain-ConstructorMyFancySimulation">Constructor: MyFancySimulation</a>
+        <li><a href="#plain-Funktionrun">Funktion: run</a>
+        <li><a href="#plain-Funktionrun_cluster_analysis">Funktion: run_cluster_analysis</a>
+        <li><a href="#plain-Funktionrun_simulation">Funktion: run_simulation</a>
+        <li><a href="#plain-Funktionrun_kerneltest">Funktion: run_kerneltest</a>
+        <li><a href="#plain-Funktionmain">Funktion: main</a>
+      </ul>
+      </ul>

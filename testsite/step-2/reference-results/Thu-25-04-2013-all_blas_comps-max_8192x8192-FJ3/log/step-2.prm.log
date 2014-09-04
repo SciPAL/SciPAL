@@ -1,0 +1,82 @@
+# Listing of Parameters
+# ---------------------
+subsection Device flags
+  # This allows to dedicate the local L1 caches completely to buffering
+  # register spilling effects.
+  set Disable L1 caching for global memory = false
+
+  # This allows to rather use 48 KB as L1 cache.
+  set Maximize L1 cache                    = false
+
+  # This allows to access the matrix via texture and not by direct memory
+  # accesses. On older hardware textures can exploit the 2D locality of matrix
+  # entries. On Fermi- or Kepler-based GPUs this should not make much sense.
+  set Wrap matrix into texture             = true
+end
+
+
+subsection Dimensions of test problems.
+  # Binary logarithm of minimal number of columns of upper triangular matrix
+  # R. Allowed range : [3,16]
+  set log2(max n cols)   = 13.001  # default: 12
+
+  # Binary logarithm of minimal number of columns of upper triangular matrix
+  # R. Allowed range : [2,15]
+  set log2(min n cols)   = 3       # default: 4
+
+  # Perform the test for this many randomly chosen matrix sizes.If the value
+  # given is 0, then a list of matrix sizes is used which is generated
+  # deterministically from the growth strategy.
+  set n random trials    = 0
+
+  # Repeat the test for a given matrix size this many times.
+  set n repetitions      = 20      # default: 1
+
+  # In each test instance the number of rows of R is increased by this factor.
+  # Allowed range : [1.1,10]
+  set n rows growth rate = 1.12517 # default: 1.4
+end
+
+
+subsection Fujimoto parameters
+  # In case of float the <generic> version is a verbatim copy of the original
+  # version. In case of double the reading of the matrix induces 50% idle
+  # threads. <no bitshift> is identical to the generic version  except that
+  # index arithmetic is done in a more human readable fashion. <double
+  # optimization> provides optimized access to the matrix entries in the case
+  # of double precision.
+  set Fujimoto variant = double optimization # default: generic
+end
+
+
+subsection Global parameters
+  # CPU-BLAS and CUBLAS double.
+  set Run CPU-BLAS vs CUBLAS double   = true
+
+  # CPU-BLAS and CUBLAS float.
+  set Run CPU-BLAS vs CUBLAS float    = true
+
+  # CPU-BLAS and Fujimoto double.
+  set Run CPU-BLAS vs Fujimoto double = true # default: false
+
+  # CPU-BLAS and Fujimoto float.
+  set Run CPU-BLAS vs Fujimoto float  = true
+
+  # Fujimoto vs CUBLAS double.
+  set Run Fujimoto vs CUBLAS double   = true # default: false
+
+  # Fujimoto vs CUBLAS float.
+  set Run Fujimoto vs CUBLAS float    = true
+end
+
+
+subsection Simulation basics
+  # Specify a directory results of the test are to be stored. This can be
+  # either an absolute path or path relative to the directory where the
+  # program has been started. The default is subdir called test_me-<date>
+  # where <date> will be replaced by the date at which the program has been
+  # started. this simplifies keeping the projects directory clean
+  set Run directory = ../step-2/reference-results/Thu-25-04-2013-all_blas_comps-max_8192x8192-FJ3 # default: ./test_me
+end
+
+

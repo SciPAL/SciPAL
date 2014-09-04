@@ -1,0 +1,188 @@
+<h1>Results</h1>
+<p>
+Before we show the results, we want to describe briefly how to use the program.
+</p>
+<p>
+The easiest way is to load the step-2.pro into QtCreator and hit the play button.
+ The program is then executed with its default parameters.
+</p>
+<p>
+The execution path and arguments which are passed to the executable
+can be changed in the project settings in QTCreator
+(in this case the only valid argument is the location of the parameter file).
+It may also be necessary to change the LD_LIBRARY_PATH such that all necessary libraries are found.
+<p>
+\htmlimage{qt_config.png, 700, Screen shot of the project settings window in QtCreator.
+You should uncheck "Run in Terminal"\, because it frequently causes problems.}
+</p>
+</p>
+<p>
+The results of the different tests are provided in the following plots. The first
+depicts runtime measurements obtained on a Tesla K20c GPU and a Dell T7500 workstation
+with two X5675 Xeons each with 6 cores.
+From this raw data we compute the speedups of the GPU-based methods over the CPU
+reference implementation provided by ATLAS.
+Then, we compare the different Fujimoto variants with each other and last but not least show
+the memory bandwidth achieved by CUBLAS and the different Fujimoto versions.
+</p>
+
+<p>
+\htmlimage{runtimes_150ppi.png, 700,
+Runtimes for Fujimoto\, ATLAS and CUBLAS matrix-vector products. In contrast to ATLAS
+the CUDA-based methods
+display a considerable startup overhead as for small matrix sizes the runtime is almost constant.}
+</p>
+
+<p>
+\htmlimage{speedup-logplot_150ppi.png, 700, Speedup of Fujimoto and CUBLAS over ATLAS.
+For sufficiently large matrices the GPU is saturated and the speedup becomes constant as expected.}
+</p>
+
+
+<p>
+\htmlimage{speedup-FJ-bitshift_150ppi.png, 700,
+Comparison of Fujimotos original kernel with bitshifts
+against the float version of the generic implementation without bitshifts.
+Values larger 1 favor the bitshift version by
+Fujimoto whereas values less than 1 indicate that bitshifting does not pay off.
+Due to the large scattering
+there is no clear winner. }
+</p>
+
+
+<p>
+\htmlimage{speedup-FJ-double-opt_150ppi.png, 700, Unlike bitshifting the optimization of the
+texture fetches for double precision does pay off which is indicated by values larger than 1.}
+</p>
+
+<!--
+<p>
+\htmlimage{speedup-FJ-vs-CUBLAS_150ppi.png, 700, As in 2008 it }
+</p>
+-->
+
+<p>
+\htmlimage{speedup-logplot-FJ-vs-CUBLAS_150ppi.png, 700,
+As in 2008 Fujimoto's kernel is faster than
+the gemv function from CUBLAS which now is indicated by values less than 1.
+For large matrices Fujimoto needs approximately only half the time as CUBLAS.
+Our extension to double precision
+shares this feature although not that prominent but there is still a gain of 20-30% over CUBLAS.}
+</p>
+<!--
+
+
+  speedup-logplot_150ppi.png
+
+-->
+
+
+<p>
+\htmlimage{bandwidths_150ppi.png, 700, Estimated memory bandwidth
+for different Fujimoto variants and CUBLAS for single and double precision.
+To compute the bandwidth we divide the memory consumed by the matrix by the runtime.
+For small matrices this is a bit conservative because the vectors are not yet negligible.
+These numbers are also more conservative as the results one obtains with NVVP. }
+</p>
+
+
+<h3>Plots</h3>
+<p>
+After the performance tests have been completed, the results are stored in
+the file <i>MVTest_results.out</i>.
+During execution a gnuplot script in the <code>plot</code> subdirectory is generated
+and produces the corresponding plots.
+<br />
+
+
+
+<br />
+The parameters used to generate the plots above are listed in the following lines:
+</p>
+<pre>
+# Listing of Parameters
+# ---------------------
+
+subsection Dimensions of test problems.
+  # Binary logarithm of minimal number of columns of upper triangular matrix
+  # R. Allowed range : [3,15]
+  set log2(max n cols)   = 13.001
+
+  # Binary logarithm of minimal number of columns of upper triangular matrix
+  # R. Allowed range : [2,15]
+  set log2(min n cols)   = 3
+
+  # Perform the test for this many randomly chosen matrix sizes.If the value
+  # given is 0, then a list of matrix sizes is used which is generated
+  # deterministically from the growth strategy.
+  set n random trials    = 0
+
+  # Repeat the test for a given matrix size this many times.
+  set n repetitions      = 20
+
+  # In each test instance the number of rows of R is increased by this factor.
+  # Allowed range : [1.1,10]
+  set n rows growth rate = 1.12517
+end
+
+
+subsection Global parameters
+  # CPU-BLAS and CUBLAS double.
+  set Run CPU-BLAS vs CUBLAS double   = false
+
+  # CPU-BLAS and CUBLAS float.
+  set Run CPU-BLAS vs CUBLAS float    = false
+
+  # CPU-BLAS and Fujimoto double.
+  set Run CPU-BLAS vs Fujimoto double = false
+
+  # CPU-BLAS and Fujimoto float.
+  set Run CPU-BLAS vs Fujimoto float  = false
+
+  # Fujimoto and CUBLAS double.
+  set Run Fujimoto vs CUBLAS double   = true
+
+  # Fujimoto and CUBLAS float.
+  set Run Fujimoto vs CUBLAS float    = false
+
+end
+
+
+subsection Fujimoto parameters
+
+  # In case of float the <generic> version is a verbatim copy
+  # of the original version. In case of double the reading of the matrix
+  # induces 50% idle threads. <no bitshift> is identical to the generic version
+  # except that index arithmetic is done in a more human readable fashion.
+  # <double optimization> provides optimized access to the matrix entries
+  # in the case of double precision.
+  # possible values : generic|no bitshift|double optimization
+  set Fujimoto variant = generic #original #|double optimization
+
+end
+
+subsection Simulation basics
+  # Specify a directory results of the test are to be stored. This can be
+  # either an absolute path or path relative to the directory where the
+  # program has been started. The default is subdir called test_me-<date>
+  # where <date> will be replaced by the date at which the program has been
+  # started. this simplifies keeping the projects directory clean
+  set Run directory = ../step-2/reference-results/Thu-25-04-2013-FJ-generic-vs-CUBLAS-double-max_8192x8192
+
+end
+
+subsection Device flags
+  # This allows to dedicate the local L1 caches completely to buffering
+  # register spilling effects.
+  set Disable L1 caching for global memory = false
+
+  # This allows to rather use 48 KB as L1 cache.
+  set Maximize L1 cache                    = false
+
+  # This allows to access the matrix via texture and not by direct memory
+  # accesses. On older hardware textures can exploit the 2D locality of matrix
+  # entries. On Fermi- or Kepler-based GPUs this should not make much sense.
+  set Wrap matrix into texture             = true
+end
+</pre>
+

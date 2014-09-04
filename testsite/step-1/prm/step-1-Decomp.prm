@@ -1,0 +1,43 @@
+# Listing of Parameters
+# ---------------------
+subsection CUDA parameters
+  # Graphics card #
+  set Device        = 1
+
+  # Decision between shared (true) or L1 (false) memory
+  set Shared Memory = true
+end
+
+
+subsection Simulation basics
+  # Specify a directory results of the test are to be stored. This can be
+  # either an absolute path or path relative to the directory where the
+  # program has been started. The default is subdir called test_me-<date>
+  # where <date> will be replaced by the date at which the program has been
+  # started. this simplifies keeping the projects directory clean
+  set Run directory = ./test_me-2013
+end
+
+
+subsection Testcase parameters
+  # Number of runs being used for averaging
+  set Average - runs            = 10
+
+  # Decide between double (true) or float (false) precision
+  set Double-Precision          = true
+
+  # Decide whether an LU decomposition shall be executed. This will lead to a
+  # symmetrical testcase matrix.
+  set LU decomposition          = true
+
+  # Start value of the range of matrix sizes tested by the simulation
+  set Matrix size - lower limit = 256
+
+  # Step size for the size created test matrices
+  set Matrix size - step size   = 64
+
+  # End value of the range of matrix sizes tested by the simulation
+  set Matrix size - upper limit = 513
+end
+
+

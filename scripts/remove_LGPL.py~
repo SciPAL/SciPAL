@@ -1,0 +1,32 @@
+#!/usr/bin/python
+# usage: python remove_LGPL.py DICT
+# where DICT is the path relative to this script. the LGPL header is removed from all files in that folder.
+import os
+import string
+import sys
+from time import *
+
+
+path = sys.argv[1]
+print str(path)
+
+dirList=os.listdir(path)
+
+#get number of lines
+lines = 0
+for line in open("file_header.txt"):
+    lines += 1
+
+print lines
+
+
+for fname in dirList:
+    fullpath = path + fname
+    os.system("tail -n +" + str(lines) + " " + str(fullpath) +  " > temp.txt")
+    os.system("mv  temp.txt " + str(fullpath))
+    print "tail -n +" + str(lines) + " " + str(fullpath) +  " > temp.txt"
+
+
+
+
+

@@ -1,0 +1,139 @@
+<h1>Introduction</h1>
+<p>
+In this example program we discuss how to implement the Cholesky factorization of dense matrices.
+Once a matrix is factorized the corresponding linear algebraic system can be solved by solving two
+auxiliary triangular linear systems.
+</p>
+<p>
+The starting point is a set of linear equations
+\f{eqnarray}
+ \label{LSYS}
+\begin{array}{rcccr}
+a_{0,0}x_0   & + & \ldots & + & a_{0,n-1}x_{n-1} \\
+             &   & \ldots &   &                  \\ 
+             &   & \ldots &   &                  \\
+             &   & \ldots &   &                  \\ 
+a_{n-1,0}x_0 & + & \ldots & + & a_{n-1,n-1}x_{n-1}
+\end{array}
+& = &
+\begin{array}{c}
+f_0 \\
+ \cdot\\
+ \cdot\\
+ \cdot\\
+f_{n-1}
+\end{array}
+\f}
+with symmetric coefficient matrix $A = (a_{ij})_{i,j=0}^{i,j=n-1}$, $a_{ij}=a_{ji}\,\forall i,j$.
+The solution vector is denoted by $x=(x_j)_{j=0}^{j=n-1}$ and the right-hand side by $f=(f_i)_{i=0}^{i=n-1}$.
+The factorization process yields a lower triangular matrix $L$, such that
+\f{eqnarray}
+LL^T & = & A \,. 
+\f}
+Solving the linear system given is then achieved by solving two triangular systems
+of equations by forward and backward substitution.
+The first step yields the auxiliary solution $y = L^Tx$.
+\f{eqnarray}
+Ax ~ = ~ f  \Rightarrow LL^Tx & = & f \\
+ y ~ = ~ L^Tx \Rightarrow Ly & = & f \\
+\Rightarrow y & = & L^{-1} f \\
+\Rightarrow x & = & (L^T)^{-1} y \,. 
+\f}
+</p>
+<p>
+
+<h2>Cholesky Factorization - Algorithm</h2>
+
+The entries of $L$ follow from the condition $LL^T = A$, that is
+\f{eqnarray}
+(LL^T)_{ij} ~ = ~ \sum_{k=0}^{\min\{i,j\}} L_{ik}L^T_{kj} 
+& = & 
+\sum_{k=0}^{\min\{i,j\}} L_{ik}L_{jk}  ~ = ~ A_{ij} \,. 
+\f}
+The upper limit of the summation is due to the triangular shape of matrix $L$.
+It implies that one has to start computing its elements at the uppermost diagonal element
+and then has to proceed down the column.
+Only then one can go over to the next column.
+Therefore the computation of the diagonal elements is inherently serial. Each diagonal element
+needs the entries of $L$ which are in the block above and to the left of it.
+<ol>
+<li>
+For the top row we have
+<ol>
+    <li> 
+        \f{eqnarray}
+            L_{00} & = & \sqrt{A_{00}}
+        \f}
+    </li>
+    <li>do in parallel : $j = 1,\ldots, n-1$ :
+        \f{eqnarray}
+            L_{j0} & = & \frac{1}{\sqrt{L_{00}}} A_{0j}
+        \f}
+    </li>
+</ol>
+</li>
+<li>
+and for the following rows $i = 1,\ldots, n-1$
+    <ol>
+        <li><br>
+            \f{eqnarray}
+            \textrm{sum} & = &  \sum_{k=0}^{i-1} L_{ik}^2 \\
+            L_{ii} & = & \sqrt{A_{ii} - \textrm{sum}  }
+            \f}
+        </li>
+        <li>do in parallel : $j = i+1,\ldots, n-1$ :
+        \f{eqnarray}
+        \textrm{sum} & = & \sum_{k=0}^{i-1} L_{ik}L_{jk} \\
+    L_{ji} & = & \frac{1}{\sqrt{L_{ii}}} \left( A_{ij} - \textrm{sum} \right)     \,.
+        \f}
+        </li>
+    </ol>
+</ol>
+This shows, that at least the computation of the off-diagonal elements can be parallelized.
+Fortunately that's the part containing most of the the computational costs in
+Cholesky factorization.
+</p>
+<h2>Special requirements due to CUDA</h2>
+<ul>
+<li> Hide latency of memory accesses, especially those to global memory
+<li> memory accesses require a certain order to be efficient (bank conflicts)</li>
+<li> Kernels should load as little data from memory as possible and should
+do as much computations with it as possible</li>
+<li> synchronisation - always an issue in parallel programming</li>
+<li> Minimize the dependencies on nvcc
+</li>
+</ul>
+<!--
+<p>
+How to handle these issues is discussed further below in the source code.
+</p>
+
+-->
+<h2>Program Structure</h2>
+
+<p>
+The diagram in the figure roughly sketches the overall class layout
+and the distribution of the classes over the source files.
+On the host side you have a toplevel class which manages the interaction
+with the user (data input and output; file step-1.cpp).
+The actual Cholesky factorization is distributed over a stack of classes and files.
+This stack reflects the
+hierarchical structure of the compute environment formed by CPU and GPU.
+The front end is a driver class which offers a black-box function for the factorization.
+The factorization routine internally delegates the work to the CUDA kernels.
+To do this, the access is not direct but via wrapper functions which encapsulate the kernel calls
+and the set up of thread grids and blocks. The purpose of this large amount of indirection is to
+facilitate porting the program to different parallelization architectures if new, promising ones appear.
+The dependence of the host side code on the device-specific one is kept at a minimum.
+The bridge between the two is formed by the file cuda_kernel_wrapper_step-1.cu.h.
+</p>
+
+\image
+
+
+\image html step-1-class-design.png "Distribution of classes over source files."
+
+<h2>Literature</h2>
+
+Cambridge CUDA-Course <a href="http://www.many-core.group.cam.ac.uk/archive/CUDAcourse09/">Lectures 3 and 4</a>
+

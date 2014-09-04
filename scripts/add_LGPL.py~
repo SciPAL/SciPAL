@@ -1,0 +1,24 @@
+#!/usr/bin/python
+# usage: python add_LGPL.py DICT
+# where DICT is the path relative to this script. the LGPL header is added to all files in that folder.
+import os
+import string
+import sys
+from time import *
+
+
+path = sys.argv[1]
+print str(path)
+
+dirList=os.listdir(path)
+for fname in dirList:
+    fullpath = path + fname
+    
+    os.system("cat file_header.txt " + str(fullpath) + " > temp.txt")
+    os.system("mv  temp.txt " + str(fullpath))
+    print "cat " + str(fullpath) + " file_header.txt > " + str(fullpath)
+
+
+
+
+

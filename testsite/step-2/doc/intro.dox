@@ -1,0 +1,83 @@
+<h1>Introduction</h1>
+
+<h2> Overview </h2>
+A fundamental operation in scientific computing is the multiplication of a dense matrix with a dense vector.
+This program compares the performance of different implementations of this product using different hardware.
+A parallelized CPU version and two different CUDA implementations are benchmarked against each other.
+The results of running this program are two diagrams containing the runtimes of the different implementations
+and the speedup of the CUDA variants over the CPU-based version over a wide range of matrix sizes.
+<p>
+On the CPU we use the gemv fcuntino from ATLAS which is an open-source implementation of
+BLAS available on virtually any standard Linux installation.
+On the GPU we use gemv from CUDA's CUBLAS and Fujmoto's texture-based CUDA implementation of a matrix-vector product.
+</p>
+<p>
+The mathematical operation itself is rather straightforward. Thus, this program rather addresses several
+issues of practical importance:
+<ul>
+<li>The deal.II's ParameterHandler class is employed in order to feed the program with information at runtime, e.g.
+for which matrix sizes the tests should be performed </li>
+<li> The directory from where the program is launched is separated
+from the directory where the results are to be stored. To do this, several QT classes are used.
+</li>
+<li> Object-orientation is employed to create an extensible framework for
+unit testing of matrix-vector multiplications and similar operations.
+</li>
+<li> To minimize the amount of source code template classes are used to
+implement the tests for the different BLAS versions independent of the particular number type.
+For each BLAS library there is only one class.
+By template specialization we get for each combination of BLAS and number type the appropriate implementation
+which can be chosen at runtime by letting them all derive from a common base class.
+</li>
+<li>
+We plot the graphs for the runtimes and speedups from within the program using a gnuplot pipe.
+This frees us from the problem to figure out which columns have to be plotted versus each other and what to put into the legend.
+The necessary gnuplot commands are collected in a file so that we can polish the figures still a bit
+if the default values for e.g. the plot range do not give satisfactory results.
+</li>
+</ul>
+</p> 
+
+
+<p>
+Before we study the program in detail let us still comment on why Fujimoto's implementation of a matrix-vector multiplication
+is still of interest.
+</p>
+<p>
+ Back in 2008 the only memory in CUDA-enabled GPUs with integrated caching capabilities was the
+ texture memory.
+ However, it during the executino of a CUDA kernel it was limited to read-only caching and updates to the texture
+ became visible only after a relaunch of a kernel.
+ The shared memory basically worked like a cache but had to be managed manually.
+ The Fermi architecture introduced a two-level cache hierarchy which buffered all accesses to the global memory
+ so that there was no direct access from the multiprocessors to the global memory anymore.
+ However, there was still only one central texture cache which buffered the texture fetches
+ issued by the different multiprocessors.
+ With the Kepler architecture each multiprocessor got its own texture cache which had the same size
+ of 64KB as the central one in the former architectures.
+ A nice feature of the texture cache, then and now, is that it is optimized for data accesses of 2D spatial locality.
+ Thus reading a matrix not in an element-per-element manner but en block by subdividing it into tiles and reading each tile
+ as a whole should profit from this special feature of the texture cache.
+ <br />
+ This is the crucial idea of Fujimoto's method.
+ </p>
+ <p>
+ Although the pay-off of this strategy should have decreased over the past due to the introduction of an "official" cache
+ it is instructive to figure out whether it still is worth the effort today.
+</p>
+
+
+<h2> Literature </h2>
+
+<ul>
+<li> Fujimoto's article from 2008: Faster Matrix-Vector Multiplication on GeForce 8800GTX,
+ In the Proceedings of the 22nd IEEE International Parallel and
+ Distributed Processing Symposium (IPDPS), LSPP-402, pp.1-8, April 2008
+</li>
+<li> CUBLAS Reference
+</li>
+<li> Josuttis' book about C++ templates
+</li>
+<li> (More) Effective C++ by Scott Meyers
+</li>
+</ul>

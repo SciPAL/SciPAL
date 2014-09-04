@@ -1,0 +1,20 @@
+This is the SciPAL readme file.
+
+In order to use SciPAL you need the following dependencies:
+
+• deal.II (www.dealii.org), see additional information in their tar-archive. 
+  Runnig deal.II's cmake-file should give you a working installation
+
+• CUDA-Toolkit (https://developer.nvidia.com/cuda-downloads). For further 
+  information have a look in NVidia's getting started guide (also on link).
+
+If you have these installed, put SciPAL in your preferred folder and run the 
+installaton script install.py from /scripts/. This will set the paths of the CUDA
+and deal.II installation. 
+
+Note: The installation script configures only for a basic deal.II installation.
+      If you have a deal.II installation using MPI, petsc, etc. you can use the
+      advanced configuration file from /config/dealii_mpi_conf.pro as template 
+      for your configuration. 
+
+contact: scipal@googlegroups.com

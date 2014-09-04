@@ -1,0 +1,36 @@
+# Listing of Parameters
+# ---------------------
+subsection CUDA parameters
+  # which CUDA-enabled GPU should be used
+  set Device        = 0
+end
+
+
+subsection Simulation basics
+  # Specify a directory where results of the test are to be stored. This can
+  # be either an absolute path or path relative to the directory where the
+  # program has been started. The default is subdir called test_me-<date>
+  # where <date> will be replaced by the date at which the program has been
+  # started. this simplifies keeping the projects directory clean
+  set Run directory = ./test_me-Cholesky-2013
+end
+
+
+subsection Testcase parameters
+  # Number of runs being used for averaging
+  set Average - runs            = 1
+
+  # Decide between double (true) or float (false) precision
+  set Double-Precision          = true
+
+  # Start value of the range of matrix sizes tested by the simulation
+  set Matrix size - lower limit = 16
+
+  # Increment for the size of the test matrices
+  set Matrix size - step size   = 16
+
+  # End value of the range of matrix sizes tested by the simulation
+  set Matrix size - upper limit = 1500
+end
+
+

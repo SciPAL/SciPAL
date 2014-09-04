@@ -24,6 +24,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef CUDACOMPLEX_H
 #define CUDACOMPLEX_H
 //SciPAL precision traits include
+#include<lac/release/Expr.h>
 #include<cuComplex.h>
 #include<base/PrecisionTraits.h>
 
@@ -103,7 +104,6 @@ struct CudaComplex : public PrecisionTraits<T, gpu_cuda>::ComplexType
         return *this;
     }
 
-    //divide
     __host__ __device__
     __forceinline__
     CudaComplex& operator()(const NumberType re, const NumberType im)
@@ -112,6 +112,14 @@ struct CudaComplex : public PrecisionTraits<T, gpu_cuda>::ComplexType
         this->y = im;
         return *this;
     }
+
+//    __host__ __device__
+//    __forceinline__
+//    template<typename X>
+//    CudaComplex& operator=(const SciPAL::Expr<X>& e)
+//    {
+//        cplxTree
+//    }
 
     //a few declarations
     __host__ __device__ /*__forceinline__*/
@@ -142,6 +150,53 @@ CudaComplex<double> conj_impl(const CudaComplex<double>& a)
 __host__ __device__ static __forceinline__
 CudaComplex<float> conj_impl(const CudaComplex<float>& a)
 {CudaComplex<float> tmp; tmp/*.Number*/ = cuConjf(a/*.Number*/); return tmp;}
+
+// abs(__z):  Returns the magnitude of __z.
+
+
+template<typename T> T abs_impl(const T a);
+
+
+__host__ __device__ __forceinline__
+float abs_impl(const CudaComplex<float> a )
+{
+    return cuCabsf(a/*.Number*/);
+}
+
+__host__ __device__ __forceinline__
+double abs_impl(const CudaComplex<double> a )
+{
+    return sqrt(a.real()*a.real() + a.imag()*a.imag());
+}
+
+template<>
+__host__ __device__ __forceinline__
+float abs_impl(const float a )
+{
+    return fabsf(a);
+}
+
+template<>
+__host__ __device__ __forceinline__
+double abs_impl(/*const*/ double a )
+{
+    return fabs(a);
+}
+
+template<typename T>
+__host__ __device__ __forceinline__
+T abs_impl(T a )
+{
+    return ::abs(a);
+}
+
+template<typename T>
+__host__ __device__ __forceinline__
+T abs(const CudaComplex<T>& __z)
+{
+    return  abs_impl(__z);
+}
+
 
 
 template<typename T>
@@ -218,7 +273,7 @@ __host__ __device__ __forceinline__
 CudaComplex<T>& CudaComplex<T>::operator/=(const CudaComplex<T>& __z)
   {
 
-      T s = ::abs(__z.real()) + ::abs(__z.imag());
+      T s = abs_impl(__z.real()) + abs_impl(__z.imag());
       T oos = T(1.0) / s;
       T ars = this->real() * oos;
       T ais = this->imag() * oos;
@@ -352,47 +407,6 @@ CudaComplex<T>
 conj(const CudaComplex<T>& __z)
 { return conj_impl(__z);}
 
-// abs(__z):  Returns the magnitude of __z.
-
-
-__host__ __device__ __forceinline__
-float abs_impl(const CudaComplex<float>& a )
-{
-    return cuCabsf(a/*.Number*/);
-}
-
-__host__ __device__ __forceinline__
-double abs_impl(const CudaComplex<double>& a )
-{
-    return sqrt(a.real()*a.real() + a.imag()*a.imag());
-}
-
-__host__ __device__ __forceinline__
-float abs_impl(const float a )
-{
-    return fabsf(a);
-}
-
-__host__ __device__ __forceinline__
-double abs_impl(/*const*/ double a )
-{
-    return fabs(a);
-}
-
-
-template<typename T>
-__host__ __device__ __forceinline__
-T abs(const CudaComplex<T>& __z)
-{
-    return  abs_impl(__z);
-}
-
-//template<typename T>
-//__host__ __device__ __forceinline__
-//T abs(const T& __z)
-//{
-//    return  abs_impl(__z);
-//}
 
 // arg(__z): Returns the phase angle of __z.
 template<typename T>

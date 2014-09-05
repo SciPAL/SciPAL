@@ -188,7 +188,7 @@ public:
     void TmTmult(Matrix<T, BW>& dst, const Matrix<T, BW>& src) const;
 
     void scaled_mmult_add_scaled( Matrix<T, BW>& dst, const Matrix<T, BW>& src,
-                                  bool transpose_A=false, bool transpose_B=false,
+                                  char transpose_A='n', char transpose_B='n',
                                   T alpha = 1.0, T beta = 0) const;
 
     template<typename VECTOR1, typename VECTOR2>
@@ -474,7 +474,8 @@ SciPAL::Matrix<T, BW>::operator = (const Matrix<T, BW> & other)
     //    this->leading_dim = other.leading_dim;
     //    this->_stride = other._stride;
 
-    this->Array<T, BW>::reinit(other.n_rows() * other.n_cols());
+    if (this != &other)
+        this->Array<T, BW>::reinit(other.n_rows() * other.n_cols());
 
     this->MyShape::reinit(this->array().val(),
                         other.n_rows(), other.n_cols(),
@@ -755,9 +756,9 @@ template<typename T, typename BW>
 void
 SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
                                                   const Matrix<T, BW>& src,
-                                                  bool transpose_A = false,
-                                                  bool transpose_B = false,
-                                                  T alpha = 1., T beta = 0) const
+                                                  char transpose_A,
+                                                  char transpose_B,
+                                                  T alpha, T beta) const
 {
     // T alpha = 1; T beta = 0;
 
@@ -765,11 +766,11 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
     int ldb = src.n_rows(); /* == this->n_cols() !!! */ //! src == B
     int ldc = dst.n_rows(); //! dst == C
 
-    BW::gemm(transpose_A ? 't' : 'n',
-             transpose_B ? 't' : 'n',
-             transpose_A ? this->n_cols() : this->n_rows(), /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
+    BW::gemm(transpose_A,
+             transpose_B,
+             transpose_A != 'n'? this->n_cols() : this->n_rows(), /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
              dst.n_cols(), /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
-             transpose_A ? this->n_rows() : this->n_cols(), /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
+             transpose_A != 'n'? this->n_rows() : this->n_cols(), /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
              alpha,
              this->data(), lda,
              src.data(), ldb,

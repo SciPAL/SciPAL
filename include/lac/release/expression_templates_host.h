@@ -64,6 +64,25 @@ struct transpose : public SciPAL::Expr<transpose<M> > {
     transpose(const M & m) : A(m) {}
 };
 
+// @sect4{Struct: adjoint}
+// Interpret Matrices and Vectors in adjoint manner.
+template<typename M>
+struct adjoint : public SciPAL::Expr<adjoint<M> > {
+
+    const M & A;
+
+    typedef adjoint<M> Type;
+    typedef adjoint<M> DevType;
+
+    typedef const Type& ConstHandle;
+
+    typedef typename M::value_type value_type;
+
+    typedef typename M::blas_wrapper_type blas_wrapper_type;
+
+    adjoint(const M & m) : A(m) {}
+};
+
 // @sect4{Struct: diag}
 // Interpret a vector as diagonal matrix.
 template<typename M>

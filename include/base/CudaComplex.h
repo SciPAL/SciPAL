@@ -153,7 +153,6 @@ CudaComplex<float> conj_impl(const CudaComplex<float>& a)
 
 // abs(__z):  Returns the magnitude of __z.
 
-
 template<typename T> T abs_impl(const T a);
 
 
@@ -183,12 +182,12 @@ double abs_impl(/*const*/ double a )
     return fabs(a);
 }
 
-template<typename T>
-__host__ __device__ __forceinline__
-T abs_impl(T a )
-{
-    return ::abs(a);
-}
+//template<typename T>
+//__host__ __device__ __forceinline__
+//T abs_impl(T a )
+//{
+//    return ::abs(a);
+//}
 
 template<typename T>
 __host__ __device__ __forceinline__

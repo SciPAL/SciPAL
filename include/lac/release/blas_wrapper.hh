@@ -164,6 +164,11 @@ struct blas {
                 __data = new T[n];
                 __n_el = n;
             }
+
+            if(__n_el == n)
+                for(size_t ii = 0; ii <  __n_el; ii++)
+                    __data[ii] = T();
+
         };
 
         ~Data()
@@ -487,7 +492,7 @@ public:
     static void
     scal (int n, double2  alpha, double2 *x, int incx)
     {
-        cblas_zscal (n, &alpha, x, incx);
+        cblas_zscal(n, &alpha, x, incx);
     }
 
     static void
@@ -590,8 +595,8 @@ public:
 
     // @sect4{Funktion: gemm}
     //!
-    //! @param transa : gibt an ob A transponiert ist oder nicht. Sei transa = 'N' oder 'n' so ist op(A)= A, sei trans = 'T', 't','C' oder 'c' so ist op(A)= trans(A)
-    //! @param transb : gibt an ob B transponiert ist oder nicht. Sei transb = 'N' oder 'n' so ist op(B)= A, sei trans = 'T', 't','C' oder 'c' so ist op(B)= trans(B)
+    //! @param transa : gibt an ob A transponiert ist oder nicht. Sei transa = 'N' oder 'n' so ist op(A)= A, sei transa = 'T' oder 't' so ist op(A)= trans(A), sei transa = 'C' oder 'c' so ist op(A)=adjoint(A)
+    //! @param transb : gibt an ob B transponiert ist oder nicht. Sei transb = 'N' oder 'n' so ist op(B)= A, sei transb = 'T' oder 't' so ist op(B)= trans(B), sei transb = 'C' oder 'c' so ist op(B)=adjoint(B)
     //! @param m : Anzahl Zeilen in Matrix A und Matrix C.
     //! @param n : Anzahl Spalten in Matrix B und Matrix C.
     //! @param k : Anzahl Spalten in Matrix A und Zeilen in Matrix B.
@@ -645,8 +650,8 @@ public:
                      const float2 * const A, int lda, const float2 * const B, int ldb,
                      const float2 beta, float2 * C, int ldc)
     {
-        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : CblasNoTrans );
-        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : ( (transa == 'c') || (transa == 'C') ) ? CblasConjTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : ( (transb == 'c') || (transb == 'C') ) ? CblasConjTrans : CblasNoTrans );
 
         cblas_cgemm(CblasColMajor,
                     tr_a, tr_b,
@@ -667,8 +672,8 @@ public:
                      const double2 * const A, int lda, const double2 * const B, int ldb,
                      const double2 beta, double2 * C, int ldc)
     {
-        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : CblasNoTrans );
-        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : ( (transa == 'c') || (transa == 'C') ) ? CblasConjTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : ( (transb == 'c') || (transb == 'C') ) ? CblasConjTrans : CblasNoTrans );
 
         cblas_zgemm(CblasColMajor, tr_a, tr_b,
                     m, n, k,

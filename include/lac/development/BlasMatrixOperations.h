@@ -56,7 +56,10 @@ struct BlasMatExp/*MatrixExpressions*/
 
 
     typedef typename SciPAL::BinaryExpr< SciPAL::transpose<Mtx>, mult, Mtx> MtM;
+    typedef typename SciPAL::BinaryExpr< SciPAL::adjoint<Mtx>, mult, Mtx> MaM;
+
     typedef typename SciPAL::BinaryExpr<Mtx, mult, SciPAL::transpose<Mtx> > MMt;
+    typedef typename SciPAL::BinaryExpr<Mtx, mult, SciPAL::adjoint<Mtx> > MMa;
 
     //matrix times matrix plus matrix
     typedef typename SciPAL::BinaryExpr<MM, plus, Mtx>  MMaM;
@@ -127,7 +130,7 @@ static void apply(::SciPAL::Matrix<T, BW> // IDEA:, ms>
 
     C.reinit(A.n_rows(), B.n_cols());
 
-    A.scaled_mmult_add_scaled(C, B, false, false, alpha, beta);
+    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
 }
 
 
@@ -147,7 +150,26 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     C.reinit(A.n_cols(), B.n_cols());
 
-    A.scaled_mmult_add_scaled(C, B, true, false, alpha, beta);
+    A.scaled_mmult_add_scaled(C, B, 't', 'n', alpha, beta);
+}
+
+template <typename T, typename BW>
+static void apply(::SciPAL::Matrix<T, BW> &result,
+                  const typename BlasMatExp<T, BW>::MaM& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = 1.0;
+    const Mtx & A = expr.l.A;
+    const Mtx & B = expr.r;
+
+    T beta = 0.0;
+
+    Mtx & C = result;
+
+    C.reinit(A.n_cols(), B.n_cols());
+
+    A.scaled_mmult_add_scaled(C, B, 'c', 'n', alpha, beta);
 }
 
 
@@ -167,7 +189,27 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     C.reinit(A.n_rows(), B.n_rows());
 
-    A.scaled_mmult_add_scaled(C, B, false, true, alpha, beta);
+    A.scaled_mmult_add_scaled(C, B, 'n', 't', alpha, beta);
+}
+
+
+template <typename T, typename BW>
+static void apply(::SciPAL::Matrix<T, BW> &result,
+                  const typename BlasMatExp<T, BW>::MMa& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = 1.0;
+    const Mtx & A = expr.l;
+    const Mtx & B = expr.r.A;
+
+    T beta = 0.0;
+
+    Mtx & C = result;
+
+    C.reinit(A.n_rows(), B.n_rows());
+
+    A.scaled_mmult_add_scaled(C, B, 'n', 'c', alpha, beta);
 }
 
 
@@ -234,8 +276,9 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     C.reinit(A.n_rows(), B.n_cols());
 
-    A.scaled_mmult_add_scaled(C, B, false, false, alpha, beta);
+    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
 }
+
 
 template <typename T, typename BW>
 static void apply(::SciPAL::Matrix<T, BW> & result,
@@ -251,25 +294,7 @@ static void apply(::SciPAL::Matrix<T, BW> & result,
 
     Mtx & C = result; //this is equivalent to expr.r
 
-    A.scaled_mmult_add_scaled(C, B, false, false, alpha, beta);
-}
-
-
-template <typename T, typename BW>
-static void apply(::SciPAL::Matrix<T, BW> & result,
-                  const typename BlasMatExp<T, BW>::sMMaM& expr)
-{
-    typedef ::SciPAL::Matrix<T, BW> Mtx;
-
-    T alpha = expr.l.l.l;
-    const Mtx & A = expr.l.l.r;
-    const Mtx & B = expr.l.r;
-
-    T beta = 1.;
-
-    Mtx & C = result;
-
-    A.scaled_mmult_add_scaled(C, B, false, false, alpha, beta);
+    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
 }
 
 
@@ -287,7 +312,7 @@ static void apply(::SciPAL::Matrix<T, BW> & result,
 
     Mtx & C = result;
 
-    A.scaled_mmult_add_scaled(C, B, false, false, alpha, beta);
+    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
 }
 
 } // END namespace LAOOperations

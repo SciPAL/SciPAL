@@ -300,7 +300,7 @@ public:
     asum (int n, const std::complex<float> *x,
           int incx)
     {
-       float sum = cblas_scasum(n, x, incx);
+       float sum = cblas_scasum(n, reinterpret_cast<const float*>(x), incx);
 
        return sum;
     }
@@ -309,7 +309,7 @@ public:
     asum (int n, const std::complex<double> *x,
           int incx)
     {
-       double sum = cblas_dzasum(n, x, incx);
+       double sum = cblas_dzasum(n, reinterpret_cast<const double*>(x), incx);
 
        return sum;
     }
@@ -318,7 +318,7 @@ public:
     asum (int n, const float2 *x,
           int incx)
     {
-       float sum = cblas_scasum(n, x, incx);
+       float sum = cblas_scasum(n, reinterpret_cast<const float*>(x), incx);
 
        return sum;
     }
@@ -327,7 +327,7 @@ public:
     asum (int n, const double2 *x,
           int incx)
     {
-       double sum = cblas_dzasum(n, x, incx);
+       double sum = cblas_dzasum(n, reinterpret_cast<const double*>(x), incx);
 
        return sum;
     }
@@ -367,28 +367,28 @@ public:
     axpy (int n, std::complex<double> alpha, const std::complex<double> *x,
           int incx, std::complex<double> *y, int incy)
     {
-       cblas_zaxpy(n, &alpha, x, incx, y, incy);
+       cblas_zaxpy(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
     }
 
     static void
     axpy (int n, std::complex<float> alpha, const std::complex<float> *x,
           int incx, std::complex<float> *y, int incy)
     {
-       cblas_caxpy(n, &alpha, x, incx, y, incy);
+       cblas_caxpy(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
     static void
     axpy (int n, double2 alpha, const double2 *x,
           int incx, double2 *y, int incy)
     {
-       cblas_zaxpy(n, &alpha, x, incx, y, incy);
+       cblas_zaxpy(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
     }
 
     static void
     axpy (int n, float2 alpha, const float2 *x,
           int incx, float2 *y, int incy)
     {
-       cblas_caxpy(n, &alpha, x, incx, y, incy);
+       cblas_caxpy(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
     // @sect4{Funktion: copy}
@@ -422,25 +422,25 @@ public:
     static void
     copy(int n, const std::complex<double> *x, int incx, std::complex<double> *y, int incy)
     {
-        cblas_zcopy(n, x, incx, y, incy);
+        cblas_zcopy(n, reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
     }
 
     static void
     copy(int n, const std::complex<float> *x, int incx, std::complex<float> *y, int incy)
     {
-        cblas_ccopy(n, x, incx, y, incy);
+        cblas_ccopy(n, reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
     static void
     copy(int n, const double2 *x, int incx, double2 *y, int incy)
     {
-        cblas_zcopy(n, x, incx, y, incy);
+        cblas_zcopy(n, reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
     }
 
     static void
     copy(int n, const float2 *x, int incx, float2 *y, int incy)
     {
-        cblas_ccopy(n, x, incx, y, incy);
+        cblas_ccopy(n, reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
     // @sect4{Funktion: scal}
@@ -474,25 +474,25 @@ public:
     static void
     scal (int n, std::complex<float> alpha, std::complex<float> *x, int incx)
     {
-       cblas_cscal(n, &alpha, x, incx);
+       cblas_cscal(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<float*>(x), incx);
     }
 
     static void
     scal (int n, std::complex<double>  alpha, std::complex<double> *x, int incx)
     {
-        cblas_zscal (n, &alpha, x, incx);
+       cblas_zscal(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<double*>(x), incx);
     }
 
     static void
     scal (int n, float2 alpha, float2 *x, int incx)
     {
-       cblas_cscal(n, &alpha, x, incx);
+       cblas_cscal(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<float*>(x), incx);
     }
 
     static void
     scal (int n, double2  alpha, double2 *x, int incx)
     {
-        cblas_zscal(n, &alpha, x, incx);
+       cblas_zscal(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<double*>(x), incx);
     }
 
     static void
@@ -501,7 +501,7 @@ public:
         float2 a;
         a.x = alpha;
         a.y = 0;
-       cblas_cscal(n, &a, x, incx);
+       cblas_cscal(n, reinterpret_cast<const float*>(&a), reinterpret_cast<float*>(x), incx);
     }
 
     static void
@@ -510,7 +510,7 @@ public:
         double2 a;
         a.x = alpha;
         a.y = 0;
-        cblas_zscal (n, &a, x, incx);
+        cblas_zscal (n, reinterpret_cast<const double*>(&a), reinterpret_cast<double*>(x), incx);
     }
 
 
@@ -656,11 +656,11 @@ public:
         cblas_cgemm(CblasColMajor,
                     tr_a, tr_b,
                     m, n, k,
-                    &alpha,
-                    A, lda,
-                    B, ldb,
-                    &beta,
-                    C, ldc);
+                    reinterpret_cast<const float*>(&alpha),
+                    reinterpret_cast<const float*>(A), lda,
+                    reinterpret_cast<const float*>(B), ldb,
+                    reinterpret_cast<const float*>(&beta),
+                    reinterpret_cast<float*>(C), ldc);
 
         //! cublasStatus status = cublasGetError();
 
@@ -675,11 +675,14 @@ public:
         CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : ( (transa == 'c') || (transa == 'C') ) ? CblasConjTrans : CblasNoTrans );
         CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : ( (transb == 'c') || (transb == 'C') ) ? CblasConjTrans : CblasNoTrans );
 
-        cblas_zgemm(CblasColMajor, tr_a, tr_b,
+        cblas_zgemm(CblasColMajor,
+                    tr_a, tr_b,
                     m, n, k,
-                    &alpha,
-                    A, lda, B, ldb,
-                    &beta, C, ldc);
+                    reinterpret_cast<const double*>(&alpha),
+                    reinterpret_cast<const double*>(A), lda,
+                    reinterpret_cast<const double*>(B), ldb,
+                    reinterpret_cast<const double*>(&beta),
+                    reinterpret_cast<double*>(C), ldc);
 
         //! cublasStatus status = cublasGetError();
 
@@ -720,7 +723,7 @@ public:
     static float
     nrm2(int n, const float2 *x, int incx)
     {
-        float result = cblas_scnrm2 (n, x, incx);
+        float result = cblas_scnrm2 (n, reinterpret_cast<const float*>(x), incx);
 
         //! cublasStatus status = cublasGetError();
 
@@ -732,7 +735,7 @@ public:
     static double
     nrm2(int n, const double2 *x, int incx)
     {
-        double result = cblas_dznrm2 (n, x, incx);
+        double result = cblas_dznrm2 (n, reinterpret_cast<const double*>(x), incx);
 
         //! cublasStatus status = cublasGetError();
 
@@ -744,7 +747,7 @@ public:
     static float
             nrm2(int n, const std::complex<float> *x, int incx)
     {
-        float result = cblas_scnrm2 (n, x, incx);
+        float result = cblas_scnrm2 (n, reinterpret_cast<const float*>(x), incx);
 
         //! cublasStatus status = cublasGetError();
 
@@ -756,7 +759,7 @@ public:
     static double
             nrm2(int n, const std::complex<double> *x, int incx)
     {
-        double result = cblas_dznrm2 (n, x, incx);
+        double result = cblas_dznrm2 (n, reinterpret_cast<const double*>(x), incx);
 
         //! cublasStatus status = cublasGetError();
 

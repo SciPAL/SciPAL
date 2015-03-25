@@ -22,7 +22,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 
 #include <lac/expression_template.h>
-#include <lac/release/expression_templates_host.h>
+#include <lac/expression_templates_host.h>
 #include <complex>
 #include <float.h>
 //! Vorwaertsdeklaration fuer expression templates
@@ -33,10 +33,10 @@ struct vmu;
 //#include <lac/SciPAL_kernels_wrapper.cu.h>
 #include <deal.II/lac/vector.h>
 
-#include <lac/release/Array.h>
-#include <lac/release/Shape.h>
+#include <lac/Array.h>
+#include <lac/Shape.h>
 
-#include <lac/development/BlasVectorOperations.h>
+#include <lac/BlasVectorOperations.h>
 
 #include <base/PrecisionTraits.h>
 

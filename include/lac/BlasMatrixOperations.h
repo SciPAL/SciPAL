@@ -20,10 +20,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef MATRIXOPERATIONS_H
 #define MATRIXOPERATIONS_H
 
-#include <lac/development/cublas_Matrix.h>
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Matrix.h>
+#include <lac/cublas_Vector.h>
 
-#include <lac/release/expression_templates_host.h>
+#include <lac/expression_templates_host.h>
 
 namespace SciPAL {
 

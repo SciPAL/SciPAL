@@ -20,7 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef cublas_SubMatrixView_H
 #define cublas_SubMatrixView_H
 
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Vector.h>
 
 namespace SciPAL {
 

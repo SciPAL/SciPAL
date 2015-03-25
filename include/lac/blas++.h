@@ -32,17 +32,17 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 //! Include implementations
 
-#include <lac/release/blas_wrapper.hh>
-#include <lac/release/cublas_wrapper.hh>
+#include <lac/blas_wrapper.hh>
+#include <lac/cublas_wrapper.hh>
 
 #include <lac/FullMatrixAccessor.h>
 
-#include <lac/release/Array.h>
+#include <lac/Array.h>
 
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Vector.h>
 #include <lac/cublas_VectorView.h>
 
-#include <lac/development/cublas_Matrix.h>
+#include <lac/cublas_Matrix.h>
 #include <lac/cublas_SubMatrixView.h>
 
 

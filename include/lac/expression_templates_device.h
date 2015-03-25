@@ -20,15 +20,17 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef DEVICEEXPR_H
 #define DEVICEEXPR_H
 
-#include <lac/release/expression_templates_host.h>
-
-#include <lac/development/DevLiteral.h>
+#include <lac/expression_templates_host.h>
+#include <lac/DevLiteral.h>
 
 struct blas;
 
 struct cublas;
 
+
 namespace SciPAL {
+
+template<typename T> struct CudaComplex;
 
 //! aux structure to solve the missing Type problem in ShapeData
 template<typename T> struct GetMyType;
@@ -45,7 +47,45 @@ template<typename T> struct GetMyType {
 
 //!definitions of operations for DevBinaryExpr
 template<typename OpTag, typename T> struct  binary;
+//templates for CudaComplex
 
+//template<typename T>
+//struct  binary<plus, CudaComplex<T> >
+//{
+//    template <typename L, typename R>
+//    __host__ __device__ __forceinline__
+//    static  CudaComplex<T> eval(const L& a, const R& b)
+//    { return CudaComplex<T>(a.x+b.x, a.y+b.y ); }
+//};
+
+//template<typename T>
+//struct  binary<mult, CudaComplex<T> >
+//{
+//    template <typename L, typename R>
+//    __host__ __device__  __forceinline__
+//    static  CudaComplex<T> eval(const L& a, const R& b)
+//    { return CudaComplex<T>(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
+//};
+
+//template<typename T> struct
+//binary<minus, CudaComplex<T> >
+//{
+//    template <typename L, typename R>
+//    __host__ __device__  __forceinline__
+//    static  CudaComplex<T> eval(const L& a, const R& b)
+//    { return CudaComplex<T>(a.x-b.x, a.y-b.y ); }
+//};
+
+//template<typename T> struct
+//binary<divide, CudaComplex<T> >
+//{
+//    template <typename L, typename R>
+//    __host__ __device__  __forceinline__
+//    static  CudaComplex<T> eval(const L& a, const R& b) { return a / b; }
+//    // Here, we could add a sanity check, whether we divide by zero
+//};
+
+//general templates
 template<typename T>
 struct  binary<plus, T>
 {
@@ -59,7 +99,7 @@ struct  binary<mult, T>
 {
     template <typename L, typename R>
     __host__ __device__  __forceinline__
-    static  T eval(const L& a, const R& b) { return a * b; }
+    static  T eval(const L a, const R b) { return a * b; }
 };
 
 template<typename T>
@@ -67,7 +107,7 @@ struct  binary<pmult, T>
 {
     template <typename L, typename R>
     __host__ __device__  __forceinline__
-    static  T eval(const L& a, const R& b) { return a * b; }
+    static  T eval(const L a, const R b) { return a * b; }
 };
 
 template<typename T> struct
@@ -109,6 +149,16 @@ template <typename T>
 struct ExprTree {
 
     //! Specialization for shapes of LAOs. Get element @p i from the data array.
+
+    __host__
+    __device__
+    __forceinline__
+    static CudaComplex<T> eval(const SciPAL::ShapeData< CudaComplex<T> > & Ax, int i)
+    {
+        // printf("%s ", __PRETTY_FUNCTION__); printf("shape data : Ex[%d] : %g\n", i, Ax.data_ptr[i] );
+        return Ax.data_ptr[i];
+    }
+
     __host__
     __device__
     __forceinline__
@@ -192,11 +242,10 @@ struct DevBinaryExpr
     {
         // Evaluate operands before the expression at this level.
         // This should simplify the analysis of errors ar compile-time.
-        // The 'E' typedef is needed, when the eval function is not static. Then @p e is an object of type @p E.
-        typedef ExprTree<value_type> /*E;
-        E*/ e;
-        value_type left  = e::eval(l, i);
-        value_type right = e::eval(r, i);
+        // We have to ask left and right operand for its value type in order to combine
+        // real and complexvalued arithmetic.
+        typename L::value_type left = ExprTree<typename L::value_type>::eval(l, i);
+        typename R::value_type right = ExprTree<typename R::value_type>::eval(r, i);
 
         return binary<Operator, value_type>::eval(left, right);
     }

@@ -24,10 +24,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 //SciPAL includes
 #include <base/ParallelArch.h>
 #include <base/PrecisionTraits.h>
-#include <lac/release/ShapeData.h>
+#include <lac/ShapeData.h>
 #include <base/CudaComplex.h>
-#include <lac/development/expression_templates_device.h>
-#include <lac/development/UnaryFunctions.h>
+#include <lac/expression_templates_device.h>
+#include <lac/UnaryFunctions.h>
 
 
 #include <iostream>

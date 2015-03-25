@@ -29,15 +29,11 @@ template<typename, typename> class Vector;
 
 }
 
-#include <lac/release/expression_templates_host.h>
+#include <lac/expression_templates_host.h>
 
-
-// #include <release/include/lac/Matrix.h>
-// #include <release/include/lac/Vector.h>
-
-#include <lac/development/cublas_Matrix.h>
-#include <lac/development/cublas_Vector.h>
-#include <lac/development/VectorCustomOperations.h>
+#include <lac/cublas_Matrix.h>
+#include <lac/cublas_Vector.h>
+#include <lac/VectorCustomOperations.h>
 namespace SciPAL {
 
 using namespace SciPAL;

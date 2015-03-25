@@ -27,14 +27,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <deal.II/base/subscriptor.h>
 
-#include <lac/release/Array.h>
-#include <lac/release/Expr.h>
-#include <lac/development/BlasMatrixOperations.h>
+#include <lac/Array.h>
+#include <lac/Expr.h>
+#include <lac/BlasMatrixOperations.h>
 
 // this is from SciPAL/include/
 //
-#include <lac/development/cublas_Vector.h>
-#include <lac/release/Shape.h>
+#include <lac/cublas_Vector.h>
+#include <lac/Shape.h>
 #include <base/ArchTraits.h>
 
 // #include <lac/ScipalExpressions.h>

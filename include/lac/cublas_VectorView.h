@@ -20,8 +20,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef cublas_VectorView_H
 #define cublas_VectorView_H
 
-#include <lac/release/Shape.h>
-#include <lac/release/Expr.h>
+#include <lac/Shape.h>
+#include <lac/Expr.h>
 
 //! Vorwaertsdeklaration fuer expression templates
 struct vmu_view;

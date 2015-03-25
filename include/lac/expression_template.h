@@ -20,7 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef EXPRESSION_TEMPLATE_H
 #define EXPRESSION_TEMPLATE_H
 
-#include <lac/release/Expr.h>
+#include <lac/Expr.h>
 
 
 //!

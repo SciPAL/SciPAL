@@ -39,85 +39,12 @@ struct vmu;
 #include <lac/BlasVectorOperations.h>
 
 #include <base/PrecisionTraits.h>
-
+#include <base/Zero_One_Traits.h>
 
 template<typename> class FullMatrixAccessor;
 
 
 namespace SciPAL {
-
-template<typename T> struct One
-{
-    typedef T Type;
-public:
-    T operator()(bool plus=true);
-};
-
-
-template<>
-inline cuComplex One<cuComplex>::operator ()(bool plus)
-{
-    Type result; result.x = (plus ? 1. : -1.); result.y = 0.; return result;
-}
-
-template<>
-inline cuDoubleComplex One<cuDoubleComplex>::operator ()(bool plus)
-{
-    Type result; result.x = (plus ? 1. : -1.); result.y = 0.; return result;
-}
-
-//template<>
-//std::complex<double> One<std::complex<double> >::operator ()(bool plus)
-//{
-//    return std::complex<double>(plus ? 1. : -1., 0.0);
-//}
-
-//template<>
-//std::complex<float> One<std::complex<float> >::operator ()(bool plus)
-//{
-//    return std::complex<float>(plus ? 1. : -1., 0.0);
-//}
-template<typename T>
-inline T One<T>::operator ()(bool plus) {  return (plus ? 1. : -1); }
-
-//!-------------------------------------------------------------------------
-
-template<typename T> struct Zero
-{
-    typedef T Type;
-public:
-    T operator()();
-};
-
-
-template<>
-inline cuComplex Zero<cuComplex>::operator ()()
-{
-    Type result;
-    result.x = 0; result.y = 0.; return result;
-}
-
-template<>
-inline cuDoubleComplex Zero<cuDoubleComplex>::operator ()()
-{
-    Type result;
-    result.x = 0; result.y = 0.; return result;
-}
-
-//template<>
-//std::complex<double> Zero<std::complex<double> >::operator ()()
-//{
-//    return std::complex<double>(0.0, 0.0);
-//}
-
-//template<>
-//std::complex<float> Zero<std::complex<float> >::operator ()()
-//{
-//    return std::complex<float>(0.0, 0.0);
-//}
-
-template<typename T>
-inline T Zero<T>::operator ()() {  return 0.; }
 
     template<typename, typename> class Array;
     template<typename, typename> class Matrix;
@@ -139,8 +66,8 @@ template<typename T, typename BW>
 class Vector
         :
         public SciPAL::Expr<Vector<T, BW> >,
-        public  dealii::Subscriptor,
         protected Array<T, BW>,
+        public  dealii::Subscriptor,
         public SciPAL::Shape<T> {
 
 
@@ -202,16 +129,6 @@ public:
 
     Vector (const std::vector<T> & src) { *this = src; }
 
-    //create Vectors from expressions
-    template<typename M, typename Op>
-    Vector(const X_read_read<M, Op, Vector<T, BW> > & Ax);
-
-    template<typename M,  typename Op,
-    typename T_src>
-    Vector(const //! X_read_read<M, Op, Vector<T, BW> >
-                                    X_read_read<M, Op, SciPAL::ColVectorView<T, T_src> >
-                                    & Ax);
-
         //! Lese- und Schreibzugriff auf das unterliegende array - falls man es doch mal braucht.
         //! Der Zwang explizit diese Funktion aufzurufen sollte Schutz genug sein gegen Missbrauch,
         //! d.h., ist man der Meinung diese Funktion nehmen zu muessen, hat man im Allgemeinen was
@@ -220,18 +137,10 @@ public:
 
     inline const Array<T, BW> & array() const { return *this; }
 
-    Vector<T, BW> & operator = (const Vector<T, BW> & other);
-
-
     template<typename BW2>
     Vector<T, BW> & operator = (const Vector<T, BW2> & other);
 
-
-    Vector<T, BW> & operator = (const std::vector<typename
-                                PrecisionTraits<T, BW::arch>::NumberType> & other);
-
-    Vector<T, BW> & operator = (const std::vector<std::complex<typename
-                                PrecisionTraits<T, BW::arch>::NumberType> > & other);
+    Vector<T, BW> & operator = (const std::vector<T> & other);
 
     template<typename T2>
     void push_to(std::vector<T2> & dst) const;
@@ -249,19 +158,6 @@ public:
 
     template<typename X>
      Vector<T, BW> & operator = (const SciPAL::Expr<X> & e);
-
-     template<typename L, typename Op, typename R >
-     Vector<T, BW> & operator= (const SciPAL::BinaryExpr<L, Op, R> & Ax);
-
-#ifdef USE_OLD_ET
-    template<typename M, typename Op>
-    Vector<T, BW> & operator = (const X_read_read<M, Op, Vector<T, BW> > & Ax);
-
-    template<typename M, typename T_src>
-    Vector<T, BW> & operator=(const
-                                    X_read_read<M, vmu, ColVectorView<T, T_src> >
-                                    & Ax);
-#endif
 
     Vector<T, BW> & operator += (const Vector<T, BW> & other);
 
@@ -310,13 +206,15 @@ public:
 
     T operator () (int k) const;
 
+    T& operator [](size_t el);
+
     void set(int k,const T value);
 
     void set(const int value);
 
     void add(int k,const T value);
 
-    // additional functions
+    // additional functions deal.ii compatibility
     bool all_zero();
 
     void add(const Vector<T, BW> & other);
@@ -373,6 +271,7 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector()
     :
       Array<T, BW>(),
+      dealii::Subscriptor(),
       MyShape(this->data(), 0, 0, 0 /*TO DO: leading dim*/)
 {}
 
@@ -385,6 +284,7 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(size_t n_elements)
     :
     Array<T, BW>(n_elements),
+    dealii::Subscriptor(),
     MyShape(this->array().val(),
               n_elements, /*n_rows*/
               1, /*n_cols*/
@@ -403,6 +303,7 @@ SciPAL::Vector<T, BW>::Vector(size_t n_elements,
                               const Array<T, BW> & raw_data)
     :
     Array<T, BW>(n_elements),
+    dealii::Subscriptor(),
     MyShape(this->array().val(),
             n_elements, 1, n_elements/*TO DO: leading dim*/)
 {
@@ -422,6 +323,7 @@ SciPAL::Vector<T, BW>::Vector(const FullMatrixAccessor<T> & src,
                               int r_begin, int c)
     :
     Array<T, BW>(src.n_rows() - r_begin),
+    dealii::Subscriptor(),
     MyShape(this->array().val(), this->__n, 1, this->__n /*TODO: leading dim*/)
 {
     int n_el = src.n_rows() - r_begin;
@@ -454,6 +356,7 @@ SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
                               int r_begin, int c)
     :
     Array<T, BW>(src.n_rows() - r_begin),
+    dealii::Subscriptor(),
     MyShape(this->array().val(), this->__n, 1, this->__n)
 {
     int n_el = src.n_rows() - r_begin;
@@ -566,6 +469,19 @@ SciPAL::Vector<T, BW>::operator () (int k) const
     return tmp[0];
 }
 
+// @sect4{Funktion: Vector::[]}
+//!
+//! Elementzugriff auf Vektor - lesend
+//!
+//! @param el : Index des Vectors
+
+template<typename T, typename BW>
+T&
+SciPAL::Vector<T, BW>::operator [] (size_t el)
+{
+    return this->data_ptr[el];
+}
+
 // @sect4{Funktion: Vector::set}
 //!
 //! Elementzugriff auf Vektor - schreibend
@@ -623,21 +539,39 @@ SciPAL::Vector<T, BW>::add(int k,const T value)
 //! in der Groesse der Quelle angepassst.
 //! @param other : rechte Seite des = ist ein Vector
 template<typename T, typename BW>
+template<typename BW2>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const Vector<T, BW> & other)
+SciPAL::Vector<T, BW>::operator = (const Vector<T, BW2> & other)
 {
 
-    if(this->__n != other.__n)
-    {
-        size_t new_size = other.size();
-        this->reinit(new_size);
-    }
-    //! Elementweise Kopie des arrays.
-    int inc_src = 1;
+    // element-wise copy of array.
+    int inc_src  = 1;
     int inc_this = 1;
+    //! same blas type no problem
+    if(typeid(BW) == typeid(BW2) )
+        BW::copy(this->n_elements(), other.val(), inc_src,
+                 this->val(), inc_this);
 
-    BW::copy(this->__n, other.val(), inc_src, this->val(), inc_this);
+    //! copy from cublas matrix to blas matrix -> GetMatrix
+    //! TODO: what is with asyn copy?
+    if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
+    {
+        cublas::GetMatrix(other.n_rows(), other.n_cols(), other.array().val(),
+                          other.leading_dim, this->array().val(), this->leading_dim);
+    }
 
+    //! copy from cublas matrix to blas matrix -> SetMatrix
+    //! TODO: what is with asyn copy?
+    if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
+    {
+        cublas::SetMatrix(other.n_rows(), other.n_cols(),
+                          other.array().val(),
+                          other.leading_dim,
+                          this->array().val(),
+                          this->leading_dim);
+    }
+
+    std::cout<<__FUNCTION__<<std::endl;
     return *this;
 }
 
@@ -650,7 +584,7 @@ SciPAL::Vector<T, BW>::operator = (const Vector<T, BW> & other)
 //! @param other : rechte Seite des = ist ein std::Vector
 template<typename T, typename BW>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const std::vector<typename PrecisionTraits<T, BW::arch>::NumberType> & other)
+SciPAL::Vector<T, BW>::operator = (const std::vector<T> & other)
 {
     size_t new_size = other.size();
     this->reinit(new_size);
@@ -665,23 +599,16 @@ SciPAL::Vector<T, BW>::operator = (const std::vector<typename PrecisionTraits<T,
 }
 
 
-
-template<typename T, typename BW>
-SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const std::vector<std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> > & other)
+template <typename T, typename BW>
+template <typename X>
+SciPAL::Vector<T, BW> & SciPAL::Vector<T, BW>::operator =
+(const SciPAL::Expr<X> & e)
 {
-    size_t new_size = other.size();
-    this->reinit(new_size);
+#ifdef DEBUG
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
+#endif
 
-    const typename PrecisionTraits<T, BW::arch>::ComplexType * src_ptr
-            = reinterpret_cast<const typename PrecisionTraits<T, BW::arch>::ComplexType *>(&other[0]);
-
-    size_t incx = 1;
-    size_t incy = 1;
-    BW::SetVector(other.size(), src_ptr, incx,
-                  reinterpret_cast<typename PrecisionTraits<T, BW::arch>::ComplexType *>(this->data()),
-                  incy);
-
+    SciPAL::LAOOperations::apply(*this, ~e);
     return *this;
 }
 
@@ -992,31 +919,6 @@ SciPAL::Vector<T, BW>::sadd (T alpha, const Vector<T, BW> & other)
 }
 
 
-
-template <typename T, typename BW>
-template <typename X>
-SciPAL::Vector<T, BW> & SciPAL::Vector<T, BW>::operator =
-(const SciPAL::Expr<X> & e)
-{
-#ifdef DEBUG
-    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
-#endif
-
-    SciPAL::LAOOperations::apply(*this, ~e);
-    return *this;
-}
-
-template <typename T, typename BW>
-template<typename L, typename Op, typename R >
-SciPAL::Vector<T, BW> &  SciPAL::Vector<T, BW>::operator=
-(const SciPAL::BinaryExpr<L, Op, R> & Ax)
-{
-#ifdef DEBUG
-   std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
-#endif
-    SciPAL::LAOOperations::apply(*this, ~Ax);
-    return *this;
-}
 
 // @sect4{struct: vmu}
 //!

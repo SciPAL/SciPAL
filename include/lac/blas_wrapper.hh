@@ -201,12 +201,9 @@ public:
     static void SetMatrix(int rows, int cols, const T2 *const &A,
                    int lda, T *&B, int ldb)
     {
-        //! cublasStatus status = cublasSetMatrix(rows, cols, sizeof(T),
-        //!                                      A, lda, B, ldb);
 
         copy(rows*cols, (A), 1, reinterpret_cast< T2*>(B), 1);
 
-        //! check_status(status);
     }
 
     // @sect4{Funktion: GetMatrix}
@@ -221,10 +218,6 @@ public:
     static void GetMatrix(int rows, int cols, const T * const &A,
                    int lda, T *&B, int ldb)
     {
-        //! cublasStatus status = cublasGetMatrix(rows, cols, sizeof(T),
-        //!                                      A, lda, B, ldb);
-
-        //!
 
         for (int c = 0; c < cols; c++)
         {
@@ -233,7 +226,6 @@ public:
 
         }
 
-        //! check_status(status);
     }
 
     // @sect4{Funktion: SetVector}
@@ -246,13 +238,7 @@ public:
     template<typename T>
     static void SetVector(int n_el, const T * const src, int inc_src, T *dst, int inc_dst)
     {
-        //! cublasStatus status = cublasSetVector(n_el, sizeof(T),
-        //!                                      src, inc_src, dst, inc_dst);
-
-        //! check_status(status);
-
         copy(n_el, src, inc_src, dst, inc_dst);
-
     }
 
     // @sect4{Funktion: GetVector}

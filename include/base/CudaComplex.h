@@ -43,7 +43,9 @@ struct CudaComplex : public PrecisionTraits<T, gpu_cuda>::ComplexType
                                     const NumberType im = NumberType())
      { this->x = re, this->y = im;}
 
-    __host__ __device__ __forceinline__ CudaComplex(const CudaComplex& a){*this = a;}
+    __host__ __device__ __forceinline__
+    CudaComplex(const CudaComplex& a)
+    {*this = a;}
 
     __host__ __device__ __forceinline__ CudaComplex(const ComplexType& a)
     {this->x = a.x; this->y = a.y;}
@@ -182,12 +184,12 @@ double abs_impl(/*const*/ double a )
     return fabs(a);
 }
 
-//template<typename T>
-//__host__ __device__ __forceinline__
-//T abs_impl(T a )
-//{
-//    return ::abs(a);
-//}
+template<typename T>
+__host__ __device__ __forceinline__
+T abs_impl(T a )
+{
+    return ::abs(a);
+}
 
 template<typename T>
 __host__ __device__ __forceinline__
@@ -298,7 +300,7 @@ CudaComplex<T> operator+(const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator+(const CudaComplex<T>& a, const T& val)
+CudaComplex<T> operator+(const CudaComplex<T>& a, const T val)
 {
     CudaComplex<T> tmp(a);
     tmp += val;
@@ -307,7 +309,7 @@ CudaComplex<T> operator+(const CudaComplex<T>& a, const T& val)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator+( const T& val, const CudaComplex<T>& a)
+CudaComplex<T> operator+( const T val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(a);
     tmp += val;
@@ -328,7 +330,7 @@ CudaComplex<T> operator-( const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator-(const CudaComplex<T>& a, const T& val)
+CudaComplex<T> operator-(const CudaComplex<T>& a, const T val)
 {
     CudaComplex<T> tmp(a);
     tmp -= val;
@@ -337,7 +339,7 @@ CudaComplex<T> operator-(const CudaComplex<T>& a, const T& val)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator-( const T& val, const CudaComplex<T>& a)
+CudaComplex<T> operator-( const T val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(val, -a.imag());
     tmp -= a.real();
@@ -356,7 +358,7 @@ CudaComplex<T> operator*( const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator*(const CudaComplex<T>& a, const T& val)
+CudaComplex<T> operator*(const CudaComplex<T>& a, const T val)
 {
     CudaComplex<T> tmp(a);
     tmp *= val;
@@ -365,7 +367,7 @@ CudaComplex<T> operator*(const CudaComplex<T>& a, const T& val)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator*( const T& val, const CudaComplex<T>& a)
+CudaComplex<T> operator*( const T val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(a);
     tmp *= val;
@@ -384,7 +386,7 @@ CudaComplex<T> operator/( const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator/(const CudaComplex<T>& val, const T& a)
+CudaComplex<T> operator/(const CudaComplex<T>& val, const T a)
 {
     CudaComplex<T> tmp(val);
     tmp /= a;
@@ -393,7 +395,7 @@ CudaComplex<T> operator/(const CudaComplex<T>& val, const T& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator/( const T& val, const CudaComplex<T>& a)
+CudaComplex<T> operator/( const T val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(val, 0.0);
     tmp /= a;

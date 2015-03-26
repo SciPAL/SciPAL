@@ -262,6 +262,8 @@ void step42::MyFancySimulation::run()
 
     testcase.complex_tests();
 
+    testcase.cusolver_demonstration();
+    
     testcase.feature_demonstration();
 
     std::cout << "Done." << std::endl;

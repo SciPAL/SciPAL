@@ -35,9 +35,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 // For details about the cuda<something> functions have a look at
 // the CUDA reference manual.
 #include <base/GPUInfo.h>
-#include <lac/release/cublas_wrapper.hh>
-#include <lac/release/blas_wrapper.hh>
-#include <lac/development/cublas_Matrix.h>
+#include <lac/cublas_wrapper.hh>
+#include <lac/blas_wrapper.hh>
+#include <lac/cublas_Matrix.h>
 
 namespace stepmini {
 

@@ -25,18 +25,18 @@ QMAKE_CXXFLAGS += -std=gnu++0x
 
 # Qt considers OSX as a unix.
     macx {
-DEALHOME =/usr/local/dealii
+DEALHOME =/scratch/deal.II
            }
     else {
         unix {
-DEALHOME =/usr/local/dealii
+DEALHOME =/scratch/deal.II
         }
     }
 #includes for deal.II
 INCLUDEPATH += $$DEALHOME/include \
           /opt/local/ \ # this is boost's home on mac OSX its 1.52, check boost/version.hpp
           $$DEALHOME/include/deal.II/bundled/ \ # this is for the TBB headers
-
+		  $$DEALHOME/bundled/boost-1.49.0/include/
 
 #deal.II LIBS
 LIBS += -L$$DEALHOME/lib

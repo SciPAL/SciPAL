@@ -1,6 +1,6 @@
 // Header-files of CUDA utility-library
 //Header for referencing CUDA based part
-#include <lac/development/scipal_kernels_wrapper.cu.h>
+#include <lac/scipal_kernels_wrapper.cu.h>
 
 //UnaryExpressions
 
@@ -150,4 +150,4 @@ template <typename T, typename BW> class Vector;
 struct blas;
 struct cublas;
 
-#include <lac/development/instantiations.h>
+#include <lac/instantiations.h>

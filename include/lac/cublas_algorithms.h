@@ -24,7 +24,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <base/sign.h>
 
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Vector.h>
 
 
 namespace SciPAL {

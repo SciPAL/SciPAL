@@ -28,10 +28,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 
 
-#include <lac/development/cublas_Matrix.h>
+#include <lac/cublas_Matrix.h>
 
 
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Vector.h>
 #include <lac/blas++.h>
 #include <base/CudaComplex.h>
 

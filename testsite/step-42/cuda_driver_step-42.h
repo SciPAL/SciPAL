@@ -20,8 +20,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef CUDADriver_STEP_42_H
 #define CUDADriver_STEP_42_H
 
-#include <lac/release/blas_wrapper.hh>
-#include <lac/release/cublas_wrapper.hh>
+#include <lac/blas_wrapper.hh>
+#include <lac/cublas_wrapper.hh>
 
 #include <numerics/SolverWrapper.h>
 

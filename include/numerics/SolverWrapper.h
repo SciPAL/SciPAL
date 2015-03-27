@@ -12,8 +12,8 @@
 #include <deal.II/base/parameter_handler.h>
 //SciPAL
 #include <base/VTraits.h>
-#include <lac/release/cublas_wrapper.hh>
-#include <lac/release/Shape.h>
+#include <lac/cublas_wrapper.hh>
+#include <lac/Shape.h>
 //Qt Includes
 #include <QDir>
 #include <QString>

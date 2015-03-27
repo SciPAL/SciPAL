@@ -131,6 +131,7 @@ LIBS += -L$$QMAKE_LIBDIR \
         -lcublas \
         -lcufft \
         -lcurand \
+        -lcusolver \
 -L/usr/lib
 
 # DO NOT REMOVE the BRACES!!!

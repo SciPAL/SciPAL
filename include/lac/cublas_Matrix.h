@@ -438,22 +438,25 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
 template<typename T, typename BW>
 template<typename BW2>
 SciPAL::Matrix<T, BW> &
-SciPAL::Matrix<T, BW>::operator = (const Matrix<SciPAL::T, BW2> &other)
+SciPAL::Matrix<T, BW>::operator = (const Matrix<T, BW2> &other)
 {
     // element-wise copy of array.
     int inc_src  = 1;
     int inc_this = 1;
+    reinit(other.n_rows(), other.n_cols());
+
     //! same blas type no problem
     if(typeid(BW) == typeid(BW2) )
-        BW::copy(this->n_elements(), other.val(), inc_src,
-                 this->val(), inc_this);
+        BW::copy(this->n_elements(), other.data_ptr, inc_src,
+                 this->data_ptr, inc_this);
 
     //! copy from cublas matrix to blas matrix -> GetMatrix
     //! TODO: what is with asyn copy?
     if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
     {
-        cublas::GetMatrix(other.n_rows(), other.n_cols(), other.array().val(),
-                          other.leading_dim, this->array().val(), this->leading_dim);
+        cublas::GetMatrix(other.n_rows(), other.n_cols(), other.data_ptr,
+                          other.leading_dim, this->data_ptr, this->leading_dim);
+        cudaStreamSynchronize(NULL);
     }
 
     //! copy from cublas matrix to blas matrix -> SetMatrix
@@ -461,10 +464,11 @@ SciPAL::Matrix<T, BW>::operator = (const Matrix<SciPAL::T, BW2> &other)
     if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
     {
         cublas::SetMatrix(other.n_rows(), other.n_cols(),
-                          other.array().val(),
+                          other.data_ptr,
                           other.leading_dim,
-                          this->array().val(),
+                          this->data_ptr,
                           this->leading_dim);
+        cudaStreamSynchronize(NULL);
     }
 
     std::cout<<__FUNCTION__<<std::endl;

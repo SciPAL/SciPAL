@@ -25,7 +25,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <complex>
 #include <iostream>
 #include <typeinfo>
-
+#include <memory>
 //include deal.II exceptions
 #include <deal.II/base/exceptions.h>
 
@@ -244,6 +244,80 @@ struct cublas {
 
         T * dev_ptr;
     };
+
+    //! This structure encapsulates the basic memory management.
+    template<typename _Tp>
+    struct CuAlloc {
+
+    public:
+       typedef size_t     size_type;
+       typedef ptrdiff_t  difference_type;
+       typedef _Tp*       pointer;
+       typedef const _Tp* const_pointer;
+       typedef _Tp&       reference;
+       typedef const _Tp& const_reference;
+       typedef _Tp        value_type;
+
+       template<typename _Tp1>
+         struct rebind
+         { typedef CuAlloc<_Tp1> other; };
+
+        //! This attribute can be used to determine an optimal
+        //! value for the leading dimension by (re)allocating memory
+        //! in multiples of it.
+        //! Its current value is 32 which corresponds to the number of
+        //! threads in a CUDA warp. For floats this is also the number of
+        //! entries in a cache line.
+        static const int leading_dim_multiplier = 32;
+
+        CuAlloc() _GLIBCXX_USE_NOEXCEPT { }
+
+        CuAlloc(const CuAlloc&) _GLIBCXX_USE_NOEXCEPT { }
+
+        template<typename _Tp1>
+        CuAlloc(const CuAlloc<_Tp1>&) _GLIBCXX_USE_NOEXCEPT { }
+
+        ~CuAlloc() _GLIBCXX_USE_NOEXCEPT { }
+
+        void
+        deallocate(pointer dev_ptr, size_type)
+        {
+            if (dev_ptr == 0) return;
+
+             cudaError_t status = cudaFree(dev_ptr);
+             check_status(status);
+
+            dev_ptr = 0;
+        }
+
+
+        pointer
+        allocate(size_type __n, const void* = 0)
+        {
+            pointer dev_ptr;
+            cudaError_t status = cudaMalloc( (void**)&dev_ptr, __n*sizeof(_Tp) );
+            check_status(status);
+
+            // set everything to zero
+            status = cudaMemset( dev_ptr, 0, __n*sizeof(_Tp) );
+            // According to the
+            // <a href="http://developer.download.nvidia.com/compute/cuda/4_2/rel/toolkit/docs/online/sync_async.html#memset_sync_async_behavior">online documentation</a>
+            // cudaMemset is asynchronous.
+            // Thus:
+            cudaThreadSynchronize();
+            // ans only then we check the error status.
+            check_status(status);
+
+            // Initially, we wanted to use cublas allocation routine. However, it seemed
+            // to suffer from 32 bit issues as no more then 512MB could alocated with it.
+            // cublasStatus_t status = cublasAlloc( n, sizeof(T), (void**)&dev_ptr);
+            // check_status(status);
+            return dev_ptr;
+        }
+
+    };
+
+
 
 
 private:

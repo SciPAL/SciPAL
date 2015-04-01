@@ -70,7 +70,7 @@ public:
     //! @param other: source shape to copy.
     Shape& operator = (const Shape& other)
     {
-        this->data_ptr = other.data_ptr;
+//        this->data_ptr = other.data_ptr;
 
         this->n_rows = other.n_rows;
         this->n_cols = other.n_cols;

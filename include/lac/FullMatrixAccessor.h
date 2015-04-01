@@ -110,7 +110,7 @@ public:
                             const T * entries);
 
 
-    FullMatrixAccessor (const dealii::IdentityMatrix &id, bool is_col_major);
+    FullMatrixAccessor (const dealii::IdentityMatrix &id, bool is_col_major=false);
 
     void reinit (size_t nr, size_t nc, bool use_col_major=false) {
         this->Base::reinit(nr,nc);
@@ -272,7 +272,7 @@ FullMatrixAccessor<_T>::FullMatrixAccessor (const unsigned int rows,
 //! oder eine Kopie der Identitaetsmatrix erstellen.
 //! @param id : zu kopierende Identitaetsmatrix.
 template<typename _T>
-FullMatrixAccessor<_T>::FullMatrixAccessor (const dealii::IdentityMatrix &id, bool is_col_major=false)
+FullMatrixAccessor<_T>::FullMatrixAccessor (const dealii::IdentityMatrix &id, bool is_col_major/*=false*/)
         :
         Base(id),
         __is_col_major(is_col_major)

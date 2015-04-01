@@ -28,10 +28,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 
 
-#include <lac/development/cublas_Matrix.h>
+#include <lac/cublas_Matrix.h>
 
 
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Vector.h>
 #include <lac/blas++.h>
 #include <base/CudaComplex.h>
 
@@ -398,6 +398,44 @@ void step42::CUDADriver::complex_tests()
 #endif
 }
 
+void step42::CUDADriver::cusolver_demonstration()
+{
+    // some dummy vectors
+    const unsigned int n_rows = 3;
+    const unsigned int n_cols = 3;
+    const unsigned int n_elements = n_rows * n_cols;
+
+    std::vector<cplxNumber> a(n_elements, 1.);
+
+    for (unsigned int i = 0; i < a.size(); i++)
+        a[i] = i+1;
+
+    SciPAL::Matrix<cplxNumber, BW>
+            A(n_rows, n_cols, a),
+            U(n_rows, n_cols),
+            Vt(n_cols, n_cols);
+
+    SciPAL::Vector<Number, BW> S(n_cols);
+    SciPAL::Vector<cplxNumber, BW> S_cplx(n_cols);
+
+    A.print();
+
+    int returnValue = SciPAL::SVD(A, U, S, Vt);
+
+    std::cout << returnValue << std::endl << "Singular values: " << std::endl;
+
+    S.print();
+
+    std::cout << "Original matrix:" << std::endl;
+
+    for (unsigned int i = 0; i < n_cols; i++)
+        S_cplx.set(i, (cplxNumber)(S(i)));
+    SciPAL::Matrix<cplxNumber, BW> A_tmp(n_rows,n_cols);
+    A_tmp = U * SciPAL::diag<SciPAL::Vector<cplxNumber, BW> >(S_cplx);
+    A = A_tmp * Vt;
+
+    A.print();
+}
 
 void step42::CUDADriver::feature_demonstration()
 {

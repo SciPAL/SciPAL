@@ -243,8 +243,8 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
 
-    const Vtr & diag = expr.r;
-    const Mtx & A = expr.l.A;
+    const Vtr & diag = expr.r.A;
+    const Mtx & A = expr.l;
 
 
     Mtx & C = result;

@@ -52,7 +52,7 @@ QMAKE_LDFLAGS += -fopenmp
 }
 
 # CUDA path
-CUDA_DIR = /usr/local/cuda
+CUDA_DIR = /scratch/CUDA
 #-5.5
 CUDA_CC = $$CUDA_DIR/bin/nvcc
 
@@ -73,7 +73,7 @@ message("nvcc resides in :" $$CUDA_CC)
 CUDA_INCLUDES += -I$$CUDA_DIR/include
 
 # Actually, these are the nvcc flags
-CUDA_CFLAGS = -arch sm_35 -G\ #cuda debugging
+CUDA_CFLAGS = -arch sm_35 \ #cuda debugging
              -ccbin $${QMAKE_CXX} # /usr/bin/clang++
 
     macx {
@@ -131,6 +131,7 @@ LIBS += -L$$QMAKE_LIBDIR \
         -lcublas \
         -lcufft \
         -lcurand \
+        -lcusolver \
 -L/usr/lib
 
 # DO NOT REMOVE the BRACES!!!

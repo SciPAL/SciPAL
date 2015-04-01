@@ -105,10 +105,10 @@ message("Load deal.II MPI config")
     }
 
 message("g++ include paths :" $$INCLUDEPATH)
-message("g++ include paths :" $$LD_LIBRARY_PATH)
+message("g++ LD paths :" $$LD_LIBRARY_PATH)
 
 # Enter project specific source and header files here
-SOURCES = \
+SOURCES += \
     cuda_kernel_step-42.cu step-42.cpp \
     SimParams.cpp
 #$$SciPAL_DIR/src/cuda/scipal_kernels.cu \

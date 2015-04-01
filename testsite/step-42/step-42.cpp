@@ -266,6 +266,12 @@ void step42::MyFancySimulation::run()
     
     testcase.feature_demonstration();
 
+    testcase.lin_combo();
+
+    testcase.views();
+
+    testcase.stacks_of_LAOs();
+
     std::cout << "Done." << std::endl;
 }
 

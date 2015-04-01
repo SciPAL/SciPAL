@@ -229,7 +229,7 @@ template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix()
     :
       Array<T, BW>(),
-      MyShape(this->data(), 0, 0, 0)
+      MyShape(this->val(), 0, 0, 0)
 {}
 
 //! Allocate a matrix of @p n_rows and @p n_cols.
@@ -273,7 +273,7 @@ SciPAL::Matrix<T, BW>::Matrix(const unsigned int n_rows,
 {
     const T2 * const tmp_ptr = &src[0];
 
-    T * this_data = this->data();
+    T * this_data = this->val();
 
     BW::SetMatrix(n_rows, n_cols, tmp_ptr, n_rows,
                   this_data, n_rows);
@@ -317,7 +317,7 @@ template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
     :
       Array<T, BW>(),
-      MyShape(this->data(), 0, 0, 0 /*TODO: leading_dim*/)
+      MyShape(this->val(), 0, 0, 0 /*TODO: leading_dim*/)
 {
     *this = Id;
 }
@@ -390,7 +390,7 @@ SciPAL::Matrix<T, BW>::operator = (const dealii::IdentityMatrix & Id)
     // Ausserdem muss man sich bei Einheitsmatrizen nicht darum kuemmern,
     // ob sie column-major oder row-major sind.
     const T *  id_val = tmp_id.val();
-    T * dst_val = this->data();
+    T * dst_val = this->val();
 
     BW::SetMatrix(__n_dofs, __n_dofs, id_val,
                   __n_dofs, dst_val, __n_dofs );
@@ -765,10 +765,10 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
              dst.n_cols(), /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
              transpose_A != 'n'? this->n_rows() : this->n_cols(), /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
              alpha,
-             this->data(), lda,
-             src.data(), ldb,
+             this->val(), lda,
+             src.val(), ldb,
              beta,
-             dst.data(), ldc);
+             dst.val(), ldc);
 }
 
 
@@ -859,7 +859,7 @@ SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c, T data)
 {
     int lead_dim = this->n_rows();
-    T * tmp_d =  & this->data()[c*this->n_rows()+r];
+    T * tmp_d =  & this->val()[c*this->n_rows()+r];
     T * p_e = &data;
     BW::SetMatrix(1, 1,
                   p_e, lead_dim, tmp_d, 1);
@@ -883,7 +883,7 @@ SciPAL::Matrix<T, BW>::print() const
     T * tmp = new T[n_el];
 
     BW::GetMatrix(this->n_rows(), this->n_cols(),
-                  this->data(), this->n_rows(), tmp, this->n_rows());
+                  this->val(), this->n_rows(), tmp, this->n_rows());
 
     for (uint r = 0; r < this->n_rows(); ++r)
     {

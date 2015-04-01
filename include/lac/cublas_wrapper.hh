@@ -92,9 +92,9 @@ struct cublas {
                 cublas_errors = "unknown cublas error state";
 
 #ifdef QT_NO_DEBUG
-       AssertThrow(false, dealii::ExcMessage(cublas_errors.c_str() ) );
+            AssertThrow(false, dealii::ExcMessage(cublas_errors.c_str() ) );
 #else
-       Assert(false, dealii::ExcMessage(cublas_errors.c_str() ) );
+            Assert(false, dealii::ExcMessage(cublas_errors.c_str() ) );
 #endif
         }
 #endif
@@ -113,9 +113,9 @@ struct cublas {
 
 
 #ifdef QT_NO_DEBUG
-       AssertThrow(false, dealii::ExcMessage(cuda_errors.c_str() ) );
+            AssertThrow(false, dealii::ExcMessage(cuda_errors.c_str() ) );
 #else
-       Assert(false, dealii::ExcMessage(cuda_errors.c_str() ) );
+            Assert(false, dealii::ExcMessage(cuda_errors.c_str() ) );
 #endif
         }
 #endif
@@ -167,7 +167,7 @@ struct cublas {
                     dealii::ExcMessage("cublas shutdown failed"));
 #else
         Assert(s == CUBLAS_STATUS_SUCCESS,
-                    dealii::ExcMessage("cublas shutdown failed"));
+               dealii::ExcMessage("cublas shutdown failed"));
 #endif
 
     }
@@ -185,52 +185,26 @@ struct cublas {
         static const int leading_dim_multiplier = 32;
 
         //! Pointer to the first element of the array.
-        T * dev_ptr;
-
-        bool initialized;
 
     public:
-        Data() : dev_ptr(0), initialized(false) {}
+        Data(){}
 
-        Data(size_t n): dev_ptr(0), initialized(false)
-        {
-            alloc(n);
-        }
+        ~Data(){}
 
-        ~Data() {  free_dev_ptr(); }
-
-        T * data() { return dev_ptr; }
-
-        const T * data() const { return dev_ptr; }
-
-        void resize(size_t n)
-        {
-            free_dev_ptr();
-            alloc(n);
-        }
-
-        const bool init_status() const {return initialized;}
-
-    protected:
-        void swap(Data<T>& other)
-        {
-            std::swap(dev_ptr, other.dev_ptr);
-        }
-
-    private:
-        void free_dev_ptr()
+    public:
+        void deallocate(T* dev_ptr)
         {
             if (dev_ptr == 0) return;
 
-             cudaError_t status = cudaFree(dev_ptr);
-             check_status(status);
+            cudaError_t status = cudaFree(dev_ptr);
+            check_status(status);
 
             dev_ptr = 0;
         }
 
-
-        void alloc(size_t n)
+        T* allocate(size_t n)
         {
+            T* dev_ptr;
             cudaError_t status = cudaMalloc( (void**)&dev_ptr, n*sizeof(T) );
             check_status(status);
 
@@ -248,8 +222,7 @@ struct cublas {
             // to suffer from 32 bit issues as no more then 512MB could alocated with it.
             // cublasStatus_t status = cublasAlloc( n, sizeof(T), (void**)&dev_ptr);
             // check_status(status);
-
-            initialized = true;
+            return dev_ptr;
         }
 
     };
@@ -273,14 +246,14 @@ public:
     //! @param ldb : leading dimension von B.
     template<typename T, typename T2>
     static void SetMatrix(int rows, int cols, const T2 *const &A,
-                   int lda, T *&B, int ldb)
+                          int lda, T *&B, int ldb)
     {
         if(sizeof(T) != sizeof(T2))
             std::cout<<"You are trying to copy matrices with different Types: T="
-                     << typeid(T).name() << ", T2=" << typeid(T2).name() ;
+                    << typeid(T).name() << ", T2=" << typeid(T2).name() ;
 
         cublasStatus_t status = cublasSetMatrix(rows, cols, sizeof(T),
-                                              A, lda, B, ldb);
+                                                A, lda, B, ldb);
 
         check_status(status);
     }
@@ -295,10 +268,10 @@ public:
     //! @param ldb : leading dimension von B.
     template<typename T>
     static void GetMatrix(int rows, int cols, const T * const &A,
-                   int lda, T *&B, int ldb)
+                          int lda, T *&B, int ldb)
     {
         cublasStatus_t status = cublasGetMatrix(rows, cols, sizeof(T),
-                                              A, lda, B, ldb);
+                                                A, lda, B, ldb);
 
         check_status(status);
     }
@@ -314,7 +287,7 @@ public:
     static void SetVector(int n_el, const T * const src, int inc_src, T *dst, int inc_dst)
     {
         cublasStatus_t status = cublasSetVector(n_el, sizeof(T),
-                                              src, inc_src, dst, inc_dst);
+                                                src, inc_src, dst, inc_dst);
 
         check_status(status);
 
@@ -331,7 +304,7 @@ public:
     static void GetVector(int n_el, const T * const &A, int inc_src, T *&B, int inc_dst)
     {
         cublasStatus_t status = cublasGetVector(n_el, sizeof(T),
-                                              A, inc_src, B, inc_dst);
+                                                A, inc_src, B, inc_dst);
 
         check_status(status);
     }
@@ -348,10 +321,10 @@ public:
     static void Memset(int n_el, T* ptr, int val)
     {
 
-//      cublasStatus_t status ;
-//      status =
-              cudaMemset( ptr, val, n_el*sizeof(T) );
-//         check_status(status);
+        //      cublasStatus_t status ;
+        //      status =
+        cudaMemset( ptr, val, n_el*sizeof(T) );
+        //         check_status(status);
     }
 
 
@@ -365,10 +338,10 @@ public:
     asum (int n, const float *x,
           int incx)
     {
-       float sum;
-       cublasStatus_t status = cublasSasum(handle, n, x, incx, &sum);
-       check_status(status);
-       return sum;
+        float sum;
+        cublasStatus_t status = cublasSasum(handle, n, x, incx, &sum);
+        check_status(status);
+        return sum;
     }
 
     static double
@@ -416,10 +389,10 @@ public:
     amin (int n, const float *x,
           int incx)
     {
-       int result;
-       cublasStatus_t status = cublasIsamin(handle, n, x, incx, &result);
-       check_status(status);
-       return result - 1;
+        int result;
+        cublasStatus_t status = cublasIsamin(handle, n, x, incx, &result);
+        check_status(status);
+        return result - 1;
     }
 
     static int
@@ -466,10 +439,10 @@ public:
     amax (int n, const float *x,
           int incx)
     {
-       int result;
-       cublasStatus_t status = cublasIsamax(handle, n, x, incx, &result);
-       check_status(status);
-       return result - 1;
+        int result;
+        cublasStatus_t status = cublasIsamax(handle, n, x, incx, &result);
+        check_status(status);
+        return result - 1;
     }
 
     static int
@@ -519,8 +492,8 @@ public:
     axpy (int n, float alpha, const float *x,
           int incx, float *y, int incy)
     {
-       cublasStatus_t status = cublasSaxpy(handle, n, &alpha, x, incx, y, incy);
-       check_status(status);
+        cublasStatus_t status = cublasSaxpy(handle, n, &alpha, x, incx, y, incy);
+        check_status(status);
     }
 
     static void
@@ -658,7 +631,7 @@ public:
 
 
     static void
-            scal (int n, cuComplex alpha, cuComplex *x, int incx)
+    scal (int n, cuComplex alpha, cuComplex *x, int incx)
     {
         cublasStatus_t status = cublasCscal (handle, n, &alpha, x, incx);
         check_status(status);
@@ -714,13 +687,13 @@ public:
           const float *B, int ldb,
           float *C, int ldc )
     {
-    cublasStatus_t status = cublasSgeam(handle,
-                                        opA,  opB,
-                                        rows,  cols,
-                                        alpha, A, lda,
-                                        beta, B, ldb,
-                                        C, ldc);
-    check_status(status);
+        cublasStatus_t status = cublasSgeam(handle,
+                                            opA,  opB,
+                                            rows,  cols,
+                                            alpha, A, lda,
+                                            beta, B, ldb,
+                                            C, ldc);
+        check_status(status);
     }
 
     static void
@@ -731,13 +704,13 @@ public:
           const double *B, int ldb,
           double *C, int ldc )
     {
-    cublasStatus_t status = cublasDgeam(handle,
-                                        opA,  opB,
-                                        rows,  cols,
-                                        alpha, A, lda,
-                                        beta, B, ldb,
-                                        C, ldc);
-    check_status(status);
+        cublasStatus_t status = cublasDgeam(handle,
+                                            opA,  opB,
+                                            rows,  cols,
+                                            alpha, A, lda,
+                                            beta, B, ldb,
+                                            C, ldc);
+        check_status(status);
     }
 
     static void
@@ -748,13 +721,13 @@ public:
           const cuComplex *B, int ldb,
           cuComplex *C, int ldc )
     {
-    cublasStatus_t status = cublasCgeam(handle,
-                                        opA,  opB,
-                                        rows,  cols,
-                                        alpha, A, lda,
-                                        beta, B, ldb,
-                                        C, ldc);
-    check_status(status);
+        cublasStatus_t status = cublasCgeam(handle,
+                                            opA,  opB,
+                                            rows,  cols,
+                                            alpha, A, lda,
+                                            beta, B, ldb,
+                                            C, ldc);
+        check_status(status);
     }
 
     static void
@@ -765,13 +738,13 @@ public:
           const cuDoubleComplex *B, int ldb,
           cuDoubleComplex *C, int ldc )
     {
-    cublasStatus_t status = cublasZgeam(handle,
-                                        opA,  opB,
-                                        rows,  cols,
-                                        alpha, A, lda,
-                                       beta, B, ldb,
-                                        C, ldc);
-    check_status(status);
+        cublasStatus_t status = cublasZgeam(handle,
+                                            opA,  opB,
+                                            rows,  cols,
+                                            alpha, A, lda,
+                                            beta, B, ldb,
+                                            C, ldc);
+        check_status(status);
     }
 
     static void
@@ -940,8 +913,8 @@ public:
         int incx, const float *y, int incy, float *A,
         int lda)
     {
-         cublasStatus_t status = cublasSger(handle, m, n, &alpha, x, incx, y, incy, A, lda);
-         check_status(status);
+        cublasStatus_t status = cublasSger(handle, m, n, &alpha, x, incx, y, incy, A, lda);
+        check_status(status);
     }
 
     static void
@@ -997,8 +970,8 @@ public:
             transactionB = CUBLAS_OP_C;
 
         cublasStatus_t status = cublasSgemm(handle, transactionA, transactionB, m, n, k, &alpha,
-                    A, lda, B, ldb,
-                    &beta, C, ldc);
+                                            A, lda, B, ldb,
+                                            &beta, C, ldc);
 
         check_status(status);
     }
@@ -1030,75 +1003,75 @@ public:
             transactionB = CUBLAS_OP_C;
 
         cublasStatus_t status = cublasDgemm(handle, transactionA, transactionB, m, n, k, &alpha,
-                    A, lda, B, ldb,
-                    &beta, C, ldc);
+                                            A, lda, B, ldb,
+                                            &beta, C, ldc);
 
         check_status(status);
     }
 
     static void gemm(char transa, char transb, int m, int n, int k, cuComplex alpha,
-                         const cuComplex * const A, int lda, const cuComplex* const B, int ldb,
-                         cuComplex beta, cuComplex * C, int ldc)
-        {
-            cublasOperation_t transactionA, transactionB;
+                     const cuComplex * const A, int lda, const cuComplex* const B, int ldb,
+                     cuComplex beta, cuComplex * C, int ldc)
+    {
+        cublasOperation_t transactionA, transactionB;
 
-            if(transa=='N' || transa=='n')
-                transactionA = CUBLAS_OP_N;
+        if(transa=='N' || transa=='n')
+            transactionA = CUBLAS_OP_N;
 
-            if(transa=='T' || transa=='t')
-                transactionA = CUBLAS_OP_T;
+        if(transa=='T' || transa=='t')
+            transactionA = CUBLAS_OP_T;
 
-            if(transa=='C' || transa=='c')
-                transactionA = CUBLAS_OP_C;
+        if(transa=='C' || transa=='c')
+            transactionA = CUBLAS_OP_C;
 
 
-            if(transb=='N' || transb=='n')
-                transactionB = CUBLAS_OP_N;
+        if(transb=='N' || transb=='n')
+            transactionB = CUBLAS_OP_N;
 
-            if(transb=='T' || transb=='t')
-                transactionB = CUBLAS_OP_T;
+        if(transb=='T' || transb=='t')
+            transactionB = CUBLAS_OP_T;
 
-            if(transb=='C' || transb=='c')
-                transactionB = CUBLAS_OP_C;
+        if(transb=='C' || transb=='c')
+            transactionB = CUBLAS_OP_C;
 
-            cublasStatus_t status = cublasCgemm(handle, transactionA, transactionB, m, n, k, &alpha,
-                        A, lda, B, ldb,
-                        &beta, C, ldc);
+        cublasStatus_t status = cublasCgemm(handle, transactionA, transactionB, m, n, k, &alpha,
+                                            A, lda, B, ldb,
+                                            &beta, C, ldc);
 
-            check_status(status);
-        }
+        check_status(status);
+    }
 
     static void gemm(char transa, char transb, int m, int n, int k, cuDoubleComplex alpha,
-                         const cuDoubleComplex * const A, int lda, const cuDoubleComplex* const B, int ldb,
-                         cuDoubleComplex beta, cuDoubleComplex * C, int ldc)
-        {
-            cublasOperation_t transactionA, transactionB;
+                     const cuDoubleComplex * const A, int lda, const cuDoubleComplex* const B, int ldb,
+                     cuDoubleComplex beta, cuDoubleComplex * C, int ldc)
+    {
+        cublasOperation_t transactionA, transactionB;
 
-            if(transa=='N' || transa=='n')
-                transactionA = CUBLAS_OP_N;
+        if(transa=='N' || transa=='n')
+            transactionA = CUBLAS_OP_N;
 
-            if(transa=='T' || transa=='t')
-                transactionA = CUBLAS_OP_T;
+        if(transa=='T' || transa=='t')
+            transactionA = CUBLAS_OP_T;
 
-            if(transa=='C' || transa=='c')
-                transactionA = CUBLAS_OP_C;
+        if(transa=='C' || transa=='c')
+            transactionA = CUBLAS_OP_C;
 
 
-            if(transb=='N' || transb=='n')
-                transactionB = CUBLAS_OP_N;
+        if(transb=='N' || transb=='n')
+            transactionB = CUBLAS_OP_N;
 
-            if(transb=='T' || transb=='t')
-                transactionB = CUBLAS_OP_T;
+        if(transb=='T' || transb=='t')
+            transactionB = CUBLAS_OP_T;
 
-            if(transb=='C' || transb=='c')
-                transactionB = CUBLAS_OP_C;
+        if(transb=='C' || transb=='c')
+            transactionB = CUBLAS_OP_C;
 
-            cublasStatus_t status = cublasZgemm(handle, transactionA, transactionB, m, n, k, &alpha,
-                        A, lda, B, ldb,
-                        &beta, C, ldc);
+        cublasStatus_t status = cublasZgemm(handle, transactionA, transactionB, m, n, k, &alpha,
+                                            A, lda, B, ldb,
+                                            &beta, C, ldc);
 
-            check_status(status);
-        }
+        check_status(status);
+    }
 
 
     // @sect4{Funktion: dgmm}
@@ -1124,10 +1097,10 @@ public:
     {
 
         cublasStatus_t status = cublasSdgmm( handle, mode,
-                                   m,  n,
-                                   A,  lda,
-                                   x, incx,
-                                   C, ldc);
+                                             m,  n,
+                                             A,  lda,
+                                             x, incx,
+                                             C, ldc);
 
         check_status(status);
     }
@@ -1140,10 +1113,10 @@ public:
     {
 
         cublasStatus_t status = cublasDdgmm( handle, mode,
-                                   m,  n,
-                                   A,  lda,
-                                   x, incx,
-                                   C, ldc);
+                                             m,  n,
+                                             A,  lda,
+                                             x, incx,
+                                             C, ldc);
 
         check_status(status);
     }
@@ -1157,10 +1130,10 @@ public:
     {
 
         cublasStatus_t status = cublasCdgmm( handle, mode,
-                                   m,  n,
-                                   A,  lda,
-                                   x, incx,
-                                   C, ldc);
+                                             m,  n,
+                                             A,  lda,
+                                             x, incx,
+                                             C, ldc);
 
         check_status(status);
     }
@@ -1173,10 +1146,10 @@ public:
     {
 
         cublasStatus_t status = cublasZdgmm( handle, mode,
-                                   m,  n,
-                                   A,  lda,
-                                   x, incx,
-                                   C, ldc);
+                                             m,  n,
+                                             A,  lda,
+                                             x, incx,
+                                             C, ldc);
 
         check_status(status);
     }
@@ -1261,13 +1234,13 @@ public:
     }
 
     static cuComplex dot(int n, const cuComplex *x,
-                      int incx, const cuComplex *y, int incy)
+                         int incx, const cuComplex *y, int incy)
     {
         return dotc(n, x, incx, y, incy);
     }
 
     static cuDoubleComplex dot(int n, const cuDoubleComplex *x,
-                      int incx, const cuDoubleComplex *y, int incy)
+                               int incx, const cuDoubleComplex *y, int incy)
     {
         return dotc(n, x, incx, y, incy);
     }
@@ -1282,7 +1255,7 @@ public:
     //! Funktioniert auch fuer cufftComplex, da dieses per typedef
     //! cuComlex cufftComplex definiert ist.
     static cuComplex dotu(int n, const cuComplex *x,
-                      int incx, const cuComplex *y, int incy)
+                          int incx, const cuComplex *y, int incy)
     {
         cuComplex result;
         cublasStatus_t status = cublasCdotu(handle, n, x, incx, y, incy, &result);
@@ -1295,7 +1268,7 @@ public:
 
 
     static cuDoubleComplex dotu(int n, const cuDoubleComplex *x,
-                      int incx, const cuDoubleComplex *y, int incy)
+                                int incx, const cuDoubleComplex *y, int incy)
     {
         cuDoubleComplex result;
         cublasStatus_t status = cublasZdotu(handle, n, x, incx, y, incy, &result);
@@ -1314,7 +1287,7 @@ public:
     //! Funktioniert auch fuer cufftComplex, da dieses per typedef
     //! cuComlex cufftComplex definiert ist.
     static cuComplex dotc(int n, const cuComplex *x,
-                      int incx, const cuComplex *y, int incy)
+                          int incx, const cuComplex *y, int incy)
     {
         cuComplex result;
         cublasStatus_t status = cublasCdotc(handle, n, x, incx, y, incy, &result);
@@ -1327,7 +1300,7 @@ public:
 
 
     static cuDoubleComplex dotc(int n, const cuDoubleComplex *x,
-                      int incx, const cuDoubleComplex *y, int incy)
+                                int incx, const cuDoubleComplex *y, int incy)
     {
         cuDoubleComplex result;
         cublasStatus_t status  = cublasZdotc(handle, n, x, incx, y, incy, &result);
@@ -1340,8 +1313,8 @@ public:
     // @sect4{Funktion: trsm}
     //!
     static inline void trsm(char side, char uplo, char transa, char diag,  int m, int n,
-                     float alpha,
-                     const float * A, int lda, float * B, int ldb)
+                            float alpha,
+                            const float * A, int lda, float * B, int ldb)
     {
 
         cublasSideMode_t sideMode;
@@ -1380,14 +1353,14 @@ public:
             diagMode = CUBLAS_DIAG_NON_UNIT;
 
         cublasStatus_t status = cublasStrsm(handle, sideMode, uploMode, transaction, diagMode, m, n, &alpha,
-                    A, lda, B, ldb);
+                                            A, lda, B, ldb);
 
         check_status(status);
     }
 
     static inline void trsm(char side, char uplo, char transa, char diag,  int m, int n,
-                     double alpha,
-                     const double * A, int lda, double * B, int ldb)
+                            double alpha,
+                            const double * A, int lda, double * B, int ldb)
     {
         cublasSideMode_t sideMode;
         cublasFillMode_t uploMode;
@@ -1425,7 +1398,7 @@ public:
             diagMode = CUBLAS_DIAG_NON_UNIT;
 
         cublasStatus_t status = cublasDtrsm(handle, sideMode, uploMode, transaction, diagMode, m, n, &alpha,
-                    A, lda, B, ldb);
+                                            A, lda, B, ldb);
 
         check_status(status);
     }

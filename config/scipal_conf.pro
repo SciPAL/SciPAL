@@ -73,7 +73,7 @@ message("nvcc resides in :" $$CUDA_CC)
 CUDA_INCLUDES += -I$$CUDA_DIR/include
 
 # Actually, these are the nvcc flags
-CUDA_CFLAGS = -arch sm_52  -G\ #cuda debugging
+CUDA_CFLAGS = -arch sm_35 -g -G\ #cuda debugging
              -ccbin $${QMAKE_CXX} # /usr/bin/clang++
 
     macx {

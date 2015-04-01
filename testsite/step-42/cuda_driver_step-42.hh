@@ -218,7 +218,11 @@ void step42::CUDADriver::gemv_tests()
        vC = vA + vB;
        std::cout << "vC = vA + vB" << std::endl;
        vC.print();
+       std::cout << "vA : " << std::endl;
+       vA.print();
 
+       std::cout << "vB : " << std::endl;
+       vB.print();
 
        vC = vA + 2.0 * vB;
        std::cout << "vC = vA + 2.0 * vB" << std::endl;

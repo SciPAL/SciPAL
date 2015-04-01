@@ -236,29 +236,6 @@ protected:
 };
 }
 
-//namespace SciPAL {
-//template<>
-//template<>
-//Vector<double, cublas> &
-//Vector<double, cublas>::operator = (const Vector<double, blas> & other)
-//{
-
-//    if(this->size() != other.size())
-//    {
-//        size_t new_size = other.size();
-//        this->reinit(new_size);
-//    }
-//    //! Elementweise Kopie des arrays.
-
-//    const double * src_ptr = other.array().val();
-
-//    size_t incx = 1;
-//    size_t incy = 1;
-//    cublas::SetVector(other.size(), src_ptr, incx, this->data(), incy);
-
-//    return *this;
-//}
-//}
 
 // @sect3{SciPAL::Vector Methoden}
 
@@ -272,7 +249,7 @@ SciPAL::Vector<T, BW>::Vector()
     :
       Array<T, BW>(),
       dealii::Subscriptor(),
-      MyShape(this->data(), 0, 0, 0 /*TO DO: leading dim*/)
+      MyShape(NULL, 0, 0, 0 /*TO DO: leading dim*/)
 {}
 
 // @sect4{Konstruktor: Vector(n)}
@@ -595,7 +572,7 @@ SciPAL::Vector<T, BW>::operator = (const std::vector<T> & other)
 
     size_t incx = 1;
     size_t incy = 1;
-    BW::SetVector(other.size(), src_ptr, incx, this->data(), incy);
+    BW::SetVector(other.size(), src_ptr, incx, this->val(), incy);
 
     return *this;
 }

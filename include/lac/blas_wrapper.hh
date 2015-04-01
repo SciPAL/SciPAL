@@ -72,16 +72,6 @@ struct blas {
     template<typename T>
     class Data {
 
-         //! Pointer to the first element of the array.
-        T * __data;
-
-        //! Number of elements in the array.
-        size_t __n_el;
-
-        bool initialized;
-
-    public:
-
         //! This attribute can be used to determine an optimal
         //! value for the leading dimension by (re)allocating memory
         //! in multiples of it.
@@ -89,23 +79,28 @@ struct blas {
         //! threads in a CUDA warp. For floats this is also the number of
         //! entries in a cache line. For the CPU this should be reasonable as well.
         static const int leading_dim_multiplier = 32;
-
+    public:
         //! Default constructor. Sets up nothing.
-        Data() : __data(0), initialized(false)
-        {}
+        Data(){}
+        ~Data(){}
 
-        //! Construct an array of length @p n.
-        //! @param n : Number of elements to allocate.
-        Data(size_t n)
-            : __data(0), __n_el(0), initialized(false)
+        void deallocate(T* dev_ptr)
         {
-            resize(n);
+#ifdef QT_NO_DEBUG
+            AssertThrow(dev_ptr != NULL,
+                        dealii::ExcMessage("allocation of 0 elements not allowed"));
+#else
+            Assert(dev_ptr != NULL,
+                   dealii::ExcMessage("allocation of 0 elements not allowed"));
+#endif
+            delete[] dev_ptr;
         }
 
         //! Resize the array to length @p n. All previous data is erased.
         //! @param n : New number of elements.
-        void resize(size_t n)
+        T* allocate(size_t n)
         {
+            T* dev_ptr;
 #ifdef QT_NO_DEBUG
             AssertThrow(n > 0,
                         dealii::ExcMessage("allocation of 0 elements not allowed"));
@@ -114,41 +109,9 @@ struct blas {
                    dealii::ExcMessage("allocation of 0 elements not allowed"));
 #endif
 
-            if (__n_el == 0)
-            {
-                __data = new T[n];
-                __n_el = n;
-            }
-            else {
-            if (__n_el != n)
-                delete __data;
-                __data = new T[n];
-                __n_el = n;
-            }
-
-            if(__n_el == n)
-                for(size_t ii = 0; ii <  __n_el; ii++)
-                    __data[ii] = T();
-
-            initialized = true;
-
-        };
-
-        ~Data()
-        {
-            if (__n_el > 0)
-            {
-                delete[] __data;
-                __data = 0;
-            }
+            dev_ptr = new T[n];
+            return dev_ptr;
         }
-
-        //! Read-Write access to pointer to the first element of the array.
-        T * data() { return __data; }
-
-        //! Read access to pointer to the first element of the array.
-        const T * data() const { return __data; }
-        const bool init_status() const {return initialized;}
     };
 
 
@@ -163,7 +126,7 @@ public:
     //! @param ldb : leading dimension von B.
     template<typename T,  typename T2>
     static void SetMatrix(int rows, int cols, const T2 *const &A,
-                   int lda, T *&B, int ldb)
+                          int lda, T *&B, int ldb)
     {
 
         copy(rows*cols, (A), 1, reinterpret_cast< T2*>(B), 1);
@@ -180,7 +143,7 @@ public:
     //! @param ldb : leading dimension von B.
     template<typename T>
     static void GetMatrix(int rows, int cols, const T * const &A,
-                   int lda, T *&B, int ldb)
+                          int lda, T *&B, int ldb)
     {
 
         for (int c = 0; c < cols; c++)
@@ -232,54 +195,54 @@ public:
     asum (int n, const float *x,
           int incx)
     {
-       float sum = cblas_sasum(n, x, incx);
+        float sum = cblas_sasum(n, x, incx);
 
-       return sum;
+        return sum;
     }
 
     static double
     asum (int n, const double *x,
           int incx)
     {
-       double sum = cblas_dasum(n, x, incx);
+        double sum = cblas_dasum(n, x, incx);
 
-       return sum;
+        return sum;
     }
 
     static float
     asum (int n, const std::complex<float> *x,
           int incx)
     {
-       float sum = cblas_scasum(n, reinterpret_cast<const float*>(x), incx);
+        float sum = cblas_scasum(n, reinterpret_cast<const float*>(x), incx);
 
-       return sum;
+        return sum;
     }
 
     static double
     asum (int n, const std::complex<double> *x,
           int incx)
     {
-       double sum = cblas_dzasum(n, reinterpret_cast<const double*>(x), incx);
+        double sum = cblas_dzasum(n, reinterpret_cast<const double*>(x), incx);
 
-       return sum;
+        return sum;
     }
 
     static float
     asum (int n, const float2 *x,
           int incx)
     {
-       float sum = cblas_scasum(n, reinterpret_cast<const float*>(x), incx);
+        float sum = cblas_scasum(n, reinterpret_cast<const float*>(x), incx);
 
-       return sum;
+        return sum;
     }
 
     static double
     asum (int n, const double2 *x,
           int incx)
     {
-       double sum = cblas_dzasum(n, reinterpret_cast<const double*>(x), incx);
+        double sum = cblas_dzasum(n, reinterpret_cast<const double*>(x), incx);
 
-       return sum;
+        return sum;
     }
 
     // @sect4{Funktion: axpy}
@@ -295,50 +258,50 @@ public:
     axpy (int n, float alpha, const float *x,
           int incx, float *y, int incy)
     {
-       cblas_saxpy(n, alpha, x, incx, y, incy);
+        cblas_saxpy(n, alpha, x, incx, y, incy);
 
-       //! cublas_status status = cublasGetError();
+        //! cublas_status status = cublasGetError();
 
-       //! check_status(status);
+        //! check_status(status);
     }
 
     static void
     axpy (int n, double alpha, const double *x,
           int incx, double *y, int incy)
     {
-       cblas_daxpy(n, alpha, x, incx, y, incy);
+        cblas_daxpy(n, alpha, x, incx, y, incy);
 
-       //! cublasStatus status = cublasGetError();
+        //! cublasStatus status = cublasGetError();
 
-       //! check_status(status);
+        //! check_status(status);
     }
 
     static void
     axpy (int n, std::complex<double> alpha, const std::complex<double> *x,
           int incx, std::complex<double> *y, int incy)
     {
-       cblas_zaxpy(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
+        cblas_zaxpy(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
     }
 
     static void
     axpy (int n, std::complex<float> alpha, const std::complex<float> *x,
           int incx, std::complex<float> *y, int incy)
     {
-       cblas_caxpy(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
+        cblas_caxpy(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
     static void
     axpy (int n, double2 alpha, const double2 *x,
           int incx, double2 *y, int incy)
     {
-       cblas_zaxpy(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
+        cblas_zaxpy(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<const double*>(x), incx, reinterpret_cast<double*>(y), incy);
     }
 
     static void
     axpy (int n, float2 alpha, const float2 *x,
           int incx, float2 *y, int incy)
     {
-       cblas_caxpy(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
+        cblas_caxpy(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
     // @sect4{Funktion: copy}
@@ -424,25 +387,25 @@ public:
     static void
     scal (int n, std::complex<float> alpha, std::complex<float> *x, int incx)
     {
-       cblas_cscal(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<float*>(x), incx);
+        cblas_cscal(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<float*>(x), incx);
     }
 
     static void
     scal (int n, std::complex<double>  alpha, std::complex<double> *x, int incx)
     {
-       cblas_zscal(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<double*>(x), incx);
+        cblas_zscal(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<double*>(x), incx);
     }
 
     static void
     scal (int n, float2 alpha, float2 *x, int incx)
     {
-       cblas_cscal(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<float*>(x), incx);
+        cblas_cscal(n, reinterpret_cast<const float*>(&alpha), reinterpret_cast<float*>(x), incx);
     }
 
     static void
     scal (int n, double2  alpha, double2 *x, int incx)
     {
-       cblas_zscal(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<double*>(x), incx);
+        cblas_zscal(n, reinterpret_cast<const double*>(&alpha), reinterpret_cast<double*>(x), incx);
     }
 
     static void
@@ -451,7 +414,7 @@ public:
         float2 a;
         a.x = alpha;
         a.y = 0;
-       cblas_cscal(n, reinterpret_cast<const float*>(&a), reinterpret_cast<float*>(x), incx);
+        cblas_cscal(n, reinterpret_cast<const float*>(&a), reinterpret_cast<float*>(x), incx);
     }
 
     static void
@@ -522,11 +485,11 @@ public:
         int incx, const float *y, int incy, float *A,
         int lda)
     {
-         cblas_sger(CblasColMajor, m, n, alpha, x, incx, y, incy, A, lda);
+        cblas_sger(CblasColMajor, m, n, alpha, x, incx, y, incy, A, lda);
 
-         //! cublasStatus status = cublasGetError();
+        //! cublasStatus status = cublasGetError();
 
-         //! check_status(status);
+        //! check_status(status);
     }
 
     static void
@@ -534,11 +497,11 @@ public:
         int incx, const double *y, int incy, double *A,
         int lda)
     {
-         cblas_dger(CblasColMajor, m, n, alpha, x, incx, y, incy, A, lda);
+        cblas_dger(CblasColMajor, m, n, alpha, x, incx, y, incy, A, lda);
 
-         //! cublasStatus status = cublasGetError();
+        //! cublasStatus status = cublasGetError();
 
-         //! check_status(status);
+        //! check_status(status);
     }
 
 
@@ -695,7 +658,7 @@ public:
     }
 
     static float
-            nrm2(int n, const std::complex<float> *x, int incx)
+    nrm2(int n, const std::complex<float> *x, int incx)
     {
         float result = cblas_scnrm2 (n, reinterpret_cast<const float*>(x), incx);
 
@@ -707,7 +670,7 @@ public:
     }
 
     static double
-            nrm2(int n, const std::complex<double> *x, int incx)
+    nrm2(int n, const std::complex<double> *x, int incx)
     {
         double result = cblas_dznrm2 (n, reinterpret_cast<const double*>(x), incx);
 

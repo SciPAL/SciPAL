@@ -39,5 +39,4 @@ struct archTraits<cpu>
 {
     typedef blas BlasType;
 };
-
 #endif // ARCHTRAITS_H

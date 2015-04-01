@@ -158,7 +158,7 @@ SciPAL::Array<T, BW> &
 SciPAL::Array<T, BW>::operator = (const Array<T, BW>& other)
 {
 
-    Assert(other.val(),
+    Assert(other.init_status() == true,
            dealii::ExcMessage("You cannot copy from an uninitialized object!") );
 
     this->reinit(other.__n);

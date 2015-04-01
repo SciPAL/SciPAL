@@ -119,9 +119,9 @@ public:
 
     Vector(const Vector<T, BW> & other)
         :
-          dealii::Subscriptor(),
           Array<T,BW>(),
-        MyShape()
+          dealii::Subscriptor(),
+          MyShape()
     {
         *this = other;
     }
@@ -543,6 +543,8 @@ template<typename BW2>
 SciPAL::Vector<T, BW> &
 SciPAL::Vector<T, BW>::operator = (const Vector<T, BW2> & other)
 {
+    if(this->n_elements() != other.n_elements())
+        this->reinit(other.n_elements());
 
     // element-wise copy of array.
     int inc_src  = 1;

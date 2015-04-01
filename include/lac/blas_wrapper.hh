@@ -54,48 +54,6 @@ struct blas {
     //! Compile-time variable for identifying the side of PCIe bus this BLAS works on.
     static const ParallelArch arch = cpu;
 
- #ifdef dfkgskdd
-
-    // @sect4{Funktion: check_status}
-    //!
-    //! Wertet das cublasStatus Argument aus und wirft im Falle
-    //! eines Fehlers eine Exception aus.
-    static void  check_status(const cublasStatus & status)
-    {
-
-        std::string cublas_errors(" ");
-
-        if (status != CUBLAS_STATUS_SUCCESS)
-        {
-            if (status == CUBLAS_STATUS_NOT_INITIALIZED)
-                cublas_errors += "cublas not initialized ";
-            if (status == CUBLAS_STATUS_MAPPING_ERROR)
-                cublas_errors +="mapping error ";
-            if (status == CUBLAS_STATUS_INVALID_VALUE)
-                cublas_errors +="invalid value ";
-            if (status == CUBLAS_STATUS_ALLOC_FAILED)
-                cublas_errors +="allocation failed ";
-            if (status == CUBLAS_STATUS_ARCH_MISMATCH)
-                cublas_errors +="architecture mismatch ";
-            if (status == CUBLAS_STATUS_EXECUTION_FAILED)
-                cublas_errors +="execution failed ";
-            if (status == CUBLAS_STATUS_INTERNAL_ERROR)
-                cublas_errors +="cublas internal error ";
-
-            if (cublas_errors == " ")
-                cublas_errors = "unknown cublas error state";
-
-#ifdef QT_NO_DEBUG
-       AssertThrow(false, dealii::ExcMessage(cublas_errors.c_str() ) );
-#else
-       AssertThrow(false, dealii::ExcMessage(cublas_errors.c_str() ) );
-#endif
-        }
-
-    }
-#endif
-
-
     //! Initialize cblas. In this particular case this function does nothing.
     static void  Init() {
 
@@ -117,10 +75,13 @@ struct blas {
          //! Pointer to the first element of the array.
         T * __data;
 
-         //! Number of elements in the array.
+        //! Number of elements in the array.
         size_t __n_el;
 
+        bool initialized;
+
     public:
+
         //! This attribute can be used to determine an optimal
         //! value for the leading dimension by (re)allocating memory
         //! in multiples of it.
@@ -130,13 +91,13 @@ struct blas {
         static const int leading_dim_multiplier = 32;
 
         //! Default constructor. Sets up nothing.
-        Data() : __data(0)
+        Data() : __data(0), initialized(false)
         {}
 
         //! Construct an array of length @p n.
         //! @param n : Number of elements to allocate.
         Data(size_t n)
-            : __data(0), __n_el(0)
+            : __data(0), __n_el(0), initialized(false)
         {
             resize(n);
         }
@@ -169,13 +130,15 @@ struct blas {
                 for(size_t ii = 0; ii <  __n_el; ii++)
                     __data[ii] = T();
 
+            initialized = true;
+
         };
 
         ~Data()
         {
             if (__n_el > 0)
             {
-                delete __data;
+                delete[] __data;
                 __data = 0;
             }
         }
@@ -185,6 +148,7 @@ struct blas {
 
         //! Read access to pointer to the first element of the array.
         const T * data() const { return __data; }
+        const bool init_status() const {return initialized;}
     };
 
 

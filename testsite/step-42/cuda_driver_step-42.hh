@@ -187,6 +187,7 @@ void step42::CUDADriver::gemv_tests()
        vC.print();
 
        std::cout << " ============ vC = " << alpha << " * vA + vB ======" << std::endl;
+
        vC = alpha * vA + vB;
          std::cout << "vC : " << std::endl;
        vC.print();
@@ -205,11 +206,15 @@ void step42::CUDADriver::gemv_tests()
 
 
        std::cout << " ============ linear combination test ======" << std::endl;
-  {     vC = 2.0 * vA;
+       vC = 2.0 * vA;
        std::cout << "vC = 2.0 * vA" << std::endl;
        vC.print();
 
+       std::cout << "vA : " << std::endl;
+       vA.print();
 
+       std::cout << "vB : " << std::endl;
+       vB.print();
        vC = vA + vB;
        std::cout << "vC = vA + vB" << std::endl;
        vC.print();
@@ -256,7 +261,7 @@ void step42::CUDADriver::gemv_tests()
 //       vC =abs(cos(2.0 * vA + 3.0 * vB));
 //       std::cout << "vC = abs(cos(2.0 * vA + 3.0 * vB)" << std::endl;
 //       vC.print();
-       }
+
        std::cout << " ============ pointwise arithmetic with matrices======" << std::endl;
 {       // After the element-wise sine of a vector we do the same for a matrix.
 

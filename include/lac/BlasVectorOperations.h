@@ -88,26 +88,20 @@ template <typename T, typename BW>
 static void apply(Vector<T, BW> &result,
                   const typename BlasVecExp<T, BW>::scaledV& expr)
 {
-    typedef Vector<T, BW> Vtr;
-
     T alpha = expr.l;
-    const Vtr & A = expr.r;
-
-    Vtr & C = result;
-
-    C = A;
+    result = expr.r;
 
     int incx = 1;
 
     //int n = A.n_elements(); this is not accessiable
-    int n = A.size();
-    // BW::scal(n, alpha, &(C.array().val()[0]), incx);
+    int n = result.size();
+     BW::scal(n, alpha, &(result.array().val()[0]), incx);
 
-    typedef SciPAL::ShapeData<T> LAOShape;
+//    typedef SciPAL::ShapeData<T> LAOShape;
 
-      SciPAL::Kernels<T, BW::arch> dev_exp(4);
-    DevBinaryExpr<DevLiteral<T>, mult, LAOShape> dev_e(expr);
-       dev_exp.apply(result, dev_e);
+//      SciPAL::Kernels<T, BW::arch> dev_exp(4);
+//    DevBinaryExpr<DevLiteral<T>, mult, LAOShape> dev_e(expr);
+//       dev_exp.apply(result, dev_e);
 }
 
 template <typename T, typename BW>

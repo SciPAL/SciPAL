@@ -25,11 +25,11 @@ QMAKE_CXXFLAGS += -std=gnu++0x
 
 # Qt considers OSX as a unix.
     macx {
-DEALHOME =/scratch/deal.II
+DEALHOME =/usr/local/dealii
            }
     else {
         unix {
-DEALHOME =/scratch/deal.II
+DEALHOME =/usr/local/dealii
         }
     }
 #includes for deal.II

@@ -64,6 +64,8 @@ public:
 
     void cusolver_demonstration();
 
+    void feature_demonstration();
+
     void lin_combo();
 
     void views();

@@ -258,7 +258,7 @@ void step42::MyFancySimulation::run()
     // ... and run the computation on the GPU (or other dedicated parallel hardware).
 //    testcase.gemm_tests();
 
-    testcase.gemv_tests();
+//    testcase.gemv_tests();
 
 //    testcase.complex_tests();
 
@@ -268,7 +268,7 @@ void step42::MyFancySimulation::run()
 
 //    testcase.lin_combo();
 
-//    testcase.views();
+    testcase.views();
 
 //    testcase.stacks_of_LAOs();
 

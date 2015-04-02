@@ -210,19 +210,9 @@ void step42::CUDADriver::gemv_tests()
        std::cout << "vC = 2.0 * vA" << std::endl;
        vC.print();
 
-       std::cout << "vA : " << std::endl;
-       vA.print();
-
-       std::cout << "vB : " << std::endl;
-       vB.print();
        vC = vA + vB;
        std::cout << "vC = vA + vB" << std::endl;
        vC.print();
-       std::cout << "vA : " << std::endl;
-       vA.print();
-
-       std::cout << "vB : " << std::endl;
-       vB.print();
 
        vC = vA + 2.0 * vB;
        std::cout << "vC = vA + 2.0 * vB" << std::endl;
@@ -242,7 +232,7 @@ void step42::CUDADriver::gemv_tests()
        vC.print();
 
        //test pointwise sqrt
-       vC = sqrt(vC);
+//       vC = sqrt(sin(2.0 * vA + 3.0 * vB));// mapping error
        std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
        vC.print();
 
@@ -262,9 +252,14 @@ void step42::CUDADriver::gemv_tests()
        vC.print();
 
        //combined expr test
-//       vC =abs(cos(2.0 * vA + 3.0 * vB));
+//       vC =abs(cos(2.0 * vA + 3.0 * vB)); //mapping error
 //       std::cout << "vC = abs(cos(2.0 * vA + 3.0 * vB)" << std::endl;
 //       vC.print();
+
+//       vC =abs(vA) +  sin(vB); //mapping error
+//       std::cout << "vC =abs(vA) +  sin(vB);" << std::endl;
+//       vC.print();
+
 
        std::cout << " ============ pointwise arithmetic with matrices======" << std::endl;
 {       // After the element-wise sine of a vector we do the same for a matrix.

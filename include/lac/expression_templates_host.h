@@ -63,7 +63,6 @@ struct transpose : public SciPAL::Expr<transpose<M> > {
     typedef typename M::value_type value_type;
 
     typedef typename M::blas_wrapper_type blas_wrapper_type;
-
     transpose(const M & m) : A(m) {}
 };
 
@@ -131,7 +130,7 @@ struct BinaryExpr
     typedef typename _L::Type::value_type value_type;
 
     //we get the wrapper type from the _R because L can be a Literal, Literals do not have a blaswrapper.
-    typedef typename _R::Type::blas_wrapper_type blas_wrapper_type;
+//    typedef typename _R::Type::blas_wrapper_type blas_wrapper_type;
 
     // For Literals the handle is a value and for matrices or vectors it is a reference.
     // these are the actual attributes of the binary expression
@@ -174,6 +173,8 @@ struct UnaryExpr
 
     typedef const Type& ConstHandle;
     typedef typename L::value_type value_type;
+//    typedef typename L::Type::blas_wrapper_type blas_wrapper_type;
+
 
     typename L::ConstHandle l;
 

@@ -207,11 +207,16 @@ public:
 
     void operator () (const unsigned int i, const unsigned int j, T data);
 
-    T l2_norm() const;
+    typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
+
+    T sum() const;
 
     inline SciPAL::Array<T, BW> & array() { return *this; }
 
     inline const SciPAL::Array<T, BW> & array() const { return *this; }
+
+    inline MyShape & shape() { return *this; }
+
 
 private:
 
@@ -563,9 +568,9 @@ SciPAL::Matrix<T, BW>::operator *= (const T2 scale)
 // @sect4{Function: l2_norm}
 //! Consider the contents of the matrix as a vector and compute its L2-norm.
 template<typename T, typename BW>
-T SciPAL::Matrix<T, BW>::l2_norm() const
+typename PrecisionTraits<T, BW::arch>::NumberType SciPAL::Matrix<T, BW>::l2_norm() const
 {
-    T result = BW::nrm2(this->n_elements(), this->val(), 1/*incx*/);
+    typename PrecisionTraits<T, BW::arch>::NumberType result = BW::nrm2(this->n_elements(), this->val(), 1/*incx*/);
 
     return result;
 }
@@ -769,6 +774,7 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
              src.val(), ldb,
              beta,
              dst.val(), ldc);
+    gpuErrchk( cudaPeekAtLastError() );
 }
 
 

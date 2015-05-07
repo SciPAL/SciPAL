@@ -38,7 +38,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 // We have to include
 #include <cuda_runtime_api.h>
 
-#include <lac/stack.h>
+#include <lac/Stack.h>
 
         // @sect4{Constructor: CUDADriver}
         //

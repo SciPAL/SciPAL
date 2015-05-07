@@ -37,7 +37,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/Shape.h>
 #include <base/ArchTraits.h>
 
-// #include <lac/ScipalExpressions.h>
+#include <base/CUDA_error_check.h>
 
 
 template<typename> class FullMatrixAccessor;

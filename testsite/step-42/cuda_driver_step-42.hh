@@ -247,7 +247,7 @@ void step42::CUDADriver::gemv_tests()
        vC.print();
 
        //test pointwise *
-       vC = vA && vB;
+//       vC = vA && vB;
        std::cout << "vC = vA .* vB" << std::endl;
        vC.print();
 
@@ -287,12 +287,12 @@ void step42::CUDADriver::gemv_tests()
        C.print();
 
        //test pointwise * on same matrix
-       C = C && C;
+//       C = C && C;
        std::cout << "C = C .* C" << std::endl;
        C.print();
 
        //test pointwise *
-       C = A && B;
+//       C = A && B;
        std::cout << "C = A .* B" << std::endl;
        C.print();
 
@@ -407,20 +407,20 @@ void step42::CUDADriver::complex_tests()
        std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
        vC.print();
 
-       //test pointwise *
-       vC = vA && vB;
-       std::cout << "vC = vA .* vB" << std::endl;
-       vC.print();
+//       //test pointwise *
+//       vC = vA && vB;
+//       std::cout << "vC = vA .* vB" << std::endl;
+//       vC.print();
 
-       //test pointwise /
-       vC = vA || vB;
-       std::cout << "vC = vA ./ vB" << std::endl;
-       vC.print();
+//       //test pointwise /
+//       vC = vA || vB;
+//       std::cout << "vC = vA ./ vB" << std::endl;
+//       vC.print();
 
-       //combined expr test
-       vC = (vA + vB) || (vA - vB);
-       std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
-       vC.print();
+//       //combined expr test
+//       vC = (vA + vB) || (vA - vB);
+//       std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
+//       vC.print();
 
        //combined expr test
 //       vC =abs(cos(2.0 * vA + 3.0 * vB));
@@ -467,7 +467,7 @@ void step42::CUDADriver::complex_tests()
        C.print();
 
        //test && for mixed numbertypes
-       C = B && D;
+//       C = B && D;
        std::cout << "totally wrong: mixed numbertypes: C = A && D;" << std::endl;
        C.print();
 
@@ -484,7 +484,7 @@ void step42::CUDADriver::complex_tests()
 
        //combined bin-un-expr test
        D = abs(A);
-       C = (B || D) && D;
+//       C = (B || D) && D;
        std::cout << "C = (B || abs(A)) && abs(A);" << std::endl;
        C.print();
 
@@ -494,7 +494,7 @@ void step42::CUDADriver::complex_tests()
 
        //combined bin-un-expr test
        D = abs(B);
-       B = (B || D) && E ;
+//       B = (B || D) && E ;
        std::cout << "fails horribly: B = (B || abs(B)) && E;" << std::endl;
        B.print();
 
@@ -576,37 +576,37 @@ void step42::CUDADriver::feature_demonstration()
 
     SciPAL::Vector<Number*, cublas> d_testV(5);
 
- d_testV = h_testV;
- d_testV.print();
+// d_testV = h_testV;
+// d_testV.print();
 
 
- std::cout<<"Test arbitrary copy directions"<<std::endl;
- SciPAL::Matrix<Number, blas> M1(2,2);
- M1(0,0,1.); M1(0,1,2.);
- M1(1,0,3.); M1(1,1,4.);
+// std::cout<<"Test arbitrary copy directions"<<std::endl;
+// SciPAL::Matrix<Number, blas> M1(2,2);
+// M1(0,0,1.); M1(0,1,2.);
+// M1(1,0,3.); M1(1,1,4.);
 
- std::cout<<"Matrix on host\n M1:"<<std::endl;
-M1.print();
+// std::cout<<"Matrix on host\n M1:"<<std::endl;
+//M1.print();
 
- SciPAL::Matrix<Number, blas> M2(2,2);
- std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
- M2 = M1;
- M2.print();
+// SciPAL::Matrix<Number, blas> M2(2,2);
+// std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
+// M2 = M1;
+// M2.print();
 
- SciPAL::Matrix<Number, cublas> M3(2,2);
- std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
- M3 = M2;
- M3.print();
+// SciPAL::Matrix<Number, cublas> M3(2,2);
+// std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
+// M3 = M2;
+// M3.print();
 
- SciPAL::Matrix<Number, cublas> M4(2,2);
- std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
- M4 = M3;
- M4.print();
+// SciPAL::Matrix<Number, cublas> M4(2,2);
+// std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
+// M4 = M3;
+// M4.print();
 
- SciPAL::Matrix<Number, blas> M5(2,2);
- std::cout<<"back on host\n M5=M4:"<<std::endl;
- M5 = M4;
- M5.print();
+// SciPAL::Matrix<Number, blas> M5(2,2);
+// std::cout<<"back on host\n M5=M4:"<<std::endl;
+// M5 = M4;
+// M5.print();
 
 
 
@@ -729,128 +729,128 @@ std::cout<<"entering tests for Views"<<std::endl;
 
 }
 
-void step42::CUDADriver::stacks_of_LAOs(){
+//void step42::CUDADriver::stacks_of_LAOs(){
 
-    // some dummy vectors
-    const unsigned int n_rows = 4;
-    const unsigned int n_cols = 4;
-    const unsigned int n_elements = n_rows * n_cols;
-//  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{
-    std::cout <<" Stack of vector test with real numbers\n";
-    typedef Number test_nmbr;
-    typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
-    std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
-    for(auto &i : h_test)
-        std::iota(i.begin(), i.end(), 1);
+//    // some dummy vectors
+//    const unsigned int n_rows = 4;
+//    const unsigned int n_cols = 4;
+//    const unsigned int n_elements = n_rows * n_cols;
+////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//{
+//    std::cout <<" Stack of vector test with real numbers\n";
+//    typedef Number test_nmbr;
+//    typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
+//    std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
+//    for(auto &i : h_test)
+//        std::iota(i.begin(), i.end(), 1);
 
-    SciPAL::Stack<test_LAO> d_test(3, n_elements);
+//    SciPAL::Stack<test_LAO> d_test(3, n_elements);
 
-    //element wise copy works
-    for(uint ii=0; ii<h_test.size(); ii++)
-        d_test[ii] = h_test[ii];
+//    //element wise copy works
+//    for(uint ii=0; ii<h_test.size(); ii++)
+//        d_test[ii] = h_test[ii];
 
-    //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
-    d_test = h_test;
+//    //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
+//    d_test = h_test;
 
-    std::cout<<"initialization \n";
-    d_test[0].print();
-    d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1];
-    std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-    d_test[2].print();
-}
-//  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     {
-        std::cout <<" Stack of vector test with cplx numbers\n";
-        typedef cplxNumber test_nmbr;
-        typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
-        std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
-        for(auto &i : h_test)
-            std::iota(i.begin(), i.end(), 1);
+//    std::cout<<"initialization \n";
+//    d_test[0].print();
+//    d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1];
+//    std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+//    d_test[2].print();
+//}
+////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//     {
+//        std::cout <<" Stack of vector test with cplx numbers\n";
+//        typedef cplxNumber test_nmbr;
+//        typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
+//        std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
+//        for(auto &i : h_test)
+//            std::iota(i.begin(), i.end(), 1);
 
-        SciPAL::Stack<test_LAO> d_test(3, 1);
+//        SciPAL::Stack<test_LAO> d_test(3, 1);
 
-        d_test = h_test;
+//        d_test = h_test;
 
-        std::cout<<"initialization \n";
-        d_test[0].print();
-        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-        d_test[2].print();
-    }
+//        std::cout<<"initialization \n";
+//        d_test[0].print();
+//        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+//        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+//        d_test[2].print();
+//    }
 
-//  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     {
-        std::cout <<" Stack of mtx test with real numbers\n";
-        typedef Number test_nmbr;
-        typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
-        typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
+////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//     {
+//        std::cout <<" Stack of mtx test with real numbers\n";
+//        typedef Number test_nmbr;
+//        typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
+//        typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
 
-        std::vector<test_nmbr> a(n_elements);
+//        std::vector<test_nmbr> a(n_elements);
 
-        std::iota(a.begin(), a.end(), 2);
+//        std::iota(a.begin(), a.end(), 2);
 
-        test_LAO_h host_init_mtx(n_rows, n_cols, a);
-        std::cout<<"host init mtx \n";
-        host_init_mtx.print();
+//        test_LAO_h host_init_mtx(n_rows, n_cols, a);
+//        std::cout<<"host init mtx \n";
+//        host_init_mtx.print();
 
-        //this is some how ugly how we have to create the stack of mtx on the host
-        std::vector<test_LAO_h> h_test(3);
+//        //this is some how ugly how we have to create the stack of mtx on the host
+//        std::vector<test_LAO_h> h_test(3);
 
-        for(uint ii = 0; ii< h_test.size(); ii++)
-            h_test[ii] = host_init_mtx;
+//        for(uint ii = 0; ii< h_test.size(); ii++)
+//            h_test[ii] = host_init_mtx;
 
-        SciPAL::Stack<test_LAO> d_test(3,1);
-        d_test = h_test;
+//        SciPAL::Stack<test_LAO> d_test(3,1);
+//        d_test = h_test;
 
-        std::cout<<"host initialization \n";
-        h_test[0].print();
+//        std::cout<<"host initialization \n";
+//        h_test[0].print();
 
-        std::cout<<"initialization \n";
-        d_test[0].print();
-        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-        d_test[2].print();
-    }
+//        std::cout<<"initialization \n";
+//        d_test[0].print();
+//        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+//        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+//        d_test[2].print();
+//    }
 
-//  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-         {
-            std::cout <<" Stack of mtx test with cplx numbers\n";
-            typedef cplxNumber test_nmbr;
-            typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
-            typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
+////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//         {
+//            std::cout <<" Stack of mtx test with cplx numbers\n";
+//            typedef cplxNumber test_nmbr;
+//            typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
+//            typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
 
-            std::vector<test_nmbr> a(n_elements);
+//            std::vector<test_nmbr> a(n_elements);
 
-            std::iota(a.begin(), a.end(), 2);
+//            std::iota(a.begin(), a.end(), 2);
 
-            test_LAO_h host_init_mtx(n_rows, n_cols, a);
-            std::cout<<"host init mtx \n";
-            host_init_mtx.print();
+//            test_LAO_h host_init_mtx(n_rows, n_cols, a);
+//            std::cout<<"host init mtx \n";
+//            host_init_mtx.print();
 
-            //this is some how ugly how we have to create the stack of mtx on the host
-            std::vector<test_LAO_h> h_test(3);
+//            //this is some how ugly how we have to create the stack of mtx on the host
+//            std::vector<test_LAO_h> h_test(3);
 
-            for(uint ii = 0; ii< h_test.size(); ii++)
-                h_test[ii] = host_init_mtx;
+//            for(uint ii = 0; ii< h_test.size(); ii++)
+//                h_test[ii] = host_init_mtx;
 
-            //in this case we CAN NOT write SciPAL::Stack<test_LAO> d_test(3,1);
-            //as for the real case, because internally this maps to a construction
-            //of a dealii::Identity matrix, which is sadly not defined for SciPAL's
-            //complex numbers. The usage of this constructor becomes only a problem
-            //if we try to copy uninitialized Stack elements.
-            SciPAL::Stack<test_LAO> d_test;
-            d_test = h_test;
+//            //in this case we CAN NOT write SciPAL::Stack<test_LAO> d_test(3,1);
+//            //as for the real case, because internally this maps to a construction
+//            //of a dealii::Identity matrix, which is sadly not defined for SciPAL's
+//            //complex numbers. The usage of this constructor becomes only a problem
+//            //if we try to copy uninitialized Stack elements.
+//            SciPAL::Stack<test_LAO> d_test;
+//            d_test = h_test;
 
-            std::cout<<"host initialization \n";
-            h_test[0].print();
+//            std::cout<<"host initialization \n";
+//            h_test[0].print();
 
-            std::cout<<"initialization \n";
-            d_test[0].print();
-            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-            d_test[2].print();
-        }
-}
+//            std::cout<<"initialization \n";
+//            d_test[0].print();
+//            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+//            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+//            d_test[2].print();
+//        }
+//}
 
 #endif //CUDA_DRIVER

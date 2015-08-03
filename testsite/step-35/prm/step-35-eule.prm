@@ -1,0 +1,75 @@
+subsection input data
+  set sigma =  0.1
+  set gaussian noise = 0.1
+
+  set image = /Users/sck/cuda-2014/Praktikum_2014/testsite/step-35/prm/johanns_eule.tif
+
+  # PAMname -- TODO
+  #set PAMname        =
+
+  # enforces first constraint
+  set alpha1         = 0.1
+
+  # enforces second constraint
+  set alpha2         = 0.1
+
+  # Do an Anscombe Transformation on input image
+  set anscombe       = false
+
+  # Dimension of the images (if TIFF-stack process each slice individually if
+  # dim = 2)
+  set dim            = 2
+
+  # Regularisation type -- TODO
+  set regType        = gradient
+
+  # intensity of regularisation
+  set regularization = 10.0
+
+  # stabilises first constraint
+  set rho1           = 1.0
+
+  # stabilises second constraint
+  set rho2           = 1.0
+
+end
+
+
+subsection output
+  # save preliminary results of the output image
+  set control      = true
+
+  # where should we put the ouput image? Will be a tiff image
+  set output image = control.tif
+end
+
+
+subsection program flow control
+  # largest patch edge length if not using small dykstra in approximation
+  set MRdepth            = 14
+
+  # do a small dykstra in approximation
+  set approx             = true
+
+  # Set maximum number of iterations
+  set maximum iterations = 10
+
+  # Reporting progress in intervals of ... Iterations
+  set report interval    = 10
+
+  # Finish when |x_r - x_{r-1}| < tolerance
+  set tolerance          = 1e-3
+end
+
+
+subsection simulate dataset from real image
+  # If set to false the input is treated as real data, if true input will be
+  # treated as test image and blurring and noise are added
+  set simulate  = false
+
+  # If false simulated noise has a constant seed, if true the seed is taken
+  # from the clock
+  set time seed = false
+end
+
+

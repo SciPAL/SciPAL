@@ -1,0 +1,36 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{loglogaxis}[
+		title={power spectral density},
+		xlabel={$\left|k\right|^2$},
+		ylabel={psd},
+		grid=major,
+		legend entries={original, noise, approx, exact},
+		width=\textwidth,
+		legend cell align=left,
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small}
+		mark size=0.8,
+		only marks,
+		xmin = 10
+		]
+		\addplot+[mark=*] table[x=k2,y=psdorig]   {psd_lena_data};
+		\addplot+[mark=*] table[x=k2,y=psdnoise]  {psd_lena_data};
+		\addplot+[mark=*] table[x=k2,y=psdapprox] {psd_lena_data};
+		\addplot+[mark=*] table[x=k2,y=psdexact]  {psd_lena_data};
+	\end{loglogaxis}
+\end{tikzpicture}
+
+\end{document}
+

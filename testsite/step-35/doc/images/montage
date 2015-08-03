@@ -1,0 +1,2 @@
+montage lena.png noise.png -mode concatenate -tile x1 lena_noise.png
+montage runtime.png speedup.png -mode concatenate -tile x1 run_summary.png

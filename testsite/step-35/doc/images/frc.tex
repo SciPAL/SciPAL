@@ -1,0 +1,39 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+\usepackage{amsmath}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{axis}[
+		title={Fourier ring correlation (FRC)},
+		xlabel={Spatial frequency [px$^{-1}$]},
+		ylabel={FRC},
+		grid=major,
+                legend entries={Noisy Image, SMRE Result, Threshold},
+%		legend pos=south east,
+		legend cell align=left,
+%		label style={font=\small},
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small},
+		width=\textwidth,
+		mark size=1,
+		xmin=0,
+		xmax=1.2,
+		]
+		\addplot table {coor_noise.txt};
+		\addplot table {coor_deconv.txt};
+		\addplot[black,sharp plot,update limits=false] 
+			coordinates {(0,0.142857) (1.4,0.142857)};
+	\end{axis}
+\end{tikzpicture}
+
+\end{document}
+

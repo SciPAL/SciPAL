@@ -1,0 +1,38 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+\usepackage{amsmath}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{axis}[
+		title={Resolution},
+		xlabel={standard deviation of white noise in percent of signal},
+		ylabel={Resolution [px]},
+		grid=major,
+                legend entries={Noisy Image, SMRE Result},
+		legend pos=south east,
+		legend cell align=left,
+%		label style={font=\small},
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small},
+		width=\textwidth,
+		]
+		\addplot+[error bars/.cd,
+		x dir=both, x explicit,
+		y dir=both, y explicit,] table[x=sigma, y=noisy, y error = errnoisy] {res_log.txt};
+		\addplot+[error bars/.cd,
+		x dir=both, x explicit,
+		y dir=both, y explicit,] table[x=sigma, y=deconv, y error = errdeconv] {res_log.txt};
+	\end{axis}
+\end{tikzpicture}
+
+\end{document}
+

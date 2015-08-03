@@ -1,0 +1,33 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{loglogaxis}[
+		title={power spectral density},
+		xlabel={$\left|k\right|^2$},
+		ylabel={psd},
+		grid=major,
+		legend entries={original, result},
+		width=0.8\textwidth,
+		legend cell align=left,
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small}
+		mark size=0.8,
+		only marks
+		]
+		\addplot+[mark=*] table[x=dof,y=SOFI]  {psd_data_single};
+		\addplot+[mark=*] table[x=dof,y=DSOFI] {psd_data_single};
+	\end{loglogaxis}
+\end{tikzpicture}
+
+\end{document}
+

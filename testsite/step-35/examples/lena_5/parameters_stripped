@@ -1,0 +1,12 @@
+image lena.tif
+tolerance 0.0001
+control 1
+sigma 2
+stepwidth 100
+simulate 1
+MRdepth 2
+gaussian_noise 2
+report_interval 1
+integer_start 100
+timeseed 0
+find_parameters 0

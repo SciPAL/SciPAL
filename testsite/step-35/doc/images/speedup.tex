@@ -1,0 +1,36 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+\usepackage{amsmath}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{loglogaxis}[
+		title={Speedup},
+		xlabel={Edge length of quadratic image [px]},
+		ylabel={Speedup = $\frac{T_{\text{cpu}}}{T_{\text{gpu}}}$},
+		grid=major,
+                legend entries={{GPU exact, float, $k$ = 15}, {GPU exact, double, $k$ = 15}, {GPU approx., float}},
+		legend pos=south east,
+		legend cell align=left,
+%		label style={font=\small},
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small},
+		width=\textwidth,
+		xmax=3072
+		]
+		\addplot table[x=px,y=exactf] {speedup.data.fd.plot};
+		\addplot table[x=px,y=exactd] {speedup.data.fd.plot};
+		\addplot table[x=px,y=approx] {speedup.data.fd.plot};
+	\end{loglogaxis}
+\end{tikzpicture}
+
+\end{document}
+

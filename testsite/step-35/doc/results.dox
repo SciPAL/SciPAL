@@ -1,0 +1,73 @@
+<h2>Results</h2>
+<h3>Simulated Data</h3>
+<p>
+Both Implementations were tested with simulated data (simulated noise with standard deviation $\sigma =1$ and
+gaussian spread function of width $4$ pixel). The original image and the image with simulated noise are shown below
+\image html lena_noise.png 
+the left side displays the original image and the right side the image with noise and gaussion blurring. The image was used without
+rescaling. The resulting estimator using the exact
+and the approximative Dykstra Algorithm are shown below.
+\image html lena_results.png
+The left image shows the result obtained by the exact Dykstra Algorithm with maximum edge length of 30 pixels and the right image the result of the approximative algorithm.
+The TV norm is calculated as $\text{TV} \left( x \in \mathbb{R}^n \right)^2 = \| x \|_2^2 + \| \nabla x
+\|_2^2$. The TV norm of difference between estimate and original image are calculated as $\text{TV}_{\text{approx}} = 214. 9656$ and
+$\text{TV}_{\text{exact}} = 223.2955$. The results with approximative and exact algorithm are nearly identical in quality, while the runtime
+for the approximative scheme is favourable. However the approximative method seemingly leads to a limit cycle in the ADMM. The constraints
+are violated even for many iterations.
+<h4> Expected Resolution Improvement</h4>
+One would like to get an overall estimate for the gain in resolution from the presented algorithm. However there is no general method at
+hand to obtain the estimate quality. An estimate will be given by using a resolution measure as introduced in \cite fsr. The correlation
+along circles in the fourier plane is calculated for different realisations of the noise. This measure was originally designed to be used in
+a case with unknown true signal. One can predict the impact of noise on the correlation, and therefore estimate the
+resolution as the radius of the circle where the correlation drops below a noise threshold. We applied the measure to an image of randomly
+placed small dots with simulated noise and convolution, the image without noise is shown below.
+\image html generic.png
+ We calculated the resolution as defined above for different standard deviations of
+the white noise.
+\image html frc_summary.png
+The left hand image shows the Fourier Ring Correlation for a standard deviation 2 of the white noise, the right hand image shows the
+estimated resolution for noisy image and estimate in dependence of the noise level.
+As visible for small white noise the algorithm performs well. However as the white noise increases in intensity the resolution as measured
+here does not differ for noisy and estimated image. The presented data was obtained with the approximative algorithm.
+</p>
+
+<h3>Runtime</h3>
+
+<p>
+The figure below compares the runtime for a OMP parallelized Dykstra Algorithm on four cores, the exact CUDA implementation and the approximative Dykstra
+Algorithm on a NVIDIA Tesla K20c.
+\image html run_summary.png
+The runtime difference between the different methods is considerable. The CUDA implementation of the Dykstra-Algorithm is about a factor 100
+faster than the CPU-implementation. The approximative methode is even faster, however one has to notice that the algorithm is a different
+one which gives similar results by observation.
+</p>
+
+<h3>SOFI Data</h3>
+
+<p>
+We had the opportunity to test the presented method with real data that was used with the <a href="step_37.html"> SOFI framework
+(step-37)</a>, see \cite Dertinger29122009 for further reference.
+We analysed a movie with 3500 frames, 10 ms per frame. Each micrograph shows a snapshot of a nerve cell with blinking nanobeads. The
+objective of the SOFI method is to increase the spatial resolution by calculating correlations in the image. Each micrograph shows 
+typical noise and spread. Due to diffraction the real image is seen as convoluted with approximately a gaussian kernel in the micrograph.
+Since the light is emitted via fluorescence poissonian noise is visible on top of that. In order to apply out method we Anscombe transformed
+\cite anscombe
+each image and applied a deconvolution. One frame of the movie and our result are shown below.
+\image html sofi_pic1.png
+The result was calculated using the approximative Dykstra Algorithm for performance reasons. Sparsity of the gradient was chosen as
+regularization parameter. While this regularization does not produce too much visible artifacts it counteracts a deconvolution to a certain
+degree. Therefore the regularization parameter was chosen very small, this results in the pattern visible in the right image. One can see a
+slight difference in the width of the spread comparing both images. This effect becomes more visible looking at the results after applying
+SOFI.
+\image html sofi_final.png
+The right image is the SOFI result on a movie with prior deconvolution and the left image the result of SOFI on the raw data. Here one can
+clearly see that the result with prior denoising is favourable, see for example the structure marked with a. 
+The resulting dots get smaller, in some cases the separation of nearby dots becomes visible only after application of the deconvolution. In
+order to quantify this effect a little more one can consider the power spectral density of both results.
+\image html psd_t.png
+The power spectral densitys are normalized. The SOFI result with prior deconvolution has an overall higher power spectrum than the result
+without deconvolution. This corresponds to a smaller typical wavelength of the dot features visible in the images. Hence the figure can be
+interpreted towards a higher resolution in the SOFI image with statistical multiresolution compared to the SOFI image on raw data. However
+the left side of the result image with SOFI and statistical multiresolution shows artifacts which are not present for SOFI on raw data,
+marked with b.
+</p>

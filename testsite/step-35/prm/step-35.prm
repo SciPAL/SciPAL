@@ -1,0 +1,68 @@
+# Listing of Parameters
+# ---------------------
+subsection input data
+  # enforces first constraint
+  set alpha1         = 1.2
+
+  # enforces second constraint
+  set alpha2         = 0.12
+
+  # estimate of gaussian noise standard deviation. If simulate = true, will be
+  # used to add gaussian noise with standard deviation of ...
+  set gaussian noise = 0
+
+  # path to the .tif image
+  set image          = /Users/sck/Documents/PostDoc/Projects/FRC_tests/lena-sigma_4.tif
+
+  # intensity of regularisation
+  set regularization = 1.0
+
+  # stabilises first constraint
+  set rho1           = 6.192
+
+  # stabilises second constraint
+  set rho2           = 1.8
+
+  # PSF spread
+  set sigma          = 4
+end
+
+
+subsection output
+  # save preliminary results of the output image
+  set control      = true
+
+  # where should we put the ouput image? Will be a tiff image
+  set output image = control.tif
+end
+
+
+subsection program flow control
+  # largest patch edge length if not using small dykstra in approximation
+  set MRdepth            = 15
+
+  # do a small dykstra in approximation
+  set approx             = false
+
+  # Set maximum number of iterations
+  set maximum iterations = 100
+
+  # Reporting progress in intervals of ... Iterations
+  set report interval    = 10
+
+  # Finish when |x_r - x_{r-1}| < tolerance
+  set tolerance          = 1e-3
+end
+
+
+subsection simulate dataset from real image
+  # If set to false the input is treated as real data, if true input will be
+  # treated as test image and blurring and noise are added
+  set simulate  = false
+
+  # If false simulated noise has a constant seed, if true the seed is taken
+  # from the clock
+  set time seed = false
+end
+
+

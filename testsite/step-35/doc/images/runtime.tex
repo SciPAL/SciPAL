@@ -1,0 +1,39 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{loglogaxis}[
+		title={Runtime},
+		xlabel={Edge length of quadratic image [px]},
+		ylabel={Runtime [s]},
+		grid=major,
+                legend entries={{GPU exact, float, $k$ = 15},
+                                {GPU exact, double, $k$ = 15},
+                                {GPU approx., float},
+                                {CPU, double, $k$ = 15}},
+		legend pos=north west,
+		legend cell align=left,
+%		label style={font=\small},
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small},
+		width=\textwidth,
+                xmax=3072
+		]
+                \addplot table {speed_log.exact.plot};
+                \addplot table {speed_log.exact_double.plot};
+                \addplot table {speed_log.approx.plot};
+                \addplot table {speed_log.cpu.plot};
+	\end{loglogaxis}
+\end{tikzpicture}
+
+\end{document}
+

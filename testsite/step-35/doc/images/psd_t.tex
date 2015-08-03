@@ -1,0 +1,33 @@
+\documentclass{standalone}
+
+\usepackage{pgfplots}
+
+%\pgfplotsset{compat=1.10}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1.5]
+	\begin{semilogyaxis}[
+		title={power spectral density},
+		xlabel={$\left|k\right|^2$},
+		ylabel={psd},
+		grid=major,
+		legend entries={SOFI result, SOFI w. prior deconvolution},
+		width=\textwidth,
+		legend cell align=left,
+%		x tick label style={font=\tiny},
+%		x label style={font=\small},
+%		y tick label style={font=\tiny},
+%		y label style={font=\small},
+%		legend style={font=\small},
+%		title style={font=\small}
+		mark size=0.8,
+		only marks
+		]
+		\addplot+[mark=*] table[x=dof,y=SOFI] {/home/jan.lebert/Praktikum_2014/testsite/step-35/doc/images/psd_data};
+		\addplot+[mark=*] table[x=dof,y=DSOFI] {/home/jan.lebert/Praktikum_2014/testsite/step-35/doc/images/psd_data};
+	\end{semilogyaxis}
+\end{tikzpicture}
+
+\end{document}
+

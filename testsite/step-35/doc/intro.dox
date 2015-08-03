@@ -1,0 +1,230 @@
+<h2>Introduction</h2>
+<p>
+In modern image analysis multiresolution methods have gained increasing interest in the last years. This methods aim to estimate a
+underlying signal from a somehow perturbed measurement, usually consisting of a linear operator and noise. The problem emerges frequently in
+microscopy and medical imaging.
+The appealing feature of this approach is that one can control
+the estimate quality at chosen scales, and finally a sound statistical interpretation of the result is at hand. While multiresolution
+methods produce nice results the computational effort is remarkable. The key part of a multiresolution estimator is the ability to project
+on the intersection of several convex subsets in $\mathbb{R}^n$.
+</p>
+
+<p>
+This work is a in relation with \cite masterarbeit. Here we will consider a simplified problem and develop algorithms to tackle a
+more
+difficult one.
+</p>
+<p>
+<ul>
+
+<h3>Background</h3>
+
+In signal processing a common problem is the inversion of
+\f{align}{
+I = A*x + \epsilon
+\f}
+Here $x$ is a true value of interest and $A : \mathbb{R}^n \rightarrow \mathbb{R}^m$ is linear operator. $\epsilon$ is a vector
+represententing noise, gaussian or poisson in most applications. $I$ is usually available by measurement and the task is to estimate the underlying signal $x$. Suppose $A$ is a point spread
+function and $\epsilon$ gaussian noise. Then a multiresolution estimator aimed to estimate a suitable $\hat{x}$ from given $I$ is written as
+\f{align}{
+\hat{x} = \text{argmin}_{x} G \left( \epsilon \right) + R \left( x \right) \text{ s.t. } I = A * x + \epsilon
+\label{eq1}
+\f}
+The introduced function $R$ is a regularization. A common example would be $R \left( x \right) = \| \nabla x \|_2$ though this generic
+choice is meant to be substituted with any problem specific term, see for example \cite Diekmann2001526 . $G$ is the
+characteristic function of the Multiresolution analysis. It is meant to restrict the possible values of $\epsilon$ to a subspace in $\mathbb{R}^m$
+where certain subsets of $\epsilon$ are distributed with at least a given probability $\alpha$ according to a gaussian distribution. This is
+achieved by selecting the weights $c_s$ accordingly as described in \cite anscombe . The method will be summarized here in short.
+In accordance with
+\cite anscombe  we choose $G$ as
+\f{align}{
+    G \left( \epsilon \right) = 0 ,  \text{ if } \max_{s \in \Omega}
+    c_s \sum_{i\in s} \epsilon_i^2 \leq 1 
+\f}
+and $G \left( \epsilon \right) = \infty$ else.
+Here $\Omega$ is a set of subsets $s \subset \{1, ..., N \}$. 
+With appropriate choice of the $c_s$ one can ensure that for each $e \in
+\{ \epsilon \in \mathbb{R}^n | G \left( \epsilon \right) < \infty \}$ all subsets $\epsilon|_{s \in \Omega}$
+are gaussian distributed with at least some chosen confidence.
+Hence the estimator $\hat{x}$ is the smoothest picture in the sense of $R$ which satisfies the Multiresolution constraint as enforced by
+$G$.
+<h4>Selection of the weights</h4>
+<p>
+The weights $c_s$ are required to ensure a balanced hypothesis test among all chosen subsets $s$ of the image plane, the probability that
+$c_s \sum_{i \in s} \epsilon_s^2 > 1$ is required to be equal for all $s \in \Omega$. Write $t_s \left( \epsilon \right) = \sum_{i \in s}
+\epsilon_i^2$. Its fourth root transform $\left( t_s \left( \epsilon \right) \right)^{\frac{1}{4}}$ is approximately normal with mean $\mu_s =
+\left( | s | - 0.5 \right)^{\frac{1}{4}}$ and variance $\sigma_s^2=\frac{1}{8 \sqrt{|s|}}$. With this transformation each $s \in \Omega$
+contributes equally to the extreme value statistics $Q_{\Omega} = \max_{s \in \Omega} \frac{ \left( t_s \right)^{\frac{1}{4}} - \mu_s}{\sigma_s}$. 
+From this one can deduce the choice $c_s = \frac{1}{\left( q_{\alpha} \sigma_s + \mu_s \right)^{4}}$ where $q_{\alpha}$ is the $\alpha$
+quantile of $Q_{\Omega}$. This leads to $P\left( c_s t_s > 1
+\right) = \alpha$ the probability to be violated is balanced for all constraints. Moreover one can show a sound statistical relation between
+the estimated signal $\hat{u}$ and the unknown real signal $u_0$ with respect to the regularization $R$, namely
+\f{align}{
+P \left( R \left( \hat{u} \right) \leq R \left( u_0 \right) \right) \geq \alpha
+\f}
+In other words
+the probability to produce an oversmoothed result is at most $1 - \alpha$, where $\alpha \in \left( 0 , 1 \right)$ is a free parameter.
+</p>
+The numerical minimization of equation (2) can be tackled using the Alternating Direction Method of Multipliers \cite ADMM .
+</ul>
+</p>
+
+<h3>Alternating Direction Method of Multipliers</h3>
+
+<p>
+The ADMM is a method to minimize a convex function depending on several variable blocks with constraints. The constraints are enforced by
+augmenting the function with a lagrangian $\Upsilon$ term for each constraint.  Then the unconstrained problem writes as
+\f{align}{
+L =  G \left( \epsilon \right) + R \left( x \right) + \frac{\rho}{2} \| I - \left( A * x + \epsilon \right) \|_2^2 +
+\langle \Upsilon , I - \left( A * x + \epsilon \right) \rangle
+\label{eq2}
+\f}
+\f{align*}{
+\hat{x} = \text{argmin}_{x, \epsilon} \text{max}_{\Upsilon} L
+\f}
+The ADMM solves the problem by iteratively minimizing woth respect to the individual variable blocks.
+one iteration $r \rightarrow r+1$ of the ADMM consists in performing the operations
+\f{align*}{
+x_{r+1} &= \text{argmin}_x L \left( x , \epsilon_r \right) \\
+\epsilon_{r+1} &= \text{argmin}_{\epsilon} L \left( x_{r+1} , \epsilon \right) \\
+\Upsilon_{r+1} &= \Upsilon_r + \alpha \left( I - \left( A * x + \epsilon \right) \right)
+\f}
+the argmin with respect to $x$ can be evaluated in linear approximation as was shown in \cite admm . The argmin with respect to $\epsilon$
+turns out to involve Dykstra's Algorithm. consider
+\f{align*}{
+\epsilon_{r+1} &= \text{argmin}_{\epsilon} G \left( \epsilon \right) + \frac{\rho}{2} \| I - \left( A * x + \epsilon \right) \|_2^2 + \langle
+\Upsilon ,I - \left( A*x + \epsilon \right) \rangle \\
+&= \text{argmin}_{\epsilon} G \left( \epsilon \right) + \frac{\rho}{2} \| \epsilon - \left( I - A * x + \frac{\Upsilon}{\rho} \right) \|_2^2
+\\
+&= P_G \left( I - A*x + \frac{\Upsilon}{\rho} \right)
+\f}
+here $P_G$ denotes the projection on the feasible set of $G$. The feasible set of $G$ is by definition the intersection of the feasible sets
+$\{ x \in \mathbb{R}^n | c_s \sum_{i \in s} x_i^2 \leq 1 \} \forall s \in \Omega$. This problem is solved using Dykstra's Algorithm. The projection on this intersection is to be performed in
+each iteration of the ADMM. Therefore its performance is critical for the overall performance of the minimization. 
+</p>
+
+<h3> Dykstra's Algorithm</h3>
+
+<p>
+Dykstra's Algorithm provides the projection on the intersection of convex sets $s \in \Omega$ given the projection $p_s$ on each set
+\cite dykstra \cite dykstra2. In our
+case the projection on each set is simply
+\f{align}{
+p_s \left( x_{i\in s} \right) = \frac{x_i}{\sqrt{c_s} \| x |_s \|_2}
+\f}
+if $c_s \sum_{i \in s} x_i^2 > 1$ and $x_i$ else. Initialize $q_0^s = 0~\forall s \in \Omega$, then one iteration of Dykstra's Algorithm consists of
+\f{align*}{
+\forall s \in \Omega \\
+x_{r+1} = p_s \left( x_r - q_r^s \right) \\
+q_{r+1}^s = x_{r+1} - x_r
+\f}
+the Algorithm is shown to converge towards the projection on the intersection of the $s \in \Omega$ given some $x_0$. The iteration is
+stopped when the change in $x_r$ is below some chosen threshold. Since the sets $s$ denote here small patches in the image plane one can see
+that the projection on two sets $s_1, s_2 \in \Omega$ can be calculated in parallel if $s_1 \cup s_2 = \emptyset$. Notice however that the order in which the projections are performed is crucial for
+the convergence of the Algorithm.  Therefore only non-overlapping subsequent projections can be calculated in parallel. The set of subsets
+we consider is the set of quadratic patches with all non-redundant offsets up to some edge length $k$. The sets are stored in a linked list,
+the order of this list determines the order of execution in a serial approach. We collect connected subsets of this list, where all sets $s$
+are disjoint. The so formed clusters can be submitted to the device for parallel execution.
+</p>
+<h3> Approximative Dykstra </h3>
+<p>
+The described algorithm in a moreless general form has some limitations which hinder an efficient CUDA implementation. The clusters of sets
+which are built for parallel execution may be very small in special cases which leads to small load of the device. Also as we do not want
+each cluster to become bigger than one threadblock one is restricted to a maximum yize of 1024 pixels per cluster if each thread works on
+one pixel. If the next set to be added to a cluster during creation exceeds this limit a new cluster is formed, leaving some threads idle in
+the former cluster. Another problem is that the variables $q^s$ need to be stored, but their total size easily exceeds the availbe device
+global memory. Hence one has to manage the storage on the host and copy needed parts to the device when necessary. The presented program
+implements the described exact Dykstra Algorithm, dealing with its complications, and a more performant approximative Algorithm. The method
+to be used can be specified in the settings file using the approx flag. The approximation consists in chosing a certain set of subsets which
+is suitable for handling in CUDA threadblocks. The chosen sets are squares with edge length as powers of 2 up to 32. Also only one
+iteration of the Algorithm is performed, this eliminates the need to keep track of the $q^s$. This approach seems to be numerically
+reasonable for gaussian statistics. See a comparison of the subset construction strategies in the figure below
+\image html dykstra_compare.png
+The left hand picture illustrates the subsect selection for the exact approach. The set of all squares with all offsets up to a chosen edge
+length are considered. On the 
+</p>
+
+<h3> Overview</h3>
+
+<p>
+In the commented source code the ADMM is implemented using CUDA. Two different approaches towards Dykstra's Algorithm are given. One is a
+method aimed to construct $\Omega$ as the set of all squares with all displacements in the image plane up to a given edge length. This
+method is more exact in a multiresolution sense. The other approach is tailored to be feasible on CUDA Hardware. Here the set $\Omega$ is
+chosen to consist all squares with edge length as a power of two up to 32. Only one step of Dykstra's Algorithm is performed in the
+approximative approach which corresponds to dropping the $q^s$. This results in a very fast approximative method which lacks the convergence
+properties given with a exact Dykstra Algorithm. Though we will show in the results that the approximative method enters a limit cycle, the
+result may be close enough to the real fixpoint of equation (2) for some applications.
+
+
+<h3> Example parameters file</h3>
+
+@code
+# Listing of Parameters
+# ---------------------
+subsection input data
+  # enforces first constraint
+  set alpha1         = 1.2
+
+  # enforces second constraint
+  set alpha2         = 0.12
+
+  # estimate of gaussian noise standard deviation. If simulate = true, will be
+  # used to add gaussian noise with standard deviation of ...
+  set gaussian noise = 0
+
+  # path to the .tif image
+  set image          =
+
+  # intensity of regularisation
+  set regularization = 1.0
+
+  # stabilises first constraint
+  set rho1           = 6.192
+
+  # stabilises second constraint
+  set rho2           = 1.8
+
+  # PSF spread
+  set sigma          = 3
+end
+
+
+subsection output
+  # save preliminary results of the output image
+  set control      = false
+
+  # where should we put the ouput image? Will be a tiff image
+  set output image = control.tif
+end
+
+
+subsection program flow control
+  # largest patch edge length if not using small dykstra in approximation
+  set MRdepth            = 15
+
+  # do a small dykstra in approximation
+  set approx             = false
+
+  # Set maximum number of iterations
+  set maximum iterations = 10000
+
+  # Reporting progress in intervals of ... Iterations
+  set report interval    = 1
+
+  # Finish when |x_r - x_{r-1}| < tolerance
+  set tolerance          = 1e-3
+end
+
+
+subsection simulate dataset from real image
+  # If set to false the input is treated as real data, if true input will be
+  # treated as test image and blurring and noise are added
+  set simulate  = true
+
+  # If false simulated noise has a constant seed, if true the seed is taken
+  # from the clock
+  set time seed = false
+end
+@endcode
+
+</p>

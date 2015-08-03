@@ -33,9 +33,7 @@ template <typename T> struct Setter;
 // We put into the same file as @p Expr because the only reason to introduce a class for literals
 // is that tempalte magic in the ET business does nto understand primitive built-n types as they are not classes.
 template <typename T>
-class Literal
-        : public Expr<Literal<T> >
-{
+class Literal : public Expr<Literal<T> > {
 public:
     typedef T value_type;
 

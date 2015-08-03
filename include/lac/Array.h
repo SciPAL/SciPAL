@@ -65,9 +65,8 @@ public:
 protected:
     //! The number of elements this array currently has. By having it in this class
     //! we do not have to put it again and again into the Data classes provided by the different blas wrappers.
-    T * data;
     size_t __n;
-    bool initialized;
+
 
     //! To avoid undesired side effects the copy constructor is made private.
     //! If gets accidentally used the compiler will throw an error message.
@@ -83,31 +82,26 @@ protected:
 
     //! Read-Write access to the data of the base class.
     Base& base() { return *this; }
-    const bool init_status() const {return initialized;}
+
 };
 
 } //! namespace SciPAL END
+
 
 template <typename T, typename BW>
 SciPAL::Array<T, BW>::Array()
     :
       Base(),
-      data(NULL),
-      __n(0),
-      initialized(false)
+      __n(0)
 {}
 
 //! @param n : Groesse des Arrays.
 template <typename T, typename BW>
 SciPAL::Array<T, BW>::Array(size_t n)
     :
-      Base(),
-      data(NULL),
-      __n(n),
-      initialized(true)
-{
-    data = this->Base::allocate(__n);
-}
+      Base(n),
+      __n(n)
+{}
 
 
 template <typename T, typename BW>
@@ -120,14 +114,10 @@ inline void SciPAL::Array<T, BW>::reinit(size_t n)
 
     if (this->__n != n)
     {
-        if(data != NULL)
-            this->Base::deallocate(data);
-
-        data = this->Base::allocate(n);
+        this->Base::resize(n);
         // Alocation errors are handled by the subclass. Thus we can go on.
         __n = n;
     }
-    initialized  = true;
 }
 
 
@@ -135,14 +125,14 @@ template <typename T, typename BW>
 T * SciPAL::Array<T, BW>::val()
 {
 #ifdef QT_NO_DEBUG
-    AssertThrow(this->data != 0,
+    AssertThrow(this->data() != 0,
                 dealii::ExcMessage("Object not initialized"));
 #else
-    Assert(this->data != 0,
+    Assert(this->data() != 0,
            dealii::ExcMessage("Object not initialized") );
 #endif
 
-    return this->data;
+    return this->data();
 }
 
 
@@ -151,14 +141,14 @@ template <typename T, typename BW>
 const T * SciPAL::Array<T, BW>::val() const
 {
 #ifdef QT_NO_DEBUG
-    AssertThrow(this->data != 0,
+    AssertThrow(this->data() != 0,
                 dealii::ExcMessage("Object not initialized"));
 #else
-    Assert(this->data != 0,
+    Assert(this->data() != 0,
            dealii::ExcMessage("Object not initialized") );
 #endif
 
-    return this->data;
+    return this->data();
 }
 
 
@@ -168,7 +158,7 @@ SciPAL::Array<T, BW> &
 SciPAL::Array<T, BW>::operator = (const Array<T, BW>& other)
 {
 
-    Assert(other.init_status() == true,
+    Assert(other.__is_allocd,
            dealii::ExcMessage("You cannot copy from an uninitialized object!") );
 
     this->reinit(other.__n);
@@ -178,7 +168,7 @@ SciPAL::Array<T, BW>::operator = (const Array<T, BW>& other)
     int inc_this = 1;
 
     BW::copy(this->__n, other.val(), inc_src,
-             this->val(), inc_this);
+             this->dev_ptr, inc_this);
 
     return *this;
 }

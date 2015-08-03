@@ -43,9 +43,7 @@ struct CudaComplex : public PrecisionTraits<T, gpu_cuda>::ComplexType
                                     const NumberType im = NumberType())
      { this->x = re, this->y = im;}
 
-    __host__ __device__ __forceinline__
-    CudaComplex(const CudaComplex& a)
-    {*this = a;}
+    __host__ __device__ __forceinline__ CudaComplex(const CudaComplex& a){*this = a;}
 
     __host__ __device__ __forceinline__ CudaComplex(const ComplexType& a)
     {this->x = a.x; this->y = a.y;}
@@ -184,12 +182,12 @@ double abs_impl(/*const*/ double a )
     return fabs(a);
 }
 
-template<typename T>
-__host__ __device__ __forceinline__
-T abs_impl(T a )
-{
-    return ::abs(a);
-}
+//template<typename T>
+//__host__ __device__ __forceinline__
+//T abs_impl(T a )
+//{
+//    return ::abs(a);
+//}
 
 template<typename T>
 __host__ __device__ __forceinline__
@@ -300,7 +298,7 @@ CudaComplex<T> operator+(const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator+(const CudaComplex<T>& a, const T val)
+CudaComplex<T> operator+(const CudaComplex<T>& a, const T& val)
 {
     CudaComplex<T> tmp(a);
     tmp += val;
@@ -309,7 +307,7 @@ CudaComplex<T> operator+(const CudaComplex<T>& a, const T val)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator+( const T val, const CudaComplex<T>& a)
+CudaComplex<T> operator+( const T& val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(a);
     tmp += val;
@@ -330,7 +328,7 @@ CudaComplex<T> operator-( const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator-(const CudaComplex<T>& a, const T val)
+CudaComplex<T> operator-(const CudaComplex<T>& a, const T& val)
 {
     CudaComplex<T> tmp(a);
     tmp -= val;
@@ -339,7 +337,7 @@ CudaComplex<T> operator-(const CudaComplex<T>& a, const T val)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator-( const T val, const CudaComplex<T>& a)
+CudaComplex<T> operator-( const T& val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(val, -a.imag());
     tmp -= a.real();
@@ -358,7 +356,7 @@ CudaComplex<T> operator*( const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator*(const CudaComplex<T>& a, const T val)
+CudaComplex<T> operator*(const CudaComplex<T>& a, const T& val)
 {
     CudaComplex<T> tmp(a);
     tmp *= val;
@@ -367,7 +365,7 @@ CudaComplex<T> operator*(const CudaComplex<T>& a, const T val)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator*( const T val, const CudaComplex<T>& a)
+CudaComplex<T> operator*( const T& val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(a);
     tmp *= val;
@@ -386,7 +384,7 @@ CudaComplex<T> operator/( const CudaComplex<T>& val, const CudaComplex<T>& a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator/(const CudaComplex<T>& val, const T a)
+CudaComplex<T> operator/(const CudaComplex<T>& val, const T& a)
 {
     CudaComplex<T> tmp(val);
     tmp /= a;
@@ -395,7 +393,7 @@ CudaComplex<T> operator/(const CudaComplex<T>& val, const T a)
 
 template<typename T>
 __host__ __device__ __forceinline__
-CudaComplex<T> operator/( const T val, const CudaComplex<T>& a)
+CudaComplex<T> operator/( const T& val, const CudaComplex<T>& a)
 {
     CudaComplex<T> tmp(val, 0.0);
     tmp /= a;
@@ -463,7 +461,7 @@ CudaComplex<T> exp(const CudaComplex<T>& __z)
 template<typename T>
 __host__ __device__ __forceinline__
 CudaComplex<T> log(const CudaComplex<T>& __z)
-{ return CudaComplex<T>(log(abs(__z)), arg(__z)); }
+{ return CudaComplex<T>(std::log(abs(__z)), arg(__z)); }
 
 template<typename T>
 __host__ __device__  __forceinline__
@@ -544,10 +542,10 @@ __host__ __device__ __forceinline__
 CudaComplex<T> pow(const CudaComplex<T>& __x, const T& __y)
 {
     if (__x.imag() == T() && __x.real() > T())
-        return pow(__x.real(), __y);
+        return std::pow(__x.real(), __y);
 
     CudaComplex<T> __t = log(__x);
-    return polar(exp(__y * __t.real()), __y * __t.imag());
+    return polar(std::exp(__y * __t.real()), __y * __t.imag());
 }
 
 template<typename T>

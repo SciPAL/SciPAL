@@ -148,8 +148,7 @@ public:
     Matrix<T, BW> & operator = (const dealii::IdentityMatrix & Id);
 
     //! Generate a deep copy of @p other
-    template<typename BW2>
-    Matrix<T, BW> & operator = (const Matrix<T, BW2> & array);
+    Matrix<T, BW> & operator = (const Matrix<T, BW> & array);
 
     template<typename X>
     Matrix & operator= (const ::SciPAL::Expr<X> & e);
@@ -229,7 +228,7 @@ template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix()
     :
       Array<T, BW>(),
-      MyShape(this->val(), 0, 0, 0)
+      MyShape(this->data(), 0, 0, 0)
 {}
 
 //! Allocate a matrix of @p n_rows and @p n_cols.
@@ -273,7 +272,7 @@ SciPAL::Matrix<T, BW>::Matrix(const unsigned int n_rows,
 {
     const T2 * const tmp_ptr = &src[0];
 
-    T * this_data = this->val();
+    T * this_data = this->data();
 
     BW::SetMatrix(n_rows, n_cols, tmp_ptr, n_rows,
                   this_data, n_rows);
@@ -310,6 +309,16 @@ SciPAL::Matrix<T, BW>::Matrix (const ::SciPAL::Expr<X> & e)
     ::SciPAL::LAOOperations::apply(*this, ~e);
 }
 
+//! Assign the result of a linear algebraic expression to a matrix.
+//! @param e : Expressino to evaluate.
+template<typename T, typename BW>
+template<typename X>
+SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator = (const ::SciPAL::Expr<X> & e)
+{
+    ::SciPAL::LAOOperations::apply(*this, ~e);
+
+    return *this;
+}
 
 //! Copy ctor with constructs a matrix from an identity matrix.
 //! @param Id : identity matrix which serves as source.
@@ -317,10 +326,11 @@ template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
     :
       Array<T, BW>(),
-      MyShape(this->val(), 0, 0, 0 /*TODO: leading_dim*/)
+      MyShape(this->data(), 0, 0, 0 /*TODO: leading_dim*/)
 {
     *this = Id;
 }
+
 
 
 //! Copy ctor with constructs a matrix from an another matrix.
@@ -360,6 +370,27 @@ void SciPAL::Matrix<T, BW>::reinit(int n_rows, int n_cols)
 
 // @sect4{Operator: =}
 //!
+//! Element-wise copy of an Array into a matrix.
+//! The source must have at least as many elements as the target.
+//! @param src : array which is to be copied into the matrix.
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator = (const Array<T, BW> & src)
+{
+    Assert(this->n_elements() <= src.n_elements(),
+           dealii::ExcMessage("n_element mismatch") );
+
+    // Setting both increments to 1 means that we copy every element.
+    int inc_src  = 1;
+    int inc_this = 1;
+
+    // The actual copy operation is delegated to the underlying BLAS library.
+    BW::copy(this->n_elements(), src.data(), inc_src,
+             this->data(), inc_this);
+
+    return *this;
+}
+
 //! Initialize a matrix from an identity matrix.
 //! @param Id : identity matrix which provides the information about the size of the matrix.
 template<typename T, typename BW>
@@ -390,7 +421,7 @@ SciPAL::Matrix<T, BW>::operator = (const dealii::IdentityMatrix & Id)
     // Ausserdem muss man sich bei Einheitsmatrizen nicht darum kuemmern,
     // ob sie column-major oder row-major sind.
     const T *  id_val = tmp_id.val();
-    T * dst_val = this->val();
+    T * dst_val = this->data();
 
     BW::SetMatrix(__n_dofs, __n_dofs, id_val,
                   __n_dofs, dst_val, __n_dofs );
@@ -436,52 +467,28 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
 //! Deep copy of a matrix. Any previous content in target is lost.
 //! @param other : Matrix which is to be copied.
 template<typename T, typename BW>
-template<typename BW2>
 SciPAL::Matrix<T, BW> &
-SciPAL::Matrix<T, BW>::operator = (const Matrix<T, BW2> &other)
+SciPAL::Matrix<T, BW>::operator = (const Matrix<T, BW> & other)
 {
+    // TODO: WHat to do?
+    //    this->leading_dim = other.leading_dim;
+    //    this->_stride = other._stride;
+
+    if (this != &other)
+        this->Array<T, BW>::reinit(other.n_rows() * other.n_cols());
+
+    this->MyShape::reinit(this->array().val(),
+                        other.n_rows(), other.n_cols(),
+                        other.n_rows() /*TODO: leading_dim*/,
+                        1 /*unit stride*/);
+
+
     // element-wise copy of array.
     int inc_src  = 1;
     int inc_this = 1;
-    reinit(other.n_rows(), other.n_cols());
 
-    //! same blas type no problem
-    if(typeid(BW) == typeid(BW2) )
-        BW::copy(this->n_elements(), other.data_ptr, inc_src,
-                 this->data_ptr, inc_this);
-
-    //! copy from cublas matrix to blas matrix -> GetMatrix
-    //! TODO: what is with asyn copy?
-    if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
-    {
-        cublas::GetMatrix(other.n_rows(), other.n_cols(), other.data_ptr,
-                          other.leading_dim, this->data_ptr, this->leading_dim);
-        cudaStreamSynchronize(NULL);
-    }
-
-    //! copy from cublas matrix to blas matrix -> SetMatrix
-    //! TODO: what is with asyn copy?
-    if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
-    {
-        cublas::SetMatrix(other.n_rows(), other.n_cols(),
-                          other.data_ptr,
-                          other.leading_dim,
-                          this->data_ptr,
-                          this->leading_dim);
-        cudaStreamSynchronize(NULL);
-    }
-
-    std::cout<<__FUNCTION__<<std::endl;
-    return *this;
-}
-
-//! Assign the result of a linear algebraic expression to a matrix.
-//! @param e : Expressino to evaluate.
-template<typename T, typename BW>
-template<typename X>
-SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator = (const ::SciPAL::Expr<X> & e)
-{
-    ::SciPAL::LAOOperations::apply(*this, ~e);
+    BW::copy(this->n_elements(), other.data(), inc_src,
+             this->data(), inc_this);
 
     return *this;
 }
@@ -765,10 +772,10 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
              dst.n_cols(), /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
              transpose_A != 'n'? this->n_rows() : this->n_cols(), /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
              alpha,
-             this->val(), lda,
-             src.val(), ldb,
+             this->data(), lda,
+             src.data(), ldb,
              beta,
-             dst.val(), ldc);
+             dst.data(), ldc);
 }
 
 
@@ -859,7 +866,7 @@ SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c, T data)
 {
     int lead_dim = this->n_rows();
-    T * tmp_d =  & this->val()[c*this->n_rows()+r];
+    T * tmp_d =  & this->data()[c*this->n_rows()+r];
     T * p_e = &data;
     BW::SetMatrix(1, 1,
                   p_e, lead_dim, tmp_d, 1);
@@ -883,16 +890,16 @@ SciPAL::Matrix<T, BW>::print() const
     T * tmp = new T[n_el];
 
     BW::GetMatrix(this->n_rows(), this->n_cols(),
-                  this->val(), this->n_rows(), tmp, this->n_rows());
+                  this->data(), this->n_rows(), tmp, this->n_rows());
 
     for (uint r = 0; r < this->n_rows(); ++r)
     {
         for (uint c = 0; c < this->n_cols(); ++c)
-            std::cout << std::setprecision(4) << std::fixed << std::setw(15) <<
-//                       std::setprecision (1) << std::scientific <<
+            std::cout <<// std::setprecision(4) << std::fixed << std::setw(15) <<
+                       std::setprecision (1) << std::scientific << std::showpos <<
                          //!(std::abs(tmp[c*this->n_rows() + r])> numerical_zero
                          //!           ?
-                         tmp[c*this->n_rows() + r]
+                         /*std::real*/(tmp[c*this->n_rows() + r])
                          //!                 : 0.)
                       << " ";
         std::cout <<";" << std::endl;

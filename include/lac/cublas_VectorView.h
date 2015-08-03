@@ -23,6 +23,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/Shape.h>
 #include <lac/Expr.h>
 
+#include <base/Zero_One_Traits.h>
+
 //! Vorwaertsdeklaration fuer expression templates
 struct vmu_view;
 

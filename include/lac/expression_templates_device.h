@@ -23,6 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/expression_templates_host.h>
 
 #include <lac/DevLiteral.h>
+#include <base/CudaComplex.h>
 
 struct blas;
 
@@ -109,6 +110,16 @@ template <typename T>
 struct ExprTree {
 
     //! Specialization for shapes of LAOs. Get element @p i from the data array.
+    __host__
+    __device__
+    __forceinline__
+    static SciPAL::CudaComplex<T>
+    eval(const SciPAL::ShapeData<SciPAL::CudaComplex<T> > & Ax, int i)
+    {
+        // printf("%s ", __PRETTY_FUNCTION__); printf("shape data : Ex[%d] : %g\n", i, Ax.data_ptr[i] );
+        return Ax.data_ptr[i];
+    }
+
     __host__
     __device__
     __forceinline__

@@ -39,94 +39,14 @@ struct vmu;
 #include <lac/BlasVectorOperations.h>
 
 #include <base/PrecisionTraits.h>
-
+#include <base/Zero_One_Traits.h>
+#include <lac/cublas_SubMatrixView.h>
+#include <lac/cublas_VectorView.h>
 
 template<typename> class FullMatrixAccessor;
 
 
-namespace SciPAL {
 
-template<typename T> struct One
-{
-    typedef T Type;
-public:
-    T operator()(bool plus=true);
-};
-
-
-template<>
-inline cuComplex One<cuComplex>::operator ()(bool plus)
-{
-    Type result; result.x = (plus ? 1. : -1.); result.y = 0.; return result;
-}
-
-template<>
-inline cuDoubleComplex One<cuDoubleComplex>::operator ()(bool plus)
-{
-    Type result; result.x = (plus ? 1. : -1.); result.y = 0.; return result;
-}
-
-//template<>
-//std::complex<double> One<std::complex<double> >::operator ()(bool plus)
-//{
-//    return std::complex<double>(plus ? 1. : -1., 0.0);
-//}
-
-//template<>
-//std::complex<float> One<std::complex<float> >::operator ()(bool plus)
-//{
-//    return std::complex<float>(plus ? 1. : -1., 0.0);
-//}
-template<typename T>
-inline T One<T>::operator ()(bool plus) {  return (plus ? 1. : -1); }
-
-//!-------------------------------------------------------------------------
-
-template<typename T> struct Zero
-{
-    typedef T Type;
-public:
-    T operator()();
-};
-
-
-template<>
-inline cuComplex Zero<cuComplex>::operator ()()
-{
-    Type result;
-    result.x = 0; result.y = 0.; return result;
-}
-
-template<>
-inline cuDoubleComplex Zero<cuDoubleComplex>::operator ()()
-{
-    Type result;
-    result.x = 0; result.y = 0.; return result;
-}
-
-//template<>
-//std::complex<double> Zero<std::complex<double> >::operator ()()
-//{
-//    return std::complex<double>(0.0, 0.0);
-//}
-
-//template<>
-//std::complex<float> Zero<std::complex<float> >::operator ()()
-//{
-//    return std::complex<float>(0.0, 0.0);
-//}
-
-template<typename T>
-inline T Zero<T>::operator ()() {  return 0.; }
-
-    template<typename, typename> class Array;
-    template<typename, typename> class Matrix;
-
-    template<typename, typename> class VectorView;
-    template<typename, typename> class ColVectorView;
-
-    template<typename, typename> class SubMatrixView;
-}
 
 namespace SciPAL {
 

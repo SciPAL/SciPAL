@@ -19,7 +19,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #ifndef LITERAL_H
 #define LITERAL_H
-#include <lac/Expr.h>
+#include <lac/release/Expr.h>
 
 namespace SciPAL {
 

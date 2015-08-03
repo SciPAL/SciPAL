@@ -22,9 +22,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 //! #include <lac/FullMatrixAccessor.h>
 
-#include <lac/cublas_wrapper.hh>
+#include <lac/release/cublas_wrapper.hh>
 
-#include <lac/blas_wrapper.hh>
+#include <lac/release/blas_wrapper.hh>
 
 //! The namespace SciPAL collects all data types needed for encapsulating
 //! the blas libraries.

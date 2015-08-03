@@ -27,14 +27,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <deal.II/base/subscriptor.h>
 
-#include <lac/Array.h>
-#include <lac/Expr.h>
-#include <lac/BlasMatrixOperations.h>
+#include <lac/release/Array.h>
+#include <lac/release/Expr.h>
+#include <lac/development/BlasMatrixOperations.h>
 
 // this is from SciPAL/include/
 //
-#include <lac/cublas_Vector.h>
-#include <lac/Shape.h>
+#include <lac/development/cublas_Vector.h>
+#include <lac/release/Shape.h>
 #include <base/ArchTraits.h>
 
 // #include <lac/ScipalExpressions.h>
@@ -895,11 +895,11 @@ SciPAL::Matrix<T, BW>::print() const
     for (uint r = 0; r < this->n_rows(); ++r)
     {
         for (uint c = 0; c < this->n_cols(); ++c)
-            std::cout <<// std::setprecision(4) << std::fixed << std::setw(15) <<
-                       std::setprecision (1) << std::scientific << std::showpos <<
+            std::cout << std::setprecision(4) << std::fixed << std::setw(15) <<
+//                       std::setprecision (1) << std::scientific <<
                          //!(std::abs(tmp[c*this->n_rows() + r])> numerical_zero
                          //!           ?
-                         /*std::real*/(tmp[c*this->n_rows() + r])
+                         tmp[c*this->n_rows() + r]
                          //!                 : 0.)
                       << " ";
         std::cout <<";" << std::endl;

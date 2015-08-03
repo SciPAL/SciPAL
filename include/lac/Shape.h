@@ -21,7 +21,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define SCIPAL_SHAPE_H
 
 #include <algorithm>
-#include <lac/ShapeData.h>
+#include <lac/release/ShapeData.h>
 
 namespace SciPAL {
 

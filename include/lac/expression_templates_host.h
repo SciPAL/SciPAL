@@ -21,13 +21,13 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define EXPRESSION_TEMPLATES_H
 
 // Base class for expressions
-#include <lac/Expr.h>
-#include <lac/ShapeData.h>
-#include <lac/Literal.h>
+#include <lac/release/Expr.h>
+#include <lac/release/ShapeData.h>
+#include <lac/release/Literal.h>
 
 // #include <IdOp/IdOp.h>
 
-#include <lac/OperandInfo.h>
+#include <lac/release/OperandInfo.h>
 
 
 //references:

@@ -20,12 +20,12 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef VECTORCUSTOMOPERATIONS_H
 #define VECTORCUSTOMOPERATIONS_H
 
-#include <lac/expression_templates_host.h>
+#include <lac/release/expression_templates_host.h>
 
-#include <lac/cublas_Matrix.h>
-#include <lac/cublas_Vector.h>
-#include <lac/scipal_kernels_wrapper.cu.h>
-#include <lac/UnaryFunctions.h>
+#include <lac/development/cublas_Matrix.h>
+#include <lac/development/cublas_Vector.h>
+#include <lac/development/scipal_kernels_wrapper.cu.h>
+#include <lac/development/UnaryFunctions.h>
 
 
 // TODO: rename this file to CustomOperations.h. Currently, "custom" means generic array arithmetic applying both to matrices and vectors.

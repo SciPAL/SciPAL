@@ -32,8 +32,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <deal.II/base/parameter_handler.h>
 //SciPAL
 #include <base/VTraits.h>
-#include <lac/release/cublas_wrapper.hh>
-#include <lac/release/Shape.h>
+#include <lac/cublas_wrapper.hh>
+#include <lac/Shape.h>
 #include <propagation_kernels_wrapper.cu.h>
 //Qt Includes
 #include <QDir>

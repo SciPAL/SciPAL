@@ -20,10 +20,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef MATRIXOPERATIONS_H
 #define MATRIXOPERATIONS_H
 
-#include <lac/development/cublas_Matrix.h>
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_Matrix.h>
+#include <lac/cublas_Vector.h>
 
-#include <lac/release/expression_templates_host.h>
+#include <lac/expression_templates_host.h>
 
 namespace SciPAL {
 
@@ -69,6 +69,8 @@ struct BlasMatExp/*MatrixExpressions*/
 
     //generalized matrix matrix product
     typedef typename SciPAL::BinaryExpr<sMM, plus, scaledM> sMMasM;
+
+    typedef typename SciPAL::adjoint<Mtx> adM;
 };
 
 // @sect3{namespace: LAOOperations}
@@ -313,6 +315,26 @@ static void apply(::SciPAL::Matrix<T, BW> & result,
     Mtx & C = result;
 
     A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
+}
+
+template <typename T, typename BW>
+static void apply(::SciPAL::Matrix<T, BW> & result,
+                  const typename BlasMatExp<T, BW>::adM& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = 1.0;
+    const Mtx & A = expr.A;
+
+    Mtx B(A.n_rows(), A.n_rows());
+    for (unsigned int i = 0; i < B.n_rows(); i++)
+        B(i, i, 1.0);
+
+    T beta = 1.0;
+
+    Mtx & C = result;
+
+    A.scaled_mmult_add_scaled(C, B, 'c', 'n', alpha, beta);
 }
 
 } // END namespace LAOOperations

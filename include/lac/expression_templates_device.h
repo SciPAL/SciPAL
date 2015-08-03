@@ -20,9 +20,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef DEVICEEXPR_H
 #define DEVICEEXPR_H
 
-#include <lac/release/expression_templates_host.h>
+#include <lac/expression_templates_host.h>
 
-#include <lac/development/DevLiteral.h>
+#include <lac/DevLiteral.h>
 
 struct blas;
 

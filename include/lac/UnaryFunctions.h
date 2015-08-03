@@ -20,7 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef UNARYFUNCTIONS_H
 #define UNARYFUNCTIONS_H
 
-#include <lac/release/Expr.h>
+#include <lac/Expr.h>
 #include <base/CudaComplex.h>
 
 // Forward declarations of blas wrappers. We need them to chose the correct implementation strategy of the Unary
@@ -65,7 +65,7 @@ struct expr_sin
     }
 };
 
-
+// This is the definition of the sin-operator
 template <typename T1>
 inline
 const UnaryExpr<T1, expr_sin<typename T1::value_type> >
@@ -130,16 +130,59 @@ MAKE_UNARIES(cos);
 
 MAKE_UNARIES(tan);
 
-MAKE_UNARIES(abs);
-
 MAKE_UNARIES(log);
 
 MAKE_UNARIES(exp);
 
 MAKE_UNARIES(sqrt);
 
+// @sect3{Unary: abs}
+// abs has to be defined by hand, since the return value type can differ from
+// the input value type. This is the case for a complex number, the modulus is real-valued.
 
+//template <typename T> struct expr_abs;
+template <typename T>
+struct expr_abs
+{
+   typedef T value_type;
 
+   __host__ __device__
+   T operator()(const SciPAL::CudaComplex<T> val) const
+   {
+       return SciPAL::abs(val);
+   }
+
+   __host__ __device__
+   T operator()(const T val) const
+   {
+       return std::abs(val);
+   }
+};
+
+//template <typename T>
+//struct  expr_abs
+//{
+//   typedef T value_type;
+
+//   __host__ __device__
+//   T operator()(const T val) const
+//   {
+//       return std::abs(val);
+//   }
+//};
+
+// This is the definition of the abs-operator
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_abs <typename PrecisionTraits<typename T1::value_type,
+gpu_cuda>::NumberType > >
+  abs(const Expr<T1> &dst)
+{
+   return UnaryExpr<T1,
+           expr_abs <typename PrecisionTraits<typename T1::value_type,
+                                              gpu_cuda>::NumberType > >
+           (~dst);
+}
 
 
 

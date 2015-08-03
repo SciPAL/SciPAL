@@ -16,11 +16,12 @@
 Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 */
 
-
 #ifndef SCIPAL_KERNELS_WRAPPER_CU_H
 #define SCIPAL_KERNELS_WRAPPER_CU_H
 //OpenMP
+#ifdef USE_OPENMP
 #include <omp.h>
+#endif
 //SciPAL includes
 #include <base/ParallelArch.h>
 #include <base/PrecisionTraits.h>

@@ -1,0 +1,22 @@
+# Listing of Parameters
+# ---------------------
+subsection Dielectric relaxation spectroscopy setup
+  set Average anion density                = .01
+  set Average cation density               = .01
+  set Average density of neutral particles = .01
+  # Reasonable values are 2 - 4.
+  set Dielectric constant of the protein   = 4.
+
+  # For water use 80.
+  set Dielectric constant of the solvent   = 80.
+  set Oxidation rate at the anode          = 1.
+
+  # The potential difference applied to the electrodes.
+  # -1, -.75, -.5, -.25, -0, +.25, +.5, +.75 +1
+  #
+  # -2, -1.75 -1.5, -1.25    1.25 1.5 1.75 2. 2.25
+  set Potential difference                 = 1.
+  set Reduction rate at the cathode        = 1.
+end
+
+

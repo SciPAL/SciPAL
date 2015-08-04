@@ -1,0 +1,18 @@
+# Listing of Parameters
+# ---------------------
+subsection DRS geometry
+  # Radius of dielectric sample in units of Debye length.
+  set Cavity diameter   = 4.
+
+  # In units of Debye length.
+  set Cylinder diameter = 10.
+
+  # In units of Debye length.
+  set Cylinder height   = 13.
+
+  # For debugging the geometry it is helpful to be able
+  # to print all the vertices of the coarse mesh.
+  set Print VX          = false
+end
+
+

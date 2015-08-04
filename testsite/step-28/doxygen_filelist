@@ -1,0 +1,43 @@
+#
+# This is a comment. If you want to exclude certain files from being documented
+# disable them by prepending a #
+#
+# Files must occur in the order they are desired to be documented.
+# Only one file per line is allowed.
+#
+
+# Documentation starts with the toplevel file containing the main function ...
+#step-28.cpp
+#Architecture.h
+#SimParams.h
+#SimParams.cpp
+
+#drs_cell.hh
+#drs_simulation.hh
+#assemble_system.hh
+#assemble_system_multithreaded.hh
+#geomgpc.h
+#bemforms.h
+bemforms.hh
+#simulation_handler.h
+#timing.h
+#BoundaryDoFTools.hh
+#UnitTestProblemData.hh
+
+# followed by the host-side interface to the part implemented in CUDA
+cuda_driver_step-28.h
+cuda_driver_step-28.hh
+
+# The header file for the kernels declares the interface to the CUDA part
+cuda_kernel_wrapper_step-28.cu.h
+
+# The CUDA-based backend of the program is contained in the following file.
+cuda_kernel_step-28.cu.c
+
+
+######################################################################################
+#                                                                                    #
+#     IF YOU ADD ANY NEW FILE THINK ABOUT TO WHICH PART IT BELONGS TO AND            #
+#     PUT IT AT THE APPROPRIATE PLACE IN THE LIST ABOVE.                             #
+#                                                                                    #
+######################################################################################

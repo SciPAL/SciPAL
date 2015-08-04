@@ -1,0 +1,49 @@
+# Listing of Parameters
+# ---------------------
+subsection Protein dipole data
+  # The length is measured in the same units as the dimensions of the FEM
+  # mesh. Thus the numbers given here depend on how the physical model has
+  # been made dimensionless.
+  # to do: +1.45 +1. +.55 +.1 -.1 -.55 -1. -1.45
+  # -.95, -.75, -.5, -.2. +.2, +.5, +.75, +.85 +.95
+  # -.975, -.9, -.85, -.625,    +.35, +.625, +.9, +.975
+  set Dipole length               = 1.95
+
+# DIpole lengths for cav diam = .13:
+# -.125, -.11, -.09, -.05, -.001, +.05 +.09, +.11, +.125
+#set Dipole length = .125
+
+# DIpole lengths for cav diam = .25:
+# -.245, -.225, -.175, -.1, -.01, +.1 +.175, +.225, +.245
+#set Dipole length = .245
+
+# DIpole lengths for cav diam = .5:
+# -.49, -.45, -.35, -.2, -.1, +.2, +.35, +.45, +.49
+#set Dipole length = 0.49
+
+
+# DIpole lengths for cav diam = 1.5:
+# -1.47, -1.35, -1., -.5, -.01, +.5, +.1, +1.35, +1.47
+#set Dipole length = 1.47
+
+
+# DIpole lengths for cav diam = 3.0:
+# -2.9, -2.5, -2, -1, -.01, +1, +2.0, +2.5, +2.9
+#set Dipole length = 2.9
+
+
+# DIpole lengths for cav diam = 4.0:
+# -3.9, -3.5, -3, -2, -0.01, +2, +3, +3.5, +3.9
+set Dipole length = -3.19
+
+  # The number of elementary charges.
+  set Dipole strength             = 1. # 1.
+
+  # In a future version the positions of the charges can be set directly
+  set Position of negative charge = Not yet implemented
+
+  # In a future version the positions of the charges can be set directly
+  set Position of positive charge = Not yet implemented
+end
+
+

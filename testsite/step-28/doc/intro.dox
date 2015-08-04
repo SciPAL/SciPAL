@@ -1,0 +1,122 @@
+<h1>Introduction</h1>
+<p>
+In this project, the assembly of matrices coupling a Finite Element and a Boundary Element problem is parallelized using CUDA
+and regular CPU threads. The underlying physical problem is that of <i>dielectric relaxation spectroscopy</i>, also simplified in this case:
+We consider a cylinder $\Omega_S$ with surface $\Gamma_0\cup\Gamma_C\cup\Gamma_A$
+filled with fluid with dissolved ions. The bottom and top cap of the cylinder ($\Gamma_A$ and $\Gamma_C$) are at possibly different electric potentials.
+
+<center>
+\htmlimage{math_overview.png, 350, Overview of the geometry of the problem}
+</center>
+
+Suspended inside of the cylinder is a protein $\Omega_P$, characterized by a discrete charge distribution. The goal is to calculate the conductivity
+of this arrangement in dependence on the potential difference between the caps.
+</p>
+<p>
+There are several assumptions to simplify the problem:
+- The protein interior $\Omega_P$ is solvent free
+- homogeneous dielectric constant ($\varepsilon_P \approx 2$) inside of the protein
+</p>
+<p>
+The behaviour of the ion concentrations is simulated using an FEM method, if which an implementation 
+in  <i>deal.II</i> was already available, courtesy of Stephan Kramer. Including the protein via FEM is not feasible,
+because the differing dielectric constant in $\Gamma_P$ compared to the exterior $\Gamma_S$ leads to complications.
+Therefore, the protein interior is treated as a seperate problem.
+</p>
+<p>
+The problem in the protein interior is a Poisson equation
+\f{equation}
+    -\varepsilon_0\varepsilon_P\Delta \Phi = \rho_P\left(=\sum_kq_k\delta(\vec{x}-\vec{x}_k)\right)\nonumber
+\f}
+with the (relative) dielectric constant $\varepsilon_P$ or the protein interior and the charge distribution $\rho_P$.
+Since only the electric potential on the protein surface is strictly necessary for this problem, we rewrite the 
+Poisson equation as a boundary integral equation:
+\f{align} 
+\frac{1}{2}\Phi_P(\vec{x})&+\oint\limits_{\Gamma}\left[-\Phi_P\frac{\partial G_{\vec{x}}}{\partial\vec{n}_P^\prime}+G_{\vec{x}}\frac{\partial\Phi_p}{\partial\vec{n}_P^\prime}\right]\text{d}~\Gamma(\vec{x}^\prime)\tag{BIE}\\
+      &=\frac{1}{\varepsilon_0\varepsilon_P}\int\limits_{\Omega_P}G_{\vec{x}}(\vec{x}^\prime)\rho_P(\vec{x}^\prime)\nonumber
+\f}
+with the Green's function for the Poisson equation $G_{\vec{x}}(\vec{y})=\frac{1}{4\pi |\vec{x}-\vec{y}|}$ and the outer normal vector $\vec{n}^\prime$.
+To incorporate the results of the boundary integral equation (BIE) into the FEM simulation as a boundary condition, a <i>Dirichlet-to-Neumann</i> map is
+needed. Together with the interface condition for electric fields:
+\f{align*} 
+  \left[\varepsilon(\vec{x})\vec{n}_P\cdot\nabla\Phi\right]=0,
+\f}
+a <i>DtN</i>-map can be derived:
+\f{align*} 
+  \left(\frac{1}{2}\mathbf{1}-K\right)\Phi_P+\frac{\varepsilon_S}{\varepsilon_P}V\partial_{\vec{n}}\Phi_P=\phi^C
+\f}
+with:
+- the dielectric constants of protein and solvent $\varepsilon_P$,$\varepsilon_S$
+- the \emph{single-layer operator} $\left(Vt_p\right)(\vec{x})=\oint G_{\vec{x}}t_P\text{d}~\Gamma$
+- the \emph{double-layer opertaor} $\left(K_P\Phi_P\right)=\oint\frac{\partial G_{\vec{x}}}{\partial\vec{n}_P^\prime}\Phi_P\text{d}~\Gamma$
+- the normal derivative of the potential: $t_P := -\partial_{\vec{n}_{P}}\Phi_P$
+- and $\phi^C=\frac{1}{\varepsilon_0\varepsilon_P}\sum_k q_k G_{\vec{x}_k}(\vec{x})$
+</p> 
+
+<p>
+To see how to couple this Neumann data into the FEM problem, we look at the Poisson equation $-\Delta u =  f$, multiply with a test function $w$ and
+integrate by parts:
+\f{align*} 
+-\int_\Omega w\Delta u = -\int_{\partial\Omega}w\frac{\partial u}{\partial\vec{n}}\text{d}~\Gamma + \int_\Omega\nabla u\cdot\nabla w\\text{d}~\Omega
+\f}
+The Neumann data can be included into $\frac{\partial u}{\partial \vec{n}}$. Since we are considering FEM, we expand $u$ in the basis of 
+the chosen locally supported functions and we introduce the normal derivative as a separate variable:
+\f{align*} 
+      u_h &= \sum_k a_k\varphi_k(\vec{x}) \\
+      \frac{\partial u_h}{\partial \vec{n}} =: \vec{t}_p &= \sum_k b_k\vartheta_k(\vec{x})
+\f}
+So the discretized FEM problem can be written as:
+
+\f{align*} 
+?u_h, \vec{t}_p : \forall w_h: \int_\Omega\nabla w_h\cdot\nabla u_h\text{d}~\Omega - \int_{\partial\Omega}w_h\underbrace{\vec{t}_p}_{\text{Neumann}}\text{d}~\Gamma 
+= \int_\Omega  f w
+\f}
+</p>
+
+
+
+<center>
+\htmlimage{cell.png, 350, Visualization of the contributions to the integral operators at $\vec{x}_i$:\n All shaded cell surfaces need to be included}
+</center>
+
+<p>
+Discretization of these integral operators in the <i>weak form</i> yields:
+
+\f{align*} 
+     V_{h,ij}&=\sum_{E\subset S_j}\sum_{a\in E}G_{\vec{x}_i}(\vec{x}_a^\prime)\psi_j(\vec{x}_a^\prime)JxW_a\\
+     K_{h,ij}&=\frac{1}{2}\delta_{ij}-\sum_{E\subset S_j}\sum_{a\in E}\frac{\partial G_{\vec{x}_i}}{\partial \vec{n}^\prime}(\vec{x}_a^\prime)
+     w_j(\vec{x}_a^\prime)JxW_a
+\f}
+    where
+- $w_j$ and $\psi_j$ are \emph{ansatz} functions
+- $JxW_a$ is an abbreviation for the product of the Jacobian of the transformation to the reference element and the quadrature weight at $\vec{x}_a$
+\\
+Or, with some more abbreviations:
+- $G_{ia} := G_{\vec{x}_i}(\vec{x}_a^\prime)$
+- $H_{ia} := \frac{\partial G_{\vec{x}_i}}{\partial \vec{n}^\prime}(\vec{x}_a^\prime)$
+- $\psi_{aj} := \psi_j(\vec{x}_a^\prime)$
+- $w_{aj} := w_j(\vec{x}_a^\prime)$
+
+\f{align} 
+     V_{h,ij}&=\sum_{E\subset S_j}\sum_{a\in E}G_{ia}\psi_{aj}JxW_a\tag{SL}\\
+     K_{h,ij}&=\frac{1}{2}\delta_{ij}-\sum_{E\subset S_j}\sum_{a\in E}H_{ia}
+     w_{aj}JxW_a\tag{DL}
+\f}
+
+</p>
+<p>
+Sine both the single-layer operator $V_{h,ij}$ (SL) and the double-layer operator $K_{h,ij}$ (DL) are built from matrix-matrix products, 
+efficient parallelization using CUDA should be possible. 
+</p>
+<p>
+This is one of the parallelizations implemented in this project, the other being a QThread based CPU-side parallelization of the cell loop. Since the
+contributions of each cell to the global matrices can be calculated independently, and the CUDA-based implementation of the assembly of the BEM matrices 
+$V_{h,ij}$ and $K_{h,ij}$ can be used from multiple threads, partitioning the cell loop onto multiple threads should lead to additional speedup.
+</p>
+
+<h2>References</h2>
+<ol>
+<li>Stephan Kramer. <i>CUDA-based Scientific Computing Tools and Selected Applications.</i>
+PhD thesis, University of G&ouml;ttingen, 2012.
+</ol>
+

@@ -43,11 +43,15 @@ namespace steptemplate {
 
         void get(dealii::ParameterHandler & prm);
 
-        // The only useful thing a default implementation can provide
+        // One useful thing a default implementation can provide
         // is the location where potential results should be stored.
         // This becomes important when the parametric dependence of a
         // physical problem gets investigated.
         QDir run_dir;
+
+        // Secondly, we need a directory where the parameter settings of a run should be logged.
+        // This will always be @p run_dir + "/log".
+        QDir prm_log_dir;
 
     private:
         SimParams (const SimParams & /*other*/) {}

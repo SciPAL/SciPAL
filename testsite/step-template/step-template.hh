@@ -66,6 +66,9 @@ private:
 
 protected:
     SimParams params;
+
+    // A simulation has to know where to find its parameters.
+    QString  prm_path;
 };
 
 }
@@ -106,13 +109,19 @@ steptemplate::MyFancySimulation::MyFancySimulation(int argc,
     // By default, the parameter file has the same name as the binary
     // and is supposed to be in a subdirectory prm of that directory,
     // where the program has been started.
-    std::string prm_filename;
+    std::string master_prm_filename;
     if (argc == 1)
     {
-        prm_filename  = argv[0];
-        prm_filename += ".prm";
+        this->prm_path = (launch_dir.absolutePath().toStdString() + "/prm/").c_str();
+
+        QFileInfo tmp(argv[0]);
+        master_prm_filename  = tmp.baseName().toStdString();
+
+        master_prm_filename = this->prm_path.toStdString() + master_prm_filename + ".prm";
 
         cwd.setPath("./prm");
+        // At this point the sobdirectory prm may not yet exist. This is fixed after the
+        // name of the parameter files are set up.
     }
     else
     {
@@ -136,17 +145,17 @@ steptemplate::MyFancySimulation::MyFancySimulation(int argc,
 
         // Next, we subdivide the given filename into its path and filename
         // so that the corresponding subdirectories can be created.
-        QString prm_path = tmp.absolutePath();
+        this->prm_path = tmp.absolutePath();
         cwd.setPath(prm_path);
         cwd.makeAbsolute();
-        prm_filename = tmp.fileName().toStdString();
+        master_prm_filename = tmp.fileName().toStdString();
 
         std::cout << "Parameter file path : "
                   << tmp.absolutePath().toStdString().c_str()
                   << std::endl;
     }
 
-    std::cout << "Parameter file : " << prm_filename  << std::endl;
+    std::cout << "Parameter file : " << master_prm_filename  << std::endl;
 
     // Before the parameter file can be read, we have to make sure that
     // its directory exists. In case of the default parameter file
@@ -156,7 +165,7 @@ steptemplate::MyFancySimulation::MyFancySimulation(int argc,
 
     QDir::setCurrent(cwd.absolutePath());
 
-    prm_handler.read_input (prm_filename);
+    prm_handler.read_input (master_prm_filename);
 
     QDir::setCurrent(launch_dir.absolutePath());
 
@@ -165,31 +174,43 @@ steptemplate::MyFancySimulation::MyFancySimulation(int argc,
     // Create toplevel run directory
     cwd.setPath(this->params.run_dir.absolutePath());
 
+    std::cout << "path to run directory : " << this->params.run_dir.absolutePath().toStdString().c_str() << std::endl;
+
+
     // The following lets a directory make its own path.
     if (!cwd.exists())
         cwd.mkpath( "." );
 
-    // Now, change to the run dir
+
+    // After the run directory we create the log directory.
+    this->params.prm_log_dir = this->params.run_dir.absolutePath() + QDir::separator() + "log";
+    if (!this->params.prm_log_dir.exists())
+        this->params.prm_log_dir.mkpath(".");
+
+    std::cout << "log path : " << this->params.prm_log_dir.absolutePath().toStdString().c_str() << std::endl;
+
+    // Now, change to the run directory
     QDir::setCurrent(cwd.absolutePath());
 
-    cwd.setPath("./log");
-    cwd.makeAbsolute();
-    if (!cwd.exists())
-        cwd.mkpath(".");
-
-    // Create the log directory and write what has been actually read
+    // ... and write what has been actually read
     // into log file. Basically, this is just another parameter file
-    // and can thus be used again as input to another run after stripping the .log suffix.
-    QDir::setCurrent(cwd.absolutePath());
+    // and thus could be used again as input to another run after stripping the .log suffix.
+    std::string master_log_file = (this->params.prm_log_dir.absolutePath() + QDir::separator()
+                                   +
+                                  (QFileInfo(master_prm_filename.c_str()).fileName()
+                                   + ".log") ).toStdString();
 
-    prm_filename += ".log";
-    std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
-    prm_handler.print_parameters (log_out_text,
+    std::cout << "log file : " << master_log_file.c_str()
+                                   << std::endl;
+
+    std::ofstream log_master_prm( master_log_file.c_str() );
+    prm_handler.print_parameters (log_master_prm,
                                   dealii::ParameterHandler::Text);
 
     // At this point the toplevel run dir must exist.
     // Thus, we can change to it without any further sanity test.
     QDir::setCurrent(this->params.run_dir.absolutePath());
+
 }
 
 

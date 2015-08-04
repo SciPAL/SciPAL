@@ -154,6 +154,8 @@ step27::SimulationManager<DRSType, SimParamsType>::SimulationManager(int argc,
     // Create toplevel run directory.
     cwd.setPath(this->params.run_dir.absolutePath());
 
+    std::cout << "run dir : " << this->params.run_dir.absolutePath().toStdString().c_str() << std::endl;
+
     // The following lets a directory make its own path.
     if (!cwd.exists())
         cwd.mkpath( "." );
@@ -162,6 +164,9 @@ step27::SimulationManager<DRSType, SimParamsType>::SimulationManager(int argc,
     // After the run directory we create the log directory.
     if (!this->params.prm_log_dir.exists())
         this->params.prm_log_dir.mkpath(".");
+
+    std::cout << "log dir : " << this->params.prm_log_dir.absolutePath().toStdString().c_str() << std::endl;
+
 
     // Now, change to the run directory
     QDir::setCurrent(cwd.absolutePath());

@@ -1,0 +1,13 @@
+# Listing of Parameters
+# ---------------------
+subsection Simulation basics
+  # Specify a directory where the results of the test are to be stored. This
+  # can be either an absolute path or path relative to the directory where the
+  # program has been started. The default is subdir called test_me-<date>
+  # where <date> will be replaced by the date at which the program has been
+  # started. this simplifies keeping the projects directory clean.
+  # If you prescribe some directory, date and time are added automatically as subdirectories.
+  set Run directory = ../step-44-runs-2
+end
+
+

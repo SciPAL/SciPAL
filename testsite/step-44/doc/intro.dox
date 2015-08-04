@@ -1,0 +1,72 @@
+<h1>Introduction</h1>
+<p>
+The introduction has to contain the final version of your introductory talk.
+Since the whole documentation is produced by doxygen you have a reach set of
+options for giving it a neat format.
+</p>
+<p>
+In this introductory section you can use html for substructuring your text or e.g.
+to add tables. LaTeX in its doxygenized version can be used for formulae (look at the sources of your project):
+</p>
+<p>
+<ul>
+<li> inline formulas are as usual $a = b$, i.e. they get enclosed by dollar-signs.
+Note that this is different from what the original doxygen doc says. Thanks to the deal.II developers there is
+a little script in the background which silently takes care of converting a LaTeX-style inline formula into
+something that doxygen understands.
+</li>
+<li> For displayed equations you have two options:
+single equation:
+\f{equation}
+    \int_a^b f(x) dx
+\f}
+<li>
+<li> array of equations:
+\f{eqnarray} 
+   I_a^b & = &  \int_a^b f(x) dx \\
+   A_{\varphi\psi} & := & \int\limits_{\Omega} \nabla \psi(\bf{x}) \cdot \varepsilon(\bf{x}) \nabla \varphi(\bf{x}) ~d\Omega
+\f}
+</li>
+</ul>
+The same formatting rules apply to the file <i>results.dox</i>  which will contain your results.
+</p> 
+<p>
+This template program does not provide any fancy, complicated computation.
+However it discusses a few basic, yet crucial issues:
+<ul>
+<li> to show you how to document your work such that you can resume your work even after a longer break.
+</li>
+</br>
+<li> the syntax for getting classes and functions into the table of contents.
+</li>
+</br>
+<li> it is no harm to put a mathematical formula right next to the C++/CUDA-code implementing it.
+Strictly speaking, this is demonstrated by the worked out examples from the previous lab courses
+which are available <a href="http://num.math.uni-goettingen.de/~stkramer/doc/tutorial/index.html">ONLINE</a>.
+</li>
+</br>
+<li>as just shown you can set links to external web sources.
+</li>
+</br>
+<li> you get a basic structure for your physical problem which is already adapted to the needs
+of programming on heterogeneous hardware architectures.
+</li>
+</br>
+<li> you have a working PARAMETER HANDLING, that you just have to extend according to your needs.
+This (hopefully) lets you jump over the development phase where you frequently have to recompile
+your program just to test parameter dependencies because you either think you do not have the time to implement it
+or maybe you simply do not know how to get parameters
+in a well-controlled way into a program.
+</li>
+</br>
+<li> the run-time parameters are stored in a parameter file which can be located anywhere in the filesystem.
+</li>
+</br>
+<li> the one useful parameter provided by the default implementation is the one which allows
+you to determine a destination folder where the program should store results, if it produced any.
+</li>
+</br>
+<li> related to the parameter handling you learn how to query device properties.
+</li>
+</ul>
+</p>

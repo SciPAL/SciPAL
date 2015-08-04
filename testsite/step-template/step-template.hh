@@ -172,6 +172,11 @@ steptemplate::MyFancySimulation::MyFancySimulation(int argc,
     this->params.get(prm_handler);
 
     // Create toplevel run directory
+
+    this->params.run_dir.setPath( this->params.run_dir.absolutePath() +  QDir::separator() +
+    QString(QDateTime::currentDateTime().toString("ddd-yyyy-MM-dd/hh_mm_ss")
+            ).remove("."));
+
     cwd.setPath(this->params.run_dir.absolutePath());
 
     std::cout << "path to run directory : " << this->params.run_dir.absolutePath().toStdString().c_str() << std::endl;

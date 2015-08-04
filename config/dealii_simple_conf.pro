@@ -25,11 +25,11 @@ QMAKE_CXXFLAGS += -std=gnu++0x
 
 # Qt considers OSX as a unix.
     macx {
-DEALHOME =/usr/local/dealii
+DEALHOME =/clusterfs/cuda-2015/dealii-minimal-installation
            }
     else {
         unix {
-DEALHOME =/usr/local/dealii
+DEALHOME =/clusterfs/cuda-2015/dealii-minimal-installation
         }
     }
 #includes for deal.II

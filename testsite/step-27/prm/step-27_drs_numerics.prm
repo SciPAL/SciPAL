@@ -1,0 +1,55 @@
+# Listing of Parameters
+# ---------------------
+subsection Numerics
+  # Quadrature order for the inner integral of the boundary element method.
+  set BEM quad order inner integral                 = 4
+
+  # Quadrature order for the outer integral of the boundary element method
+  # (integral over test function in weak formulation!).
+  set BEM quad order outer integral                  = -1
+
+  # Degree of the finite elements.
+  set FE degree                                     = 1
+
+  # Mapping degree for the finite element method. For FE Degree >= 2, mapping
+  # degree and fe degree should be equal.
+  set FE mapping degree                             = 2
+
+  # Quadrature order for the finite element method. If set to -1, the order is
+  # set automatically to 2*fe_degree+1 for rules, where the order can be
+  # adjusted.
+  set FE quad order                                 = -1
+
+  # After parsing, the sceleton mesh is refined this many times for generating
+  # the coarse mesh which is the starting point for the adaptove solutino
+  # process.
+  set N init refinements                            = 1
+
+  # During mesh refinement the coarse mesh may be refined this many times in
+  # order to compute an improved solution.
+  set N mesh refinements                            = 4
+
+  # Select the type of quadrature rule to use for the finite element
+  # part.Possible values are:
+  # gauss|midpoint|milne|simpson|trapez|weddle
+  set Quadrature rule for FE part                   = gauss
+
+  # For collocation methods this parameter is ignored, because the outer
+  # integral does not exist. As q rules you can choose from the same set as
+  # for the FE part.
+  set Quadrature rule for outer integral of BE part = gauss
+
+
+  subsection Multigrid parameters
+    set N smoothing steps = 2
+    # The classical choice of smoother is a relaxation method like Jacobi or
+    # Gauss-Seidel. However, Krylov-like methods like the iterative inverse
+    # based on Chebyshev polynomials is an option as well. The advantage of
+    # the Chebyshev smoother is that it only requires matrix-vector products
+    # and thus can be parallelized easily.
+    set Smoothing method  = relaxation
+  end
+
+end
+
+

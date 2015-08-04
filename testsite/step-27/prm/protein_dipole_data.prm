@@ -1,0 +1,19 @@
+# Listing of Parameters
+# ---------------------
+subsection Protein dipole data
+  # The length is measured in the same units as the dimensions of the FEM
+  # mesh. Thus the numbers given here depend on how the physical model has
+  # been made dimensionless.
+  set Dipole length               = 2.75
+
+  # The number of elementary charges.
+  set Dipole strength             = .1
+
+  # In a future version the positions of the charges can be set directly
+  set Position of negative charge = Not yet implemented
+
+  # In a future version the positions of the charges can be set directly
+  set Position of positive charge = Not yet implemented
+end
+
+

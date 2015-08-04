@@ -1,0 +1,62 @@
+<h1>Results</h1>
+<p>
+To calculate the speedup achieved by the parallization in this project, timing tests were run on an computer with two Intel Xeon X5675 12-core CPUs
+and an nVidia Tesly K20c graphics card.
+</p>
+
+
+<p>
+The results can be seen in the following plots. The speedup is defined here as the time needed by the CPU divided by the time needed by CUDA to
+calculate a given problem. The solid lines show the speedup for the total cell loop, the dashed lines how the speedup in the average time needed
+to assemble the BEM matrices (the only part parallized by CUDA in the cell loop).
+</p>
+
+
+<p>
+The maximum total speedup that could be achieved is about 9, as the following two plots show. 
+</p>
+
+<center>
+\htmlimage{speedup_timing_BEMQ-8_FEMapp-2_FEDeg-2_InitRef-1_MaxRef-5.png, 950, }
+</center>
+
+<center>
+\htmlimage{speedup_timing_BEMQ-8_FEMapp-4_FEDeg-1_InitRef-1_MaxRef-5.png, 950, }
+</center>
+
+<p>
+One of the goals of this project was to see whether the speedup with CUDA would carry over to multiple threads. In the second plot above,
+it can be seen that this is the case, observing that the speedup for 12 threads vs. 1 is approximately the product of the speedups for
+1 thread and the speedup for 12 threads.
+</p>
+
+
+
+<p>
+The following two plots are visualization of the simulated system. For imporoved visibility, only the center of the cylinder is shown. Here, 
+contour plots of the numerically achieved solutions are shown, togehter with point plots of the analytically derived reference solution, which
+match nicely.
+</p>
+
+
+<center>
+\htmlimage{interior2.png,  950, Pics}
+</center>
+
+
+<center>
+\htmlimage{interior_small2.png,  950, Pics}
+</center>
+
+
+
+
+<p>
+To conclude, this project showed that by combining CUDA for matrix assembly and QThreads for domain decomposition can yield large speedups.
+Combining these parallization strategies with, for exmaple, MPI (Message Passing Interface) and distributing work across multiple processing nodes
+each equipped with NVidia graphics cards could make the simulation of even very large systems feasible. 
+</p>
+
+<p>
+
+</p>

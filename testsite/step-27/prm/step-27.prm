@@ -1,0 +1,32 @@
+# Listing of Parameters
+# ---------------------
+
+
+  # Specify a directory where the results of the simulation should be stored.
+  # This can be either an absolute path or path relative to the directory
+  # where the program has been started. The default is asubdir called
+  # test_me-<date> where <date> will be replaced by the date at which the
+  # program has been started. this simplifies keeping the projects directory
+  # clean
+  set Run directory         = /Users/sck/cuda-workspace/step-27-runs/
+
+
+  # If set to true, the results of the run will be stored in a subdirectory
+  # of a given run directory which named after the date and time at the
+  # start of the program. This allows to group runs without
+  # overwriting previous results.
+  set Use time tag = true
+
+                      # These test cases can be used for convergence tests. Currently available are:
+                      # sum: f(x,y,z) = 2*x+y+z
+                      # prod: f(x,y,z) = 0.01*x*y*z
+                      # sum_prod: f(x,y,z) = sum + prod
+                      # dipole: f(x,y,z) = a/|r-r0| - a/|r-r1|,
+                      # where a is the strength of the dipole and r0,r1 are points on the z axis,
+                      # symmetric w.r.t. to the origin.
+                      # a and the lengths of r0, r1 can be tuned in protein_dipole_data.prm
+                      # sum_prod_dipole: f(x,y,z) = sum + prod + dipole
+                      # drs: do not use a test case, but actually run the drs simulation.
+  set FEM-BEM reference solution = sum_prod_dipole
+
+

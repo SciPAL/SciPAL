@@ -38,7 +38,7 @@ DEFINES += "BLOCK_DIM_Y=4"
 
     HOME = $$(HOME) # your home directory
     PRAK = $$_PRO_FILE_PWD_/../../ #$$HOME/cuda-2014/Praktikum_2013 # path to your copy of the lab course folder. Typically, this 2 levels above the source folder of your step-
-    SciPAL_DIR = $$PRAK/SciPAL
+    SciPAL_DIR = $$PRAK
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/..
 
 message("SciPALs home :" $$SciPAL_DIR)

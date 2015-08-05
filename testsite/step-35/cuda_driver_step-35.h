@@ -194,10 +194,10 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *lag2,*tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // ,*tmp2_d, *tmp_d,*lag1,
+    Mdouble *tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // ,*tmp2_d, *tmp_d,*lag1,*lag2,
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2;
 
 
     cufftHandle *plan_fft,*iplan_fft;
@@ -236,7 +236,7 @@ class CUDADriver {
           inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
-          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix)
+          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -280,15 +280,15 @@ class CUDADriver {
         tmp_h=new Mdouble[inf->ext_num_pix];
         //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
         //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
-        checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
+        //checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
         checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
         checkCudaErrors(cudaMalloc((void **)&tmp_haar2, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
 
         //Init the lagrangian fields
-        step35::Kernels<Mdouble> kernel;
+        //step35::Kernels<Mdouble> kernel;
         //kernel.reset(lag1, inf->ext_num_pix);
-        kernel.reset(lag2, inf->ext_num_pix);
+        //kernel.reset(lag2, inf->ext_num_pix);
         //Generate Mpatch element used to signal threads to shut down
         cend=new Mpatch(0);
 
@@ -658,7 +658,7 @@ class CUDADriver {
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        kernel.diff(tmp2_d.array().val(), lag2, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
         kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
@@ -675,7 +675,7 @@ class CUDADriver {
         kernel.sum(tmp_d.array().val(), inf->x_d,0, inf->ext_width, inf->ext_height, inf->ext_depth);
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //Update the lagrangian estimates
-        kernel.update_lagrangian(lag1.array().val(), lag2, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
+        kernel.update_lagrangian(lag1.array().val(), lag2.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
                                  alpha1, alpha2, inf->e_d, inf->im_d,tmp_d.array().val(), inf->x_d, inf->z_d);
     }
 
@@ -711,7 +711,7 @@ class CUDADriver {
                 if ( i < inf->ext_height) {
                     checkCudaErrors(cudaMemcpyAsync(&(tmp_haar[i*inf->ny2]), &(inf->x_d[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr[i*inf->ny2]), &(lag2[i*inf->ext_height]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                 }
             }
@@ -720,7 +720,7 @@ class CUDADriver {
             //Forward 2D Haar Wavelet transform
             kernel.haar(tmp_haar,tmp_haar2,inf->ny2);
             kernel.haar(tmp_lagr,tmp_haar2,inf->ny2);
-            kernel.soft_threshold(tmp_haar,lag2,tmp_haar,rho2,gamma,inf->nx2*inf->ny2);
+            kernel.soft_threshold(tmp_haar,lag2.array().val(),tmp_haar,rho2,gamma,inf->nx2*inf->ny2);
             //Backward 2D Haar Wavelet transform
             kernel.inverse_haar(tmp_haar,tmp_haar2,inf->ny2);
 
@@ -736,14 +736,14 @@ class CUDADriver {
         //Regularization by direct space sparsity
         if ( inf->regType == sparse ) {
             //checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->framesize, cudaMemcpyDeviceToDevice));
-            kernel.soft_threshold(inf->z_d,lag2,inf->x_d, rho2, gamma, inf->ext_num_pix);
+            kernel.soft_threshold(inf->z_d,lag2.array().val(),inf->x_d, rho2, gamma, inf->ext_num_pix);
             //kernel.tv_regularization(inf->x_d,inf->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
         }
         //Regularization by Fourier Space L_2 Norm
         if ( inf->regType == quadratic ) {
             checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
             //the solution with smallest L_2 Norm is obtained, this corresponds to the pseudoinverse
-            kernel.pseudo_inverse(inf->z_d,lag2,rho2,gamma,inf->ext_num_pix);
+            kernel.pseudo_inverse(inf->z_d,lag2.array().val(),rho2,gamma,inf->ext_num_pix);
         }
     }
 };

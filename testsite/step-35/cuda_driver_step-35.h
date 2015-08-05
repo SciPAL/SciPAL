@@ -618,9 +618,9 @@ class CUDADriver {
     //@sect5{Function: push_data}
     //@brief Push all data from host to device
     void push_data() {
-        checkCudaErrors(cudaMemcpy(inf->im_d, &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->x_d, &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->z_d, &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy(inf->im_d.array().val(), &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy(inf->x_d.array().val(), &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(inf->e_d.array().val(), &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
     }
@@ -628,9 +628,9 @@ class CUDADriver {
     //@sect5{Function: get_data}
     //@brief Pull all data from device to host
     void get_data() {
-        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
     }
@@ -642,37 +642,41 @@ class CUDADriver {
         step35::Kernels<Mdouble> kernel;
         //$\text{tmp}_d=I$tmp2
         kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->im_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=I-e$
         kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        conv2(inf->x_d, tmp2_d.array().val());
-        //$\text{tmp}_d=I-e-A*x$
+        //tmp_d = inf->im_d - inf->e_d;
+        conv2(inf->x_d.array().val(), tmp2_d.array().val());
+        //$\text{tmp}_d=I-e-A*x$       
         kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //tmp_d = tmp_d - tmp2_d;
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
         kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
         kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //tmp_d = rho1*tmp_d + lag1;
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //$\text{tmp2}_d=z$
         kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp2_d.array().val(), inf->z_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp2_d.array().val(), inf->z_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=z-x$
-        kernel.diff(tmp2_d.array().val(), inf->x_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
+        kernel.diff(tmp2_d.array().val(), inf->x_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
          //$\text{tmp2}_d=z-x$
-         //tmp2_d = inf->z_d - inf->x_d;
-
+        //tmp2_d = inf->z_d - inf->x_d;
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
         kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
         kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //tmp2_d = rho2*tmp2_d+tmp_d - lag2;
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
         kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.sum(inf->x_d, tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(inf->x_d.array().val(), tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //inf->x_d = inf->x_d + inf->gamma*tmp2_d;
+
     }
 
     //@sect5{Function: update_lagrangian}
@@ -682,21 +686,21 @@ class CUDADriver {
     void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
         step35::Kernels<Mdouble> kernel;
         kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->x_d,0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp_d.array().val(), inf->x_d.array().val(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //Update the lagrangian estimates
         kernel.update_lagrangian(lag1.array().val(), lag2.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
-                                 alpha1, alpha2, inf->e_d.array().val(), inf->im_d,tmp_d.array().val(), inf->x_d, inf->z_d);
+                                 alpha1, alpha2, inf->e_d.array().val(), inf->im_d.array().val(),tmp_d.array().val(), inf->x_d.array().val(), inf->z_d.array().val());
     }
 
     //@sect5{Function: dykstra_gauss}
     //@brief Wrapper around the whole projection procedure
     //@param rho parameter for the first constraint
     void dykstra_gauss(const Mdouble rho) {
-        conv2(inf->x_d,tmp_d.array().val());
+        conv2(inf->x_d.array().val(),tmp_d.array().val());
         step35::Kernels<Mdouble> kernel;
         //the value to be projected is copied into e_d
-        kernel.prepare_e(inf->e_d.array().val(), inf->im_d, tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.prepare_e(inf->e_d.array().val(), inf->im_d.array().val(), tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //Perform the Dykstra Algotithm
         iterate();
     }
@@ -722,7 +726,7 @@ class CUDADriver {
             //Copy $x$ into the bigger temp variable while conserving its shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_height) {
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i*inf->ny2]), &(inf->x_d[i*inf->ext_height]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i*inf->ny2]), &(inf->x_d.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                     checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
@@ -740,7 +744,7 @@ class CUDADriver {
             //Copy back, pay attention not to mess up the shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_width )
-                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d[i*inf->ext_height]), &(tmp_haar.array().val()[i*inf->ny2]),
+                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d.array().val()[i*inf->ext_height]), &(tmp_haar.array().val()[i*inf->ny2]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
             }
             checkCudaErrors(cudaDeviceSynchronize());
@@ -749,14 +753,14 @@ class CUDADriver {
         //Regularization by direct space sparsity
         if ( inf->regType == sparse ) {
             //checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->framesize, cudaMemcpyDeviceToDevice));
-            kernel.soft_threshold(inf->z_d,lag2.array().val(),inf->x_d, rho2, gamma, inf->ext_num_pix);
+            kernel.soft_threshold(inf->z_d.array().val(),lag2.array().val(),inf->x_d.array().val(), rho2, gamma, inf->ext_num_pix);
             //kernel.tv_regularization(inf->x_d,inf->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
         }
         //Regularization by Fourier Space L_2 Norm
         if ( inf->regType == quadratic ) {
-            checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
+            checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
             //the solution with smallest L_2 Norm is obtained, this corresponds to the pseudoinverse
-            kernel.pseudo_inverse(inf->z_d,lag2.array().val(),rho2,gamma,inf->ext_num_pix);
+            kernel.pseudo_inverse(inf->z_d.array().val(),lag2.array().val(),rho2,gamma,inf->ext_num_pix);
         }
     }
 };

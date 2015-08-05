@@ -650,13 +650,13 @@ class CUDADriver {
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //$\text{tmp2}_d=z$
-        //kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
-        //kernel.sum(tmp2_d.array().val(), inf->z_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
+        kernel.sum(tmp2_d.array().val(), inf->z_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=z-x$
-       //  kernel.diff(tmp2_d.array().val(), inf->x_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp2_d.array().val(), inf->x_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
          //$\text{tmp2}_d=z-x$
-         tmp2_d = inf->z_d - inf->x_d;
+         //tmp2_d = inf->z_d - inf->x_d;
 
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
         kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);

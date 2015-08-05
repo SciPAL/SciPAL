@@ -194,10 +194,10 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *lag1,*lag2,*tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // ,*tmp2_d, *tmp_d,
+    Mdouble *lag2,*tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // ,*tmp2_d, *tmp_d,*lag1,
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1;
 
 
     cufftHandle *plan_fft,*iplan_fft;
@@ -236,7 +236,7 @@ class CUDADriver {
           inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
-          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix)
+          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -279,7 +279,7 @@ class CUDADriver {
         // FIXME: why is there host allocation when device arrays are alloc'd?
         tmp_h=new Mdouble[inf->ext_num_pix];
         //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
-        checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
+        //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
         checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
@@ -287,7 +287,7 @@ class CUDADriver {
 
         //Init the lagrangian fields
         step35::Kernels<Mdouble> kernel;
-        kernel.reset(lag1, inf->ext_num_pix);
+        //kernel.reset(lag1, inf->ext_num_pix);
         kernel.reset(lag2, inf->ext_num_pix);
         //Generate Mpatch element used to signal threads to shut down
         cend=new Mpatch(0);
@@ -645,7 +645,7 @@ class CUDADriver {
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
         kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-        kernel.sum(tmp_d.array().val(), lag1, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //$\text{tmp2}_d=z$
@@ -675,7 +675,7 @@ class CUDADriver {
         kernel.sum(tmp_d.array().val(), inf->x_d,0, inf->ext_width, inf->ext_height, inf->ext_depth);
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //Update the lagrangian estimates
-        kernel.update_lagrangian(lag1, lag2, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
+        kernel.update_lagrangian(lag1.array().val(), lag2, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
                                  alpha1, alpha2, inf->e_d, inf->im_d,tmp_d.array().val(), inf->x_d, inf->z_d);
     }
 
@@ -686,7 +686,7 @@ class CUDADriver {
         conv2(inf->x_d,tmp_d.array().val());
         step35::Kernels<Mdouble> kernel;
         //the value to be projected is copied into e_d
-        kernel.prepare_e(inf->e_d, inf->im_d, tmp_d.array().val(), lag1, rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.prepare_e(inf->e_d, inf->im_d, tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //Perform the Dykstra Algotithm
         iterate();
     }

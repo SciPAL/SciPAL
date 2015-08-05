@@ -194,10 +194,10 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *tmp_h,*tmp_haar,*tmp_lagr; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,
+    Mdouble *tmp_h,*tmp_haar; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr;
 
 
     cufftHandle *plan_fft,*iplan_fft;
@@ -283,7 +283,7 @@ class CUDADriver {
         //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
         //checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
-        checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
+        //checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
         //checkCudaErrors(cudaMalloc((void **)&tmp_haar2, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
 
         //Init the lagrangian fields
@@ -709,14 +709,16 @@ class CUDADriver {
                 std::abort();
             }
             kernel.reset(tmp_haar,inf->nx2*inf->ny2);
-            kernel.reset(tmp_lagr,inf->nx2*inf->ny2);
+            tmp_lagr = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
+
+            //kernel.reset(tmp_lagr,inf->nx2*inf->ny2);
 
             //Copy $x$ into the bigger temp variable while conserving its shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_height) {
                     checkCudaErrors(cudaMemcpyAsync(&(tmp_haar[i*inf->ny2]), &(inf->x_d[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                 }
             }
@@ -724,7 +726,7 @@ class CUDADriver {
 
             //Forward 2D Haar Wavelet transform
             kernel.haar(tmp_haar,tmp_haar2.array().val(),inf->ny2);
-            kernel.haar(tmp_lagr,tmp_haar2.array().val(),inf->ny2);
+            kernel.haar(tmp_lagr.array().val(),tmp_haar2.array().val(),inf->ny2);
             kernel.soft_threshold(tmp_haar,lag2.array().val(),tmp_haar,rho2,gamma,inf->nx2*inf->ny2);
             //Backward 2D Haar Wavelet transform
             kernel.inverse_haar(tmp_haar,tmp_haar2.array().val(),inf->ny2);

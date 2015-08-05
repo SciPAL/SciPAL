@@ -131,6 +131,7 @@ LIBS += -L$$QMAKE_LIBDIR \
         -lcublas \
         -lcufft \
         -lcurand \
+-lcusolver \
 -L/usr/lib
 
 # DO NOT REMOVE the BRACES!!!
@@ -193,15 +194,15 @@ QMAKE_RUN_CC_IMP = $(CC) \
     "$@" \
     "$<"
 
-CONFIG(debug, debug|release) {
-    QMAKE_PRE_LINK = "$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJCOMP) $(LIBS)" 2>&1 |\
-    python $$SciPAL_DIR/scripts/createInst.py Debug >> $$_PRO_FILE_PWD_/autoInstantiations.h;
-}
+#CONFIG(debug, debug|release) {
+#    QMAKE_PRE_LINK = "$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJCOMP) $(LIBS)" 2>&1 |\
+#    python $$SciPAL_DIR/scripts/createInst.py Debug >> $$_PRO_FILE_PWD_/autoInstantiations.h;
+#}
 
-CONFIG(release, debug|release) {
-    QMAKE_PRE_LINK = "$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJCOMP) $(LIBS)" 2>&1 |\
-    python $$SciPAL_DIR/scripts/createInst.py Release >> $$_PRO_FILE_PWD_/autoInstantiations.h;
-}
+#CONFIG(release, debug|release) {
+#    QMAKE_PRE_LINK = "$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJCOMP) $(LIBS)" 2>&1 |\
+#    python $$SciPAL_DIR/scripts/createInst.py Release >> $$_PRO_FILE_PWD_/autoInstantiations.h;
+#}
 
 TEMPLATE =
 

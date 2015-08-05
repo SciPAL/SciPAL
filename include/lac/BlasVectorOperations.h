@@ -134,6 +134,42 @@ static void apply(Vector<T, BW> &result,
             &(result.array().val()[0]), incy);
 }
 
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A \cdot src$
+
+template <typename T, typename BW>
+static void apply(Vector<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::MV& expr)
+{
+
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    Vtr & dst = result;
+
+
+    BW::gemv('n',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data_ptr,
+             A.n_rows(), // lda
+             x.data_ptr,
+             1, // incx
+             beta,
+             dst.data_ptr, // y
+             1 // incy
+             );
+}
+
 // @sect4{Function: scaled_vmult}
 //!
 //! Generic matrix-vector multiplication.
@@ -153,19 +189,19 @@ static void apply(Vector<T, BW> &result,
 
     T beta = expr.r.l;
 
-    Mtx & dst = result;
+    Vtr & dst = result;
 
 
     BW::gemv('n',
-             A.__n_rows, // m
-             A.__n_cols, // n
+             A.n_rows(), // m
+             A.n_cols(), // n
              alpha,
-             A.data(),
-             A.__n_rows, // lda
-             x.val(),
+             A.data_ptr,
+             A.n_rows(), // lda
+             x.data_ptr,
              1, // incx
              beta,
-             dst.val(), // y
+             dst.data_ptr, // y
              1 // incy
              );
 }

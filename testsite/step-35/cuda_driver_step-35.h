@@ -236,7 +236,7 @@ class CUDADriver {
           inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
-          tmp_d(inf->ext_num_pix),tmp2_d(inf->n_bytes_per_frame)
+          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be

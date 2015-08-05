@@ -194,10 +194,10 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *lag1,*lag2,*tmp2_d,*tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // *tmp_d,
+    Mdouble *lag1,*lag2,*tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // ,*tmp2_d, *tmp_d,
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d;
 
 
     cufftHandle *plan_fft,*iplan_fft;
@@ -236,7 +236,7 @@ class CUDADriver {
           inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
-          tmp_d(inf->ext_num_pix)
+          tmp_d(inf->ext_num_pix),tmp2_d(inf->n_bytes_per_frame)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -278,7 +278,7 @@ class CUDADriver {
         // checkCudaErrors(cudaMalloc((void **)&tmp_d, inf->n_bytes_per_frame));
         // FIXME: why is there host allocation when device arrays are alloc'd?
         tmp_h=new Mdouble[inf->ext_num_pix];
-        checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
+        //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
         checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
@@ -639,9 +639,9 @@ class CUDADriver {
         kernel.sum(tmp_d.array().val(), inf->im_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=I-e$
         kernel.diff(tmp_d.array().val(), inf->e_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        conv2(inf->x_d, tmp2_d);
+        conv2(inf->x_d, tmp2_d.array().val());
         //$\text{tmp}_d=I-e-A*x$
-        kernel.diff(tmp_d.array().val(), tmp2_d, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
         kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
@@ -649,20 +649,20 @@ class CUDADriver {
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //$\text{tmp2}_d=z$
-        kernel.reset(tmp2_d, inf->ext_num_pix);
-        kernel.sum(tmp2_d, inf->z_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
+        kernel.sum(tmp2_d.array().val(), inf->z_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=z-x$
-        kernel.diff(tmp2_d, inf->x_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp2_d.array().val(), inf->x_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        kernel.mult(tmp2_d, rho2, inf->ext_num_pix);
+        kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        kernel.sum(tmp2_d, tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        kernel.diff(tmp2_d, lag2, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp2_d.array().val(), lag2, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.mult(tmp2_d, inf->gamma, inf->ext_num_pix);
+        kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.sum(inf->x_d, tmp2_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(inf->x_d, tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
     }
 
     //@sect5{Function: update_lagrangian}

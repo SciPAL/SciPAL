@@ -831,7 +831,7 @@ FEMBEMPoissonProblem<dim>::FEMBEMPoissonProblem (const step27::NumericsParams<di
       old_solution(),
       new_solution(),
       degree (numerics_prms.fe_degree),
-      fem_bem(testcase, prm_path),
+      fem_bem(testcase, prm_path, log_dir),
       laplace(mapping, fe, *numerics_prms.fem_q_rule),
       matrices(sparsity_patterns)
 

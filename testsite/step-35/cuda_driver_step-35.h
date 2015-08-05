@@ -34,6 +34,9 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <lac/cublas_wrapper.hh>
 #include <lac/cublas_Vector.h>
 
+//deal.II
+#include <deal.II/lac/vector.h>
+
 //Our stuff
 #include "cuda_driver_step-35.hh"
 #include "cuda_kernel_wrapper_step-35.cu.h"
@@ -194,7 +197,8 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *tmp_h; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,tmp_haar
+    //Mdouble *tmp_h; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,tmp_haar
+    dealii::Vector<Mdouble> tmp_h;
 
     // FIXME: For the device side arrays use this:
     SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr,tmp_haar;
@@ -237,7 +241,8 @@ class CUDADriver {
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
           tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix),
-          tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix)
+          tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix),
+          tmp_h(inf->ext_num_pix)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -278,7 +283,7 @@ class CUDADriver {
         checkCudaErrors(cudaMalloc((void **)&fm1, fm1_size));
         // checkCudaErrors(cudaMalloc((void **)&tmp_d, inf->n_bytes_per_frame));
         // FIXME: why is there host allocation when device arrays are alloc'd?
-        tmp_h=new Mdouble[inf->ext_num_pix];
+        //tmp_h=new Mdouble[inf->ext_num_pix];
         //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
         //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
         //checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
@@ -326,7 +331,7 @@ class CUDADriver {
 
         //Cleanup
         delete[] fm1_h;
-        delete[] tmp_h;
+        //delete[] tmp_h;
         cufftDestroy(*plan_fft);
         cufftDestroy(*iplan_fft);
         delete plan_fft;
@@ -617,7 +622,7 @@ class CUDADriver {
         checkCudaErrors(cudaMemcpy(inf->x_d, &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(inf->z_d, &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(inf->e_d, &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), tmp_h, inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
     }
 
     //@sect5{Function: get_data}
@@ -627,7 +632,7 @@ class CUDADriver {
         checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(tmp_h, tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
     }
 
     // FIXME: use SciPAl vectors and ETs!!!

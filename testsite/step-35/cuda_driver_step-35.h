@@ -194,10 +194,10 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *tmp_h,*tmp_haar; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,
+    Mdouble *tmp_h; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,tmp_haar
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr,tmp_haar;
 
 
     cufftHandle *plan_fft,*iplan_fft;
@@ -237,7 +237,7 @@ class CUDADriver {
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
           tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix),
-          tmp_haar2(inf->ext_num_pix)
+          tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -282,7 +282,7 @@ class CUDADriver {
         //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
         //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
         //checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
-        checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
+        //checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
         //checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
         //checkCudaErrors(cudaMalloc((void **)&tmp_haar2, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
 
@@ -708,7 +708,8 @@ class CUDADriver {
                 std::cerr << "Haar regularisation with 3d images is not yet implemented!" << std::endl;
                 std::abort();
             }
-            kernel.reset(tmp_haar,inf->nx2*inf->ny2);
+            //kernel.reset(tmp_haar,inf->nx2*inf->ny2);
+            tmp_haar = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
             tmp_lagr = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
 
             //kernel.reset(tmp_lagr,inf->nx2*inf->ny2);
@@ -716,7 +717,7 @@ class CUDADriver {
             //Copy $x$ into the bigger temp variable while conserving its shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_height) {
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar[i*inf->ny2]), &(inf->x_d[i*inf->ext_height]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i*inf->ny2]), &(inf->x_d[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                     checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
@@ -725,16 +726,16 @@ class CUDADriver {
             checkCudaErrors(cudaDeviceSynchronize());
 
             //Forward 2D Haar Wavelet transform
-            kernel.haar(tmp_haar,tmp_haar2.array().val(),inf->ny2);
+            kernel.haar(tmp_haar.array().val(),tmp_haar2.array().val(),inf->ny2);
             kernel.haar(tmp_lagr.array().val(),tmp_haar2.array().val(),inf->ny2);
-            kernel.soft_threshold(tmp_haar,lag2.array().val(),tmp_haar,rho2,gamma,inf->nx2*inf->ny2);
+            kernel.soft_threshold(tmp_haar.array().val(),lag2.array().val(),tmp_haar.array().val(),rho2,gamma,inf->nx2*inf->ny2);
             //Backward 2D Haar Wavelet transform
-            kernel.inverse_haar(tmp_haar,tmp_haar2.array().val(),inf->ny2);
+            kernel.inverse_haar(tmp_haar.array().val(),tmp_haar2.array().val(),inf->ny2);
 
             //Copy back, pay attention not to mess up the shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_width )
-                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d[i*inf->ext_height]), &(tmp_haar[i*inf->ny2]),
+                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d[i*inf->ext_height]), &(tmp_haar.array().val()[i*inf->ny2]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
             }
             checkCudaErrors(cudaDeviceSynchronize());

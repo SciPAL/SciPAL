@@ -358,14 +358,14 @@ class CUDADriver {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
             for (int so=0; so<5; so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d, inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
                 }
             }
         }
         else { //TODO 3d
             for (int so=0; so<5; so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d, inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
                 }
             }
         }
@@ -482,7 +482,7 @@ class CUDADriver {
             cudaEventRecord(start, mystream);
 #endif
             //Calculate Dykstra's algorithm on all frames in the list of clusters we recieved
-            kernels.dykstra(d_q,inf->e_d, cluster_info_d, q_offset_d, num_of_cluster, inf->width, inf->height, 1024, &mystream);
+            kernels.dykstra(d_q,inf->e_d.array().val(), cluster_info_d, q_offset_d, num_of_cluster, inf->width, inf->height, 1024, &mystream);
 
 #ifdef TIME_KERNELS
             cudaEventRecord(stop, mystream);
@@ -621,7 +621,7 @@ class CUDADriver {
         checkCudaErrors(cudaMemcpy(inf->im_d, &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(inf->x_d, &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(inf->z_d, &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->e_d, &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpy(inf->e_d.array().val(), &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
         checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
     }
 
@@ -631,7 +631,7 @@ class CUDADriver {
         checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
         checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
     }
 
@@ -644,7 +644,7 @@ class CUDADriver {
         kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
         kernel.sum(tmp_d.array().val(), inf->im_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=I-e$
-        kernel.diff(tmp_d.array().val(), inf->e_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         conv2(inf->x_d, tmp2_d.array().val());
         //$\text{tmp}_d=I-e-A*x$
         kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
@@ -686,7 +686,7 @@ class CUDADriver {
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //Update the lagrangian estimates
         kernel.update_lagrangian(lag1.array().val(), lag2.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
-                                 alpha1, alpha2, inf->e_d, inf->im_d,tmp_d.array().val(), inf->x_d, inf->z_d);
+                                 alpha1, alpha2, inf->e_d.array().val(), inf->im_d,tmp_d.array().val(), inf->x_d, inf->z_d);
     }
 
     //@sect5{Function: dykstra_gauss}
@@ -696,7 +696,7 @@ class CUDADriver {
         conv2(inf->x_d,tmp_d.array().val());
         step35::Kernels<Mdouble> kernel;
         //the value to be projected is copied into e_d
-        kernel.prepare_e(inf->e_d, inf->im_d, tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.prepare_e(inf->e_d.array().val(), inf->im_d, tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //Perform the Dykstra Algotithm
         iterate();
     }

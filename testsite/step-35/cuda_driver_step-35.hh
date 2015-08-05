@@ -69,7 +69,8 @@ class ImageInfo {
     //@param ext_num_pix equals ext_width*ext_height*ext_depth
     int ext_width, ext_height, nx2, ny2, ext_depth, ext_num_pix;
     //Residual Field on Device and Host
-    Mdouble *e_d; // FIXME,*e_h;
+    //Mdouble *e_d; // FIXME,*e_h;
+    SciPAL::Vector<Mdouble,cublas> e_d;
     //Noisy image on Device and Host
     // Mdouble *im_h; // FIXME
     // FIXME: storign references to vectors is bad design. Either use dealii::SmartPointers or rethink the design of this class. Preferably the latter.
@@ -135,7 +136,8 @@ class ImageInfo {
          z_h(ext_num_pix),
          im_h(ext_num_pix),
          gamma(mgamma), sigma(msigma),regType(newreg),
-         dim(mdim)
+         dim(mdim),
+         e_d(ext_num_pix)
     {
 
         // FIXME: this is already in the gpuInfo object instantiated in the main function!
@@ -231,7 +233,7 @@ class ImageInfo {
             checkCudaErrors(cudaMalloc((void **)&cs_d, cs_n*sizeof(Mdouble)));
             checkCudaErrors(cudaMalloc((void **)&x_d, n_bytes_per_frame));
             checkCudaErrors(cudaMalloc((void **)&z_d, n_bytes_per_frame));
-            checkCudaErrors(cudaMalloc((void **)&e_d, n_bytes_per_frame));
+            //checkCudaErrors(cudaMalloc((void **)&e_d, n_bytes_per_frame));
             checkCudaErrors(cudaMalloc((void **)&im_d, n_bytes_per_frame));
             Mdouble *fpsf_tmp_d;
             checkCudaErrors(cudaMalloc((void **)&fpsf_tmp_d, n_bytes_per_frame));
@@ -241,7 +243,7 @@ class ImageInfo {
             checkCudaErrors(cudaMemcpyAsync(x_d, &(x_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpyAsync(z_d, &(z_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
             //checkCudaErrors(
-                        cudaMemcpy/*Async*/(e_d, &(e_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice); //);
+                        cudaMemcpy/*Async*/(e_d.array().val(), &(e_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice); //);
             checkCudaErrors(cudaMemcpyAsync(cs_d, cs_h, cs_n*sizeof(Mdouble), cudaMemcpyHostToDevice));
             //Copy $c_s$ to constant CUDA memory
             step35::Kernels<Mdouble> kernel;
@@ -270,7 +272,7 @@ class ImageInfo {
     ~ImageInfo() {
         if ( c == gpu_cuda ) {
             cudaFree(cs_d);
-            cudaFree(e_d);
+            //cudaFree(e_d);
             cudaFree(x_d);
             cudaFree(z_d);
             cudaFree(im_d);

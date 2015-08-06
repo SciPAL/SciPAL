@@ -34,7 +34,7 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <lac/cublas_wrapper.hh>
 #include <lac/cublas_Vector.h>
 #include <lac/VectorCustomOperations.h>
-#include <numerics/FFTWrapper.h>
+//#include <numerics/FFTWrapper.h>
 
 //deal.II
 #include <deal.II/lac/vector.h>
@@ -538,38 +538,38 @@ class CUDADriver {
     //@brief Cyclic convolution, based on FFT
     //@param in input array
     //@param out output array
-    //void conv2(Mdouble *in, Mdouble *out) {
-    void conv2(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
-        //SciPAL FFT
-        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda> cuda_fft(inf->ext_height,inf->ext_width,out,in);
+    void conv2(Mdouble *in, Mdouble *out) {
+//    void conv2(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
+//        //SciPAL FFT
+//        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda> cuda_fft(inf->ext_height,inf->ext_width,out,in);
 
-        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2R,gpu_cuda> cuda_ifft(inf->ext_height,inf->ext_width,);
+//        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2R,gpu_cuda> cuda_ifft(inf->ext_height,inf->ext_width,);
 
-        cuda_fft(in,in,FORWARD);
-        //in*=inf->fpsf_d;
-        cuda_ifft(out,in,BACKWARD);
+//        cuda_fft(in,in,FORWARD);
+//        //in*=inf->fpsf_d;
+//        cuda_ifft(out,in,BACKWARD);
 
 
-//#ifdef DOUBLE_PRECISION
-//        cufftExecD2Z(*plan_fft, in, fm1);
-//#else
-//        cufftExecR2C(*plan_fft, in, fm1);
-//#endif
-//        checkCudaErrors(cudaDeviceSynchronize());
+#ifdef DOUBLE_PRECISION
+        cufftExecD2Z(*plan_fft, in, fm1);
+#else
+        cufftExecR2C(*plan_fft, in, fm1);
+#endif
+        checkCudaErrors(cudaDeviceSynchronize());
 
-//        //Convolve, multiply in Fourier space
-//        step35::Kernels<Mdouble> kernel;
-//        kernel.element_norm_product(fm1, inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //Convolve, multiply in Fourier space
+        step35::Kernels<Mdouble> kernel;
+        kernel.element_norm_product(fm1, inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
 
-//        //Transform back
-//        // FIXME: replace by SciPAL's FFT wrappers
-//#ifdef DOUBLE_PRECISION
-//        cufftExecZ2D(*iplan_fft, fm1, out);
-//#else
-//        cufftExecC2R(*iplan_fft, fm1, out);
-//#endif
-//        checkCudaErrors(cudaDeviceSynchronize());
-//        getLastCudaError("cufft error!\n");
+        //Transform back
+        // FIXME: replace by SciPAL's FFT wrappers
+#ifdef DOUBLE_PRECISION
+        cufftExecZ2D(*iplan_fft, fm1, out);
+#else
+        cufftExecC2R(*iplan_fft, fm1, out);
+#endif
+        checkCudaErrors(cudaDeviceSynchronize());
+        getLastCudaError("cufft error!\n");
     }
 
     //@sect5{Function: projection_gauss}
@@ -654,46 +654,88 @@ class CUDADriver {
     void x_step(const Mdouble rho1,const Mdouble rho2) {
         step35::Kernels<Mdouble> kernel;
         //$\text{tmp}_d=I$tmp2
-        //kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        //kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //tmp_d = inf->im_d;
+        kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
+        kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=I-e$
-        //kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        tmp_d = inf->im_d - inf->e_d;//(Mdouble)(-1)*
-        cuda_fft(inf->ext_height,inf->ext_width,tmp2_d,inf->x_d);
-        tmp2_d *= inf->fpsf_d;
-        cuda_ifft(inf->ext_height,inf->ext_width,tmp2_d);
-
+        kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         conv2(inf->x_d.array().val(), tmp2_d.array().val());
         //$\text{tmp}_d=I-e-A*x$
         kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //tmp_d -= tmp2_d;
+
+
+
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
         kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
         kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //tmp_d = rho1*tmp_d + lag1;
+
+
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         conv2(tmp_d.array().val(), tmp_d.array().val());
+
         //$\text{tmp2}_d=z$
         kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
         kernel.sum(tmp2_d.array().val(), inf->z_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //$\text{tmp2}_d=z-x$
+        //$\text{tmp2}_d=z-x$ 
+
         kernel.diff(tmp2_d.array().val(), inf->x_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-         //$\text{tmp2}_d=z-x$
-        //tmp2_d = inf->z_d - inf->x_d;
+        //$\text{tmp2}_d=z-x$
+
+
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
         kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
+
+
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
         kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //tmp2_d = rho2*tmp2_d+tmp_d - lag2;
+
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
         kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
+
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
         kernel.sum(inf->x_d.array().val(), tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //inf->x_d = inf->x_d + inf->gamma*tmp2_d;
+
+
+    }
+    // FIXME: use SciPAl vectors and ETs!!!
+    //@sect5{Function: x_step}
+    //@brief Performs approximative argmin with respect to $x$
+    void x_step_ET(const Mdouble rho1,const Mdouble rho2) {
+        step35::Kernels<Mdouble> kernel;
+
+        //$\text{tmp}_d=I-e$
+        tmp_d = inf->im_d - inf->e_d;
+
+        conv2(inf->x_d.array().val(), tmp2_d.array().val());
+        //$\text{tmp}_d=I-e-A*x$
+        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        //$\text{tmp}_d=\left((I-e-A*x\right)*\rho_1+\Upsilon_1$
+        tmp_d = lag1 + (rho1*tmp_d); //but tmp_d = (rho1*tmp_d)+lag1: Does NOT work!!!
+
+        //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
+        conv2(tmp_d.array().val(), tmp_d.array().val());
+
+        //$\text{tmp2}_d=z-x$
+        tmp2_d = inf->z_d - inf->x_d;
+
+        //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
+        tmp2_d *= rho2;
+
+        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
+        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
+        tmp2_d -= lag2;
+
+        //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
+        tmp2_d *= inf->gamma;
+
+        //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
+        inf->x_d += tmp2_d;
 
     }
 

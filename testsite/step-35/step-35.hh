@@ -568,7 +568,8 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
     T c1,c2=0;
     while (  ( res > params.tol && iter < params.max_it) || iter < 5 ) {
         //Argmin w.r.t. x
-        driver.x_step(params.rho1, params.rho2);
+        //driver.x_step(params.rho1, params.rho2);
+        driver.x_step_ET(params.rho1, params.rho2);
 
         //Argmin w.r.t. z
         driver.m_smoothing(params.regInt, params.rho2);

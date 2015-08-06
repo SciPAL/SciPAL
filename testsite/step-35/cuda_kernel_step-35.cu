@@ -40,6 +40,8 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 //SciPAL
 #include <base/PrecisionTraits.h>
+#include <src/cuda/scipal_kernels.cu>
+#include <step-35/autoInstantiations.h>
 
 //Our stuff
 #include "cuda_helper.h"

@@ -33,6 +33,8 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <base/PrecisionTraits.h>
 #include <lac/cublas_wrapper.hh>
 #include <lac/cublas_Vector.h>
+#include <lac/VectorCustomOperations.h>
+#include <numerics/FFTWrapper.h>
 
 //deal.II
 #include <deal.II/lac/vector.h>
@@ -536,27 +538,38 @@ class CUDADriver {
     //@brief Cyclic convolution, based on FFT
     //@param in input array
     //@param out output array
-    void conv2(Mdouble *in, Mdouble *out) {
-#ifdef DOUBLE_PRECISION
-        cufftExecD2Z(*plan_fft, in, fm1);
-#else
-        cufftExecR2C(*plan_fft, in, fm1);
-#endif
-        checkCudaErrors(cudaDeviceSynchronize());
+    //void conv2(Mdouble *in, Mdouble *out) {
+    void conv2(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
+        //SciPAL FFT
+        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda> cuda_fft(inf->ext_height,inf->ext_width,out,in);
 
-        //Convolve, multiply in Fourier space
-        step35::Kernels<Mdouble> kernel;
-        kernel.element_norm_product(fm1, inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
+        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2R,gpu_cuda> cuda_ifft(inf->ext_height,inf->ext_width,);
 
-        //Transform back
-        // FIXME: replace by SciPAL's FFT wrappers
-#ifdef DOUBLE_PRECISION
-        cufftExecZ2D(*iplan_fft, fm1, out);
-#else
-        cufftExecC2R(*iplan_fft, fm1, out);
-#endif
-        checkCudaErrors(cudaDeviceSynchronize());
-        getLastCudaError("cufft error!\n");
+        cuda_fft(in,in,FORWARD);
+        //in*=inf->fpsf_d;
+        cuda_ifft(out,in,BACKWARD);
+
+
+//#ifdef DOUBLE_PRECISION
+//        cufftExecD2Z(*plan_fft, in, fm1);
+//#else
+//        cufftExecR2C(*plan_fft, in, fm1);
+//#endif
+//        checkCudaErrors(cudaDeviceSynchronize());
+
+//        //Convolve, multiply in Fourier space
+//        step35::Kernels<Mdouble> kernel;
+//        kernel.element_norm_product(fm1, inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+//        //Transform back
+//        // FIXME: replace by SciPAL's FFT wrappers
+//#ifdef DOUBLE_PRECISION
+//        cufftExecZ2D(*iplan_fft, fm1, out);
+//#else
+//        cufftExecC2R(*iplan_fft, fm1, out);
+//#endif
+//        checkCudaErrors(cudaDeviceSynchronize());
+//        getLastCudaError("cufft error!\n");
     }
 
     //@sect5{Function: projection_gauss}
@@ -641,15 +654,20 @@ class CUDADriver {
     void x_step(const Mdouble rho1,const Mdouble rho2) {
         step35::Kernels<Mdouble> kernel;
         //$\text{tmp}_d=I$tmp2
-        kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
+        //kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //tmp_d = inf->im_d;
         //$\text{tmp}_d=I-e$
-        kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //tmp_d = inf->im_d - inf->e_d;
+        //kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        tmp_d = inf->im_d - inf->e_d;//(Mdouble)(-1)*
+        cuda_fft(inf->ext_height,inf->ext_width,tmp2_d,inf->x_d);
+        tmp2_d *= inf->fpsf_d;
+        cuda_ifft(inf->ext_height,inf->ext_width,tmp2_d);
+
         conv2(inf->x_d.array().val(), tmp2_d.array().val());
-        //$\text{tmp}_d=I-e-A*x$       
+        //$\text{tmp}_d=I-e-A*x$
         kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //tmp_d = tmp_d - tmp2_d;
+        //tmp_d -= tmp2_d;
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
         kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$

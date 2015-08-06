@@ -244,12 +244,15 @@ class ImageInfo {
             Mdouble *fpsf_tmp_d;
             checkCudaErrors(cudaMalloc((void **)&fpsf_tmp_d, n_bytes_per_frame));
             checkCudaErrors(cudaMalloc((void **)&fpsf_d, cframesize));
-            checkCudaErrors(cudaMemcpyAsync(im_d.array().val(), &(im_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
+            im_d = im_h;
+            x_d = x_h;
+            z_d = z_h;
+            e_d = e_h;
+            //checkCudaErrors(cudaMemcpyAsync(im_d.array().val(), &(im_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpyAsync(fpsf_tmp_d, &(psf_h(0)), n_bytes_per_frame, cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpyAsync(x_d.array().val(), &(x_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpyAsync(z_d.array().val(), &(z_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
-            //checkCudaErrors(
-                        cudaMemcpy/*Async*/(e_d.array().val(), &(e_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice); //);
+            //checkCudaErrors(cudaMemcpyAsync(x_d.array().val(), &(x_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
+            //checkCudaErrors(cudaMemcpyAsync(z_d.array().val(), &(z_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice));
+            //checkCudaErrors(cudaMemcpy/*Async*/(e_d.array().val(), &(e_h[0]), n_bytes_per_frame, cudaMemcpyHostToDevice); //);
             checkCudaErrors(cudaMemcpyAsync(cs_d, cs_h, cs_n*sizeof(Mdouble), cudaMemcpyHostToDevice));
             //Copy $c_s$ to constant CUDA memory
             step35::Kernels<Mdouble> kernel;

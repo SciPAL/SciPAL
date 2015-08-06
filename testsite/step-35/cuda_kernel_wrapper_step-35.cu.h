@@ -52,6 +52,7 @@ struct Kernels {
     void sparse(T* arr, T* lag, T rho, T gamma, int size);
     void pseudo_inverse(T* arr,T* lag,T rho,T gamma,int size);
     void soft_threshold_complex(typename PrecisionTraits<T, gpu_cuda>::ComplexType* arr,T threshold,int size);
+    void real(SciPAL::ShapeData<T> &dst, const SciPAL::ShapeData<SciPAL::CudaComplex<T> > &src);
 };
 
 }

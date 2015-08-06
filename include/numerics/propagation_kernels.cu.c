@@ -853,5 +853,3 @@ template class PropagationKernelsImpl<double2>::Impl<cpu,double2>;
 //template void PropagationKernelsImpl<float2>::Impl<cpu, float2>::amplitude_adaption_r<MagProj>(float2 *, float2 const*, int );
 //template void PropagationKernelsImpl<double2>::Impl<cpu, double2>::amplitude_adaption_r<MagProj>(double2*,double2 const*, int );
 
-
-

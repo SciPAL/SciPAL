@@ -34,7 +34,7 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <lac/cublas_wrapper.hh>
 #include <lac/cublas_Vector.h>
 #include <lac/VectorCustomOperations.h>
-//#include <numerics/FFTWrapper.h>
+#include <numerics/FFTWrapper.h>
 
 //deal.II
 #include <deal.II/lac/vector.h>
@@ -538,17 +538,7 @@ class CUDADriver {
     //@brief Cyclic convolution, based on FFT
     //@param in input array
     //@param out output array
-    void conv2(Mdouble *in, Mdouble *out) {
-//    void conv2(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
-//        //SciPAL FFT
-//        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda> cuda_fft(inf->ext_height,inf->ext_width,out,in);
-
-//        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2R,gpu_cuda> cuda_ifft(inf->ext_height,inf->ext_width,);
-
-//        cuda_fft(in,in,FORWARD);
-//        //in*=inf->fpsf_d;
-//        cuda_ifft(out,in,BACKWARD);
-
+      void conv2(Mdouble *in, Mdouble *out) {
 
 #ifdef DOUBLE_PRECISION
         cufftExecD2Z(*plan_fft, in, fm1);
@@ -570,6 +560,31 @@ class CUDADriver {
 #endif
         checkCudaErrors(cudaDeviceSynchronize());
         getLastCudaError("cufft error!\n");
+    }
+
+    //@sect5{Function: conv2}
+    //@brief Cyclic convolution, based on FFT
+    //@param in input array
+    //@param out output array
+
+    void conv2_ET(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
+       //SciPAL FFT
+        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas> tmpfft_d(inf->ext_num_pix);
+       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda>
+               cuda_fft(inf->ext_height,inf->ext_width,tmpfft_d,in);
+
+        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas> tmpifft_d(inf->ext_num_pix);
+       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2C,gpu_cuda>
+               cuda_ifft(inf->ext_height,inf->ext_width,tmpifft_d/*out*/,tmpfft_d);
+
+        cuda_fft(tmpfft_d,in,FORWARD);
+        //Convolve, multiply in Fourier space
+        step35::Kernels<Mdouble> kernel;
+        kernel.element_norm_product(tmpfft_d.array().val(), inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        cuda_ifft(tmpifft_d/*out*/,tmpfft_d,BACKWARD);
+
+        kernel.real(out, tmpifft_d);
     }
 
     //@sect5{Function: projection_gauss}
@@ -631,21 +646,32 @@ class CUDADriver {
     //@sect5{Function: push_data}
     //@brief Push all data from host to device
     void push_data() {
-        checkCudaErrors(cudaMemcpy(inf->im_d.array().val(), &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->x_d.array().val(), &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->e_d.array().val(), &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        inf->im_d = inf->im_h;
+        inf->x_d = inf->x_h;
+        inf->z_d = inf->z_h;
+        inf->e_d = inf->e_h;
+        tmp_d = tmp_h;
+
+//        checkCudaErrors(cudaMemcpy(inf->im_d.array().val(), &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(inf->x_d.array().val(), &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(inf->e_d.array().val(), &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
     }
 
     //@sect5{Function: get_data}
     //@brief Pull all data from device to host
     void get_data() {
-        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        inf->im_d.push_to(inf->im_h);
+        inf->x_d.push_to(inf->x_h);
+        inf->z_d.push_to(inf->z_h);
+        inf->e_d.push_to(inf->e_h);
+        tmp_d.push_to(tmp_h);
+//        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
     }
 
     // FIXME: use SciPAl vectors and ETs!!!
@@ -717,7 +743,7 @@ class CUDADriver {
         tmp_d = lag1 + (rho1*tmp_d); //but tmp_d = (rho1*tmp_d)+lag1: Does NOT work!!!
 
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        conv2(tmp_d.array().val(), tmp_d.array().val());
+        conv2_ET(tmp_d, tmp_d);
 
         //$\text{tmp2}_d=z-x$
         tmp2_d = inf->z_d - inf->x_d;

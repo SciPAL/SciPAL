@@ -65,8 +65,8 @@ public:
 //        typedef typename PrecisionTraits<T, gpu_cuda>::ComplexType NumberType2;
         typedef typename PrecisionTraits<T, gpu_cuda>::NumberType NumberType;
         typedef typename SciPAL::CudaComplex<NumberType> NumberType2;
-        typedef typename SciPAL::Shape<NumberType2, vector> cShape;
-        typedef typename SciPAL::Shape<NumberType, vector> rShape;
+        typedef typename SciPAL::Shape<NumberType2> cShape;
+        typedef typename SciPAL::Shape<NumberType> rShape;
 
         void generate_k(cShape &d_devPtr, NumberType delta_z,
                         NumberType k, NumberType pixel_size, int width,
@@ -96,8 +96,8 @@ template <typename dummy> class Impl<cpu, dummy> {
 
         typedef typename PrecisionTraits<T, gpu_cuda>::NumberType NumberType;
         typedef typename SciPAL::CudaComplex<NumberType> NumberType2;
-        typedef typename SciPAL::Shape<NumberType2, vector> cShape;
-        typedef typename SciPAL::Shape<NumberType, vector> rShape;
+        typedef typename SciPAL::Shape<NumberType2> cShape;
+        typedef typename SciPAL::Shape<NumberType> rShape;
 
         void generate_k(cShape &d_devPtr, NumberType delta_z,
                         NumberType k, NumberType pixel_size, int width,

@@ -27,6 +27,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include<lac/Expr.h>
 #include<cuComplex.h>
 #include<base/PrecisionTraits.h>
+#include <sstream>
 
 
 // CudaComplex dosen't support mixed precision arithmetics.
@@ -192,6 +193,19 @@ double abs_impl(/*const*/ double a )
 template<typename T>
 __host__ __device__ __forceinline__
 T abs(const CudaComplex<T>& __z)
+{
+    return  abs_impl(__z);
+}
+
+__host__ __device__ __forceinline__
+float abs(const float __z)
+{
+    return  abs_impl(__z);
+}
+
+
+__host__ __device__ __forceinline__
+double abs(const double __z)
 {
     return  abs_impl(__z);
 }
@@ -614,6 +628,17 @@ operator!=(const T& __x, const CudaComplex<T>& __y)
 { return __x != __y.real() || T() != __y.imag(); }
 //@}
 
+template<typename _Tp, typename _CharT, class _Traits>
+  std::basic_ostream<_CharT, _Traits>&
+  operator<<(std::basic_ostream<_CharT, _Traits>& __os, const CudaComplex<_Tp>& __x)
+  {
+    std::basic_ostringstream<_CharT, _Traits> __s;
+    __s.flags(__os.flags());
+    __s.imbue(__os.getloc());
+    __s.precision(__os.precision());
+    __s << '(' << __x.real() << ',' << __x.imag() << ')';
+    return __os << __s.str();
+  }
 
 } //end namespace SciPAL
 #endif // CUDACOMPLEX_H

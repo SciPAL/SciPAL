@@ -122,16 +122,6 @@ public:
 
     Vector (const std::vector<T> & src) { *this = src; }
 
-    //create Vectors from expressions
-    template<typename M, typename Op>
-    Vector(const X_read_read<M, Op, Vector<T, BW> > & Ax);
-
-    template<typename M,  typename Op,
-    typename T_src>
-    Vector(const //! X_read_read<M, Op, Vector<T, BW> >
-                                    X_read_read<M, Op, SciPAL::ColVectorView<T, T_src> >
-                                    & Ax);
-
         //! Lese- und Schreibzugriff auf das unterliegende array - falls man es doch mal braucht.
         //! Der Zwang explizit diese Funktion aufzurufen sollte Schutz genug sein gegen Missbrauch,
         //! d.h., ist man der Meinung diese Funktion nehmen zu muessen, hat man im Allgemeinen was
@@ -140,18 +130,10 @@ public:
 
     inline const Array<T, BW> & array() const { return *this; }
 
-    Vector<T, BW> & operator = (const Vector<T, BW> & other);
-
-
     template<typename BW2>
     Vector<T, BW> & operator = (const Vector<T, BW2> & other);
 
-
-    Vector<T, BW> & operator = (const std::vector<typename
-                                PrecisionTraits<T, BW::arch>::NumberType> & other);
-
-    Vector<T, BW> & operator = (const std::vector<std::complex<typename
-                                PrecisionTraits<T, BW::arch>::NumberType> > & other);
+    Vector<T, BW> & operator = (const std::vector<T> & other);
 
     template<typename T2>
     void push_to(std::vector<T2> & dst) const;
@@ -229,6 +211,8 @@ public:
     size_t n_cols() const { return this->__n; }
 
     T operator () (int k) const;
+
+    T& operator [](size_t el);
 
     void set(int k,const T value);
 
@@ -486,6 +470,19 @@ SciPAL::Vector<T, BW>::operator () (int k) const
     return tmp[0];
 }
 
+// @sect4{Funktion: Vector::[]}
+//!
+//! Elementzugriff auf Vektor - lesend
+//!
+//! @param el : Index des Vectors
+
+template<typename T, typename BW>
+T&
+SciPAL::Vector<T, BW>::operator [] (size_t el)
+{
+    return this->data_ptr[el];
+}
+
 // @sect4{Funktion: Vector::set}
 //!
 //! Elementzugriff auf Vektor - schreibend
@@ -543,21 +540,41 @@ SciPAL::Vector<T, BW>::add(int k,const T value)
 //! in der Groesse der Quelle angepassst.
 //! @param other : rechte Seite des = ist ein Vector
 template<typename T, typename BW>
+template<typename BW2>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const Vector<T, BW> & other)
+SciPAL::Vector<T, BW>::operator = (const Vector<T, BW2> & other)
 {
+    if(this->n_elements() != other.n_elements())
+        this->reinit(other.n_elements());
 
-    if(this->__n != other.__n)
-    {
-        size_t new_size = other.size();
-        this->reinit(new_size);
-    }
-    //! Elementweise Kopie des arrays.
-    int inc_src = 1;
+    // element-wise copy of array.
+    int inc_src  = 1;
     int inc_this = 1;
+    //! same blas type no problem
+    if(typeid(BW) == typeid(BW2) )
+        BW::copy(this->n_elements(), other.val(), inc_src,
+                 this->val(), inc_this);
 
-    BW::copy(this->__n, other.val(), inc_src, this->val(), inc_this);
+    //! copy from cublas matrix to blas matrix -> GetMatrix
+    //! TODO: what is with asyn copy?
+    if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
+    {
+        cublas::GetMatrix(other.n_rows(), other.n_cols(), other.array().val(),
+                          other.leading_dim, this->array().val(), this->leading_dim);
+    }
 
+    //! copy from cublas matrix to blas matrix -> SetMatrix
+    //! TODO: what is with asyn copy?
+    if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
+    {
+        cublas::SetMatrix(other.n_rows(), other.n_cols(),
+                          other.array().val(),
+                          other.leading_dim,
+                          this->array().val(),
+                          this->leading_dim);
+    }
+
+    std::cout<<__FUNCTION__<<std::endl;
     return *this;
 }
 
@@ -570,7 +587,7 @@ SciPAL::Vector<T, BW>::operator = (const Vector<T, BW> & other)
 //! @param other : rechte Seite des = ist ein std::Vector
 template<typename T, typename BW>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const std::vector<typename PrecisionTraits<T, BW::arch>::NumberType> & other)
+SciPAL::Vector<T, BW>::operator = (const std::vector<T> & other)
 {
     size_t new_size = other.size();
     this->reinit(new_size);
@@ -579,31 +596,11 @@ SciPAL::Vector<T, BW>::operator = (const std::vector<typename PrecisionTraits<T,
 
     size_t incx = 1;
     size_t incy = 1;
-    BW::SetVector(other.size(), src_ptr, incx, this->data(), incy);
+    BW::SetVector(other.size(), src_ptr, incx, this->val(), incy);
 
     return *this;
 }
 
-
-
-template<typename T, typename BW>
-SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const std::vector<std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> > & other)
-{
-    size_t new_size = other.size();
-    this->reinit(new_size);
-
-    const typename PrecisionTraits<T, BW::arch>::ComplexType * src_ptr
-            = reinterpret_cast<const typename PrecisionTraits<T, BW::arch>::ComplexType *>(&other[0]);
-
-    size_t incx = 1;
-    size_t incy = 1;
-    BW::SetVector(other.size(), src_ptr, incx,
-                  reinterpret_cast<typename PrecisionTraits<T, BW::arch>::ComplexType *>(this->data()),
-                  incy);
-
-    return *this;
-}
 
 template<typename T, typename BW>
 template<typename T2>

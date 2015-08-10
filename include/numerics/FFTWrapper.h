@@ -488,13 +488,13 @@ struct CUDAFFT<T, dim, cufft_type, gpu_cuda>
             pkernels;
 
     CUDAFFT(int _height, int _width, FFTDataDST &/*dst*/, FFTDataSRC &/*src*/, int batch = 1)
-        :
-          height(_height), width(_width), pkernels(4),batch2(1)
+        :height(_height), width(_width), batch2(1), pkernels(4)
    {
+        cufftResult result;
         switch(dim)
         {
         case 1:
-            cufftPlan1d(&this->plan_cuda, width, cufft_type, batch);
+            result = cufftPlan1d(&this->plan_cuda, width, cufft_type, batch);
             break;
         case 2:
 
@@ -502,16 +502,42 @@ struct CUDAFFT<T, dim, cufft_type, gpu_cuda>
             {
                 uint used_mem = 67108864; //64MB
                 batch2 = (used_mem) / (width * 2 * sizeof(T));
-                cufftPlan1d(&this->plan_cuda, width, cufft_type, batch2);
+                result = cufftPlan1d(&this->plan_cuda, width, cufft_type, batch2);
             }
             else
-                cufftPlan2d(&this->plan_cuda, width, height, cufft_type);
+                result = cufftPlan2d(&this->plan_cuda, width, height, cufft_type);
 
             break;
         case 3:
-            // cufftPlan3d(&plan_cuda, width ,depth, height , CUFFT_);
+            // result = cufftPlan3d(&plan_cuda, width ,depth, height , CUFFT_);
         default:
             break;
+        }
+
+        if(result!=CUFFT_SUCCESS)
+        {
+            switch(result)
+            {
+            case CUFFT_ALLOC_FAILED:
+                std::cout<<"The allocation of GPU resources for the plan failed."<<std::endl;
+                break;
+            case CUFFT_INVALID_VALUE:
+                std::cout<<"One or more invalid parameters were passed to the API."<<std::endl;
+                break;
+            case CUFFT_INTERNAL_ERROR:
+                std::cout<<"An internal driver error was detected."<<std::endl;
+                break;
+            case CUFFT_INVALID_SIZE:
+                std::cout<<"Either or both of the nx or ny parameters is not a supported size."<<std::endl;
+                break;
+            case CUFFT_SETUP_FAILED:
+                std::cout<<"The CUFFT library failed to initialize."<<std::endl;
+                break;
+            case CUFFT_SUCCESS:
+                break;
+            default :
+                std::cout<<"Unspecified error"<<std::endl;
+            }
         }
     }
 

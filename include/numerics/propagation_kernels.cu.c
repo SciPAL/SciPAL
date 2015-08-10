@@ -83,7 +83,7 @@ transposeNoBankConflicts_inplace
         x = blockIdx.y * TILE_DIM + threadIdx.x;  // transpose block offset
         y = blockIdx.x * TILE_DIM + threadIdx.y;
 
-        if (typeid(T) == typeid(double2))
+        if (sizeof(T) == 16 /*128 bit -> complex double*/)
         {
         unsigned long long int tmp2;
         ulonglong2 * pointer =
@@ -208,7 +208,7 @@ PropagationKernelsImpl<T>::Impl<gpu_cuda, dummy>
     dim3 dimGrid(width/TILE_DIM, height/TILE_DIM, 1);
     dim3 dimBlock(TILE_DIM, BLOCK_ROWS, 1);
 
-    transposeNoBankConflicts_inplace<T><<<dimGrid, dimBlock>>>(d_devPtr);
+    transposeNoBankConflicts_inplace<U><<<dimGrid, dimBlock>>>(d_devPtr);
 
     //    __transpose2<T><<<blocks,threads_per_block>>>(d_devPtr, width, height, size);
     cudaThreadSynchronize();
@@ -406,6 +406,8 @@ template class PropagationKernels<double2,gpu_cuda>;
 template class PropagationKernelsImpl<float2>::Impl<gpu_cuda,float2>;
 template class PropagationKernelsImpl<double2>::Impl<gpu_cuda,double2>;
 template void PropagationKernelsImpl<double2>::Impl<(ParallelArch)1, double2>::transpose2<SciPAL::CudaComplex<double> >(SciPAL::CudaComplex<double>*, int, int, int);
+template void PropagationKernelsImpl<float2>::Impl<(ParallelArch)1, float2>::transpose2<SciPAL::CudaComplex<float> >(SciPAL::CudaComplex<float>*, int, int, int);
+template void PropagationKernelsImpl<float2>::Impl<(ParallelArch)1, float2>::transpose2<float>(float*, int, int, int);
 
 template class PropagationKernels<float2,cpu>;
 template class PropagationKernels<double2,cpu>;

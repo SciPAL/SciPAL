@@ -210,6 +210,20 @@ double abs(const double __z)
     return  abs_impl(__z);
 }
 
+template<typename T>
+__host__ __device__ __forceinline__
+T real(const CudaComplex<T>& __z)
+{
+    return  __z.real();
+}
+
+template<typename T>
+__host__ __device__ __forceinline__
+T imag(const CudaComplex<T>& __z)
+{
+    return  __z.imag();
+}
+
 
 
 template<typename T>

@@ -20,6 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef DEVICEEXPR_H
 #define DEVICEEXPR_H
 
+#include <lac/OperandInfo.h>
 #include <lac/expression_templates_host.h>
 
 #include <lac/DevLiteral.h>
@@ -30,6 +31,14 @@ struct blas;
 struct cublas;
 
 namespace SciPAL {
+
+//declare device expression types
+template <typename _L, typename Operator, typename _R> struct DevBinaryExpr;
+template <typename _L, typename Operation > struct DevUnaryExpr;
+
+//declare host expression types
+template <typename _L, typename Operator, typename _R> struct BinaryExpr;
+template <typename _L, typename Operation > struct UnaryExpr;
 
 //! aux structure to solve the missing Type problem in ShapeData
 template<typename T> struct GetMyType;

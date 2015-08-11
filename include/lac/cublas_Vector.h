@@ -182,8 +182,6 @@ public:
 
     Vector<T, BW> & operator *=(Vector<T, BW> &scale);
 
-    T operator * (const Vector<T, BW> & other);
-
     Vector<T, BW> & operator /= (const T scale);
 
     Vector<T, BW> & operator /= (Vector<T, BW> &scale);
@@ -826,20 +824,6 @@ SciPAL::Vector<T, BW>::operator -= (const VectorView<T, T_src > & other)
 }
 
 
-
- // @sect4{Operator: *}
- //!
-//! Skalarprodukt zweier Vectoren
-//! @param other : zweiter Vektor
-
-template<typename T, typename BW>
-T
-SciPAL::Vector<T, BW>::operator * (const Vector<T, BW> & other)
-{
-     Assert(this->size() == other.size(),
-           dealii::ExcMessage("Dimension mismatch") );
-    return this->dot(other);
-}
 
 
 

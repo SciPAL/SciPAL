@@ -31,6 +31,17 @@ struct cublas;
 
 namespace SciPAL {
 
+//declare device expression types
+template <typename _L, typename Operator, typename _R> struct DevBinaryExpr;
+template <typename _L, typename Operation > struct DevUnaryExpr;
+
+//declare host expression types
+template <typename _L, typename Operator, typename _R> struct BinaryExpr;
+template <typename _L, typename Operation > struct UnaryExpr;
+}
+
+namespace SciPAL {
+
 // @sect3{Struct: expr_sin}
 //
 // This structure wrapps the built-in sin

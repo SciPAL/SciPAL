@@ -20,6 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef LITERAL_H
 #define LITERAL_H
 #include <lac/Expr.h>
+#include<lac/BlasVectorOperations.h>
 
 namespace SciPAL {
 
@@ -49,13 +50,37 @@ public:
     }
 
      __host__ __device__ __forceinline__
-     T operator()(int /*i*/) const { return val; }
+     T get_val() const { return val; }
 
-     __host__ __device__ __forceinline__
-     T get_val() const {return val; }
+     Literal<T> operator =(T new_val) {
+         val = new_val;
+         return *this;
+     }
+
+     Literal<T> operator =(Literal<T> new_val) {
+         val = new_val.get_val();
+         return *this;
+     }
+
+     template <typename X>
+     SciPAL::Literal<T> & operator = (const SciPAL::Expr<X> & e);
+
 
 private:
-    const T val;
+     T val;
 };
+template <typename T>
+template <typename X>
+Literal<T> & Literal<T>::operator =
+(const SciPAL::Expr<X> & e)
+{
+#ifdef DEBUG
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
+#endif
+
+    SciPAL::LAOOperations::apply<T, cublas>(*this, ~e);
+    return *this;
+}
+
 }
 #endif // LITERAL_H

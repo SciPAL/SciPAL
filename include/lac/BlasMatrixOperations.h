@@ -20,10 +20,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef MATRIXOPERATIONS_H
 #define MATRIXOPERATIONS_H
 
-#include <lac/cublas_Matrix.h>
-#include <lac/cublas_Vector.h>
 
 #include <lac/expression_templates_host.h>
+
+namespace SciPAL {
+template<typename, typename> class Matrix;
+template<typename, typename> class Vector;
+template<typename T> struct Literal;
+}
 
 namespace SciPAL {
 

@@ -1,6 +1,8 @@
 // Header-files of CUDA utility-library
 //Header for referencing CUDA based part
 #include <lac/scipal_kernels_wrapper.cu.h>
+#include <base/CUDA_error_check.h>
+
 
 //UnaryExpressions
 
@@ -53,7 +55,9 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
     __apply<T, X><<<blocks, threads_per_block>>>(d_dst.data_ptr, Ax, size);
-    cudaDeviceSynchronize();
+
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
 
 }
 
@@ -100,7 +104,7 @@ __apply(T *d_dst,
     int x = blockDim.x*blockIdx.x+threadIdx.x;
 
     //Prevents kernel to calculate something outside the image vector.
-//    if(x<size)
+    if(x<size)
      __apply_element<T, L, op, R>(d_dst, Ax, x);
 
 }
@@ -123,7 +127,9 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> & d_dst,
 
     __apply<T, L, op, R><<<blocks, threads_per_block>>>
                         (d_dst.data_ptr, Ax, size);
-    cudaDeviceSynchronize();
+
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
 }
 
 //CPU specialization:
@@ -150,4 +156,3 @@ template <typename T, typename BW> class Vector;
 struct blas;
 struct cublas;
 
-#include <lac/instantiations.h>

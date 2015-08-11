@@ -20,6 +20,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef EXPRESSION_TEMPLATES_H
 #define EXPRESSION_TEMPLATES_H
 
+#include <base/PrecisionTraits.h>
+#include <base/ArchTraits.h>
+
 // Base class for expressions
 #include <lac/Expr.h>
 #include <lac/ShapeData.h>
@@ -217,13 +220,22 @@ operator - (const Expr<T1> &e1, const Expr<T2> &e2)
     return BinaryExpr< T1, SciPAL::minus, T2 >(~e1, ~e2);
 }
 
+//for the case that we want to multiply a real-valued literal with a complex LAO
+template <typename T, typename BW, template <typename, typename> class LAO >
+inline
+const BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >
+operator *(const typename PrecisionTraits<T, BW::arch>::NumberType e1,
+           const  LAO<T, BW>& e2)
+{
+    return BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >(~Literal<T>(e1), ~e2);
+}
 
 template <typename T, typename BW, template <typename, typename> class LAO >
 inline
 const BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >
 operator *(const T e1, const  LAO<T, BW>& e2)
 {
-    return BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >(e1, e2);
+    return BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >(~Literal<T>(e1), ~e2);
 }
 
 template <typename T1, typename T2 >

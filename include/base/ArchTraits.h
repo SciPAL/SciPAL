@@ -20,12 +20,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef ARCHTRAITS_H
 #define ARCHTRAITS_H
 
-#include <lac/blas++.h>
 #include <base/ParallelArch.h>
 
 // @sect3{struct: archTraits}
 // We need the archTraits to get the correct version of blas in dependence of the template
 // parameter arch.
+struct blas;
+struct cublas;
+
 template <ParallelArch T> struct archTraits;
 
 template<>

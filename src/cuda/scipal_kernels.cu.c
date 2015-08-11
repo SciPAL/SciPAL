@@ -104,7 +104,7 @@ __apply(T *d_dst,
     int x = blockDim.x*blockIdx.x+threadIdx.x;
 
     //Prevents kernel to calculate something outside the image vector.
-    if(x<size)
+    if(x<size) //important!!1!
      __apply_element<T, L, op, R>(d_dst, Ax, x);
 
 }

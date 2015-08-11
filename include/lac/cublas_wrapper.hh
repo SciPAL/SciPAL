@@ -626,6 +626,44 @@ public:
         cublasStatus_t status = cublasZcopy(handle, n, x, incx, y, incy);
         check_status(status);
     }
+
+    // @sect4{Funktion: swap}
+    //!
+    //! @param n : Anzahl Elemente.
+    //! @param x : Quellvektor x.
+    //! @param incx : Speicher Abstand zwischen Elemente in Vector x.
+    //! @param y : Zielvektor (y= alpha*x+y).
+    //! @param incy: Speicher Abstand zwischen Elemente in Vector y.
+
+    static void
+    swap(int n, float *x, int incx, float *y, int incy)
+    {
+        cublasStatus_t status = cublasSswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
+    static void
+    swap(int n, double *x, int incx, double *y, int incy)
+    {
+        cublasStatus_t status;
+        status = cublasDswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
+    static void
+    swap(int n, cuComplex *x, int incx, cuComplex *y, int incy)
+    {
+        cublasStatus_t status = cublasCswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
+    static void
+    swap(int n, cuDoubleComplex *x, int incx, cuDoubleComplex *y, int incy)
+    {
+        cublasStatus_t status = cublasZswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
     // @sect4{Funktion:}
     //!
     //! @param n : Anzahl Elemente.

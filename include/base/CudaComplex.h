@@ -219,9 +219,23 @@ T real(const CudaComplex<T>& __z)
 
 template<typename T>
 __host__ __device__ __forceinline__
+T real(const T& __z)
+{
+    return  __z;
+}
+
+template<typename T>
+__host__ __device__ __forceinline__
 T imag(const CudaComplex<T>& __z)
 {
     return  __z.imag();
+}
+
+template<typename T>
+__host__ __device__ __forceinline__
+T imag(const T& __z)
+{
+    return  0;
 }
 
 

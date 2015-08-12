@@ -247,7 +247,7 @@ void step42::CUDADriver::gemv_tests()
        vC.print();
 
        //test pointwise *
-//       vC = vA && vB;
+       vC = vA && vB;
        std::cout << "vC = vA .* vB" << std::endl;
        vC.print();
 
@@ -339,13 +339,13 @@ void step42::CUDADriver::complex_tests()
      for (unsigned int i = 0; i < a.size(); i++ )
          a[i] = std::complex<Number>(i+1, (i+1)/2.); //generate some inputs
 
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vA, vB, vC;
-       vA = a;
-       vB = b;
-       vC = a;
-//               vA(n_elements, 1, a),
-//               vB(n_elements, 1, b),
-//               vC(n_elements, 1, a);
+       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> //vA, vB, vC;
+//       vA = a;
+//       vB = b;
+//       vC = a;
+               vA( a),
+               vB( b),
+               vC( a);
 
        std::cout << "vA : " << std::endl;
        vA.print();
@@ -524,44 +524,6 @@ void step42::CUDADriver::complex_tests()
 #endif
 }
 
-void step42::CUDADriver::cusolver_demonstration()
-{
-    // some dummy vectors
-    const unsigned int n_rows = 3;
-    const unsigned int n_cols = 3;
-    const unsigned int n_elements = n_rows * n_cols;
-
-    std::vector<cplxNumber> a(n_elements, 1.);
-
-    for (unsigned int i = 0; i < a.size(); i++)
-        a[i] = i+1;
-
-    SciPAL::Matrix<cplxNumber, BW>
-            A(n_rows, n_cols, a),
-            U(n_rows, n_cols),
-            Vt(n_cols, n_cols);
-
-    SciPAL::Vector<Number, BW> S(n_cols);
-    SciPAL::Vector<cplxNumber, BW> S_cplx(n_cols);
-
-    A.print();
-
-    int returnValue = SciPAL::SVD(A, U, S, Vt);
-
-    std::cout << returnValue << std::endl << "Singular values: " << std::endl;
-
-    S.print();
-
-    std::cout << "Original matrix:" << std::endl;
-
-    for (unsigned int i = 0; i < n_cols; i++)
-        S_cplx.set(i, (cplxNumber)(S(i)));
-    SciPAL::Matrix<cplxNumber, BW> A_tmp(n_rows,n_cols);
-    A_tmp = U * SciPAL::diag<SciPAL::Vector<cplxNumber, BW> >(S_cplx);
-    A = A_tmp * Vt;
-
-    A.print();
-}
 
 void step42::CUDADriver::feature_demonstration()
 {
@@ -576,37 +538,37 @@ void step42::CUDADriver::feature_demonstration()
 
     SciPAL::Vector<Number*, cublas> d_testV(5);
 
-// d_testV = h_testV;
-// d_testV.print();
+ d_testV = h_testV;
+ d_testV.print();
 
 
-// std::cout<<"Test arbitrary copy directions"<<std::endl;
-// SciPAL::Matrix<Number, blas> M1(2,2);
-// M1(0,0,1.); M1(0,1,2.);
-// M1(1,0,3.); M1(1,1,4.);
+ std::cout<<"Test arbitrary copy directions"<<std::endl;
+ SciPAL::Matrix<Number, blas> M1(2,2);
+ M1(0,0,1.); M1(0,1,2.);
+ M1(1,0,3.); M1(1,1,4.);
 
-// std::cout<<"Matrix on host\n M1:"<<std::endl;
-//M1.print();
+ std::cout<<"Matrix on host\n M1:"<<std::endl;
+M1.print();
 
-// SciPAL::Matrix<Number, blas> M2(2,2);
-// std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
-// M2 = M1;
-// M2.print();
+ SciPAL::Matrix<Number, blas> M2(2,2);
+ std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
+ M2 = M1;
+ M2.print();
 
-// SciPAL::Matrix<Number, cublas> M3(2,2);
-// std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
-// M3 = M2;
-// M3.print();
+ SciPAL::Matrix<Number, cublas> M3(2,2);
+ std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
+ M3 = M2;
+ M3.print();
 
-// SciPAL::Matrix<Number, cublas> M4(2,2);
-// std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
-// M4 = M3;
-// M4.print();
+ SciPAL::Matrix<Number, cublas> M4(2,2);
+ std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
+ M4 = M3;
+ M4.print();
 
-// SciPAL::Matrix<Number, blas> M5(2,2);
-// std::cout<<"back on host\n M5=M4:"<<std::endl;
-// M5 = M4;
-// M5.print();
+ SciPAL::Matrix<Number, blas> M5(2,2);
+ std::cout<<"back on host\n M5=M4:"<<std::endl;
+ M5 = M4;
+ M5.print();
 
 
 
@@ -629,9 +591,9 @@ void step42::CUDADriver::lin_combo(){
 
 
      for (unsigned int i = 0; i < a.size(); i++ )
-         a[i] = std::complex<Number>(i+1, (i+1)/2.); //generate some inputs
+         a[i] = SciPAL::CudaComplex<Number>(i+1, (i+1)/2.); //generate some inputs
 
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vA, vB, vC;
+       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vA(n_elements), vB, vC;
        vA = a;
        vB = b;
        vC = a;
@@ -729,36 +691,90 @@ std::cout<<"entering tests for Views"<<std::endl;
 
 }
 
-//void step42::CUDADriver::stacks_of_LAOs(){
+void step42::CUDADriver::operator_precedence(){
+const unsigned int n_rows = 2;
+const unsigned int n_cols = 2;
+const unsigned int n_elements = n_rows * n_cols;
 
-//    // some dummy vectors
-//    const unsigned int n_rows = 4;
-//    const unsigned int n_cols = 4;
-//    const unsigned int n_elements = n_rows * n_cols;
-////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//{
-//    std::cout <<" Stack of vector test with real numbers\n";
-//    typedef Number test_nmbr;
-//    typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
-//    std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
-//    for(auto &i : h_test)
-//        std::iota(i.begin(), i.end(), 1);
+Number alpha = 1.1;
+Number beta = 2.;
 
-//    SciPAL::Stack<test_LAO> d_test(3, n_elements);
+std::vector<Number>
+           a(n_elements, 1.),
+           b(n_elements, 2.);
 
-//    //element wise copy works
-//    for(uint ii=0; ii<h_test.size(); ii++)
-//        d_test[ii] = h_test[ii];
 
-//    //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
+for (unsigned int i = 0; i < a.size(); i++ )
+    a[i] = i+1;
+
+SciPAL::Vector<Number, BW> vA, vB(n_elements), vC, vD(n_elements);
+  vA = a;
+  // This sets all elements of vB to 2.3, note: vector needs to be initialized.
+  vB = SciPAL::Literal<Number>(2.3);
+  vC = a;
+
+
+  std::cout << "vA : " << std::endl;
+  vA.print();
+
+  std::cout << "vB : " << std::endl;
+  vB.print();
+
+  std::cout << "vC : " << std::endl;
+  vC.print();
+
+    std::cout << "vD = (vA && vB ) + vC" << std::endl;
+    vD = (vA && vB ) + vC;
+    vD.print();
+
+    std::cout << "vA : " << std::endl;
+    vA.print();
+
+    std::cout << "vB : " << std::endl;
+    vB.print();
+
+    std::cout << "vC : " << std::endl;
+    vC.print();
+    std::cout << std::endl;
+
+    std::cout << "vD = vC + (vA && vB)" << std::endl;
+   vD = vC + vA * vB;
+    vD.print();
+
+    SciPAL::Literal<Number> test(0);
+    test = (SciPAL::transpose<SciPAL::Vector<Number, BW> >(vA)) * vB;
+    std::cout<< test << std::endl;
+}
+void step42::CUDADriver::stacks_of_LAOs(){
+
+    // some dummy vectors
+    const unsigned int n_rows = 4;
+    const unsigned int n_cols = 4;
+    const unsigned int n_elements = n_rows * n_cols;
+//  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{
+    std::cout <<" Stack of vector test with real numbers\n";
+    typedef Number test_nmbr;
+    typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
+    std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
+    for(auto &i : h_test)
+        std::iota(i.begin(), i.end(), 1);
+
+    std::vector<SciPAL::Vector<test_nmbr, BW> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
+
+    //element wise copy works
+    for(uint ii=0; ii<h_test.size(); ii++)
+        d_test[ii] = h_test[ii];
+
+    //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
 //    d_test = h_test;
 
-//    std::cout<<"initialization \n";
-//    d_test[0].print();
-//    d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1];
-//    std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-//    d_test[2].print();
-//}
+    std::cout<<"initialization \n";
+    d_test[0].print();
+    d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1];
+    std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+    d_test[2].print();
+}
 ////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //     {
 //        std::cout <<" Stack of vector test with cplx numbers\n";
@@ -851,6 +867,6 @@ std::cout<<"entering tests for Views"<<std::endl;
 //            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
 //            d_test[2].print();
 //        }
-//}
+}
 
 #endif //CUDA_DRIVER

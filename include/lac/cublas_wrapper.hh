@@ -262,15 +262,16 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T, typename T2>
-    static void SetMatrix(int rows, int cols, const T2 *const &A,
-                   int lda, T *&B, int ldb)
+    static void SetMatrix(int rows, int cols, const T2 *const A,
+                   int lda, T *B, int ldb)
     {
         if(sizeof(T) != sizeof(T2))
             std::cout<<"You are trying to copy matrices with different Types: T="
                      << typeid(T).name() << ", T2=" << typeid(T2).name() ;
 
         cublasStatus_t status = cublasSetMatrix(rows, cols, sizeof(T),
-                                              A, lda, B, ldb);
+                                                A, lda,
+                                                B, ldb);
 
         check_status(status);
     }
@@ -284,8 +285,8 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T>
-    static void GetMatrix(int rows, int cols, const T * const &A,
-                   int lda, T *&B, int ldb)
+    static void GetMatrix(int rows, int cols, const T * const A,
+                   int lda, T *B, int ldb)
     {
         cublasStatus_t status = cublasGetMatrix(rows, cols, sizeof(T),
                                               A, lda, B, ldb);

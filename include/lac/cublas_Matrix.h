@@ -147,7 +147,50 @@ public:
     Matrix<T, BW> & operator = (const dealii::IdentityMatrix & Id);
 
     //! Generate a deep copy of @p other
-    Matrix<T, BW> & operator = (const Matrix<T, BW> & array);
+    template <typename BW2>
+    Matrix<T, BW> & operator = (const Matrix<T, BW2> & other)
+    {
+        //! check it both matrices have the same layout
+        if((this->n_rows() != other.n_rows()) || this->n_cols() != other.n_cols())
+        {
+            size_t new_size = other.size();
+            //does not respect lda
+            this->reinit(other.n_rows(), other.n_cols());
+        }
+
+
+        // element-wise copy of array.
+        int inc_src  = 1;
+        int inc_this = 1;
+        //! same blas type no problem
+        if(typeid(BW) == typeid(BW2) )
+        BW::copy(this->n_elements(), other.array().val(), inc_src,
+                 this->array().val(), inc_this);
+
+        //! copy from cublas matrix to blas matrix -> GetMatrix
+        //! TODO: what is with asyn copy?
+        if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
+        {
+            cublas::GetMatrix(other.n_rows(), other.n_cols(),
+                              other.array().val(),
+                              other.leading_dim,
+                              this->array().val(), this->leading_dim);
+        }
+
+        //! copy from cublas matrix to blas matrix -> SetMatrix
+        //! TODO: what is with asyn copy?
+        if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
+        {
+            cublas::SetMatrix(other.n_rows(), other.n_cols(),
+                              other.array().val(),
+                              other.leading_dim,
+                              this->array().val(),
+                              this->leading_dim);
+        }
+
+
+        return *this;
+    }
 
     template<typename X>
     Matrix & operator= (const ::SciPAL::Expr<X> & e);
@@ -460,36 +503,6 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
     // der Zeilen angegeben.
     T * tmp_dst = this->data();
     BW::SetMatrix(nr, nc, tmp_src, nr, tmp_dst, nr);
-
-    return *this;
-}
-
-
-//! Deep copy of a matrix. Any previous content in target is lost.
-//! @param other : Matrix which is to be copied.
-template<typename T, typename BW>
-SciPAL::Matrix<T, BW> &
-SciPAL::Matrix<T, BW>::operator = (const Matrix<T, BW> & other)
-{
-    // TODO: WHat to do?
-    //    this->leading_dim = other.leading_dim;
-    //    this->_stride = other._stride;
-
-    if (this != &other)
-        this->Array<T, BW>::reinit(other.n_rows() * other.n_cols());
-
-    this->MyShape::reinit(this->array().val(),
-                        other.n_rows(), other.n_cols(),
-                        other.n_rows() /*TODO: leading_dim*/,
-                        1 /*unit stride*/);
-
-
-    // element-wise copy of array.
-    int inc_src  = 1;
-    int inc_this = 1;
-
-    BW::copy(this->n_elements(), other.data(), inc_src,
-             this->data(), inc_this);
 
     return *this;
 }

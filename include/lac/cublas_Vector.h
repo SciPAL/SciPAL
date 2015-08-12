@@ -130,10 +130,44 @@ public:
 
     inline const Array<T, BW> & array() const { return *this; }
 
-    template<typename BW2>
-    Vector<T, BW> & operator = (const Vector<T, BW2> & other);
-
     Vector<T, BW> & operator = (const std::vector<T> & other);
+
+    template<typename BW2>
+    Vector<T, BW> & operator = (const Vector<T, BW2> & other)
+    {
+        if(this->n_elements() != other.n_elements())
+            this->reinit(other.n_elements());
+
+        // element-wise copy of array.
+        int inc_src  = 1;
+        int inc_this = 1;
+        //! same blas type no problem
+        if(typeid(BW) == typeid(BW2) )
+            BW::copy(this->n_elements(), other.val(), inc_src,
+                     this->val(), inc_this);
+
+        //! copy from cublas matrix to blas matrix -> GetMatrix
+        //! TODO: what is with asyn copy?
+        if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
+        {
+            cublas::GetMatrix(other.n_rows(), other.n_cols(), other.array().val(),
+                              other.leading_dim, this->array().val(), this->leading_dim);
+        }
+
+        //! copy from cublas matrix to blas matrix -> SetMatrix
+        //! TODO: what is with asyn copy?
+        if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
+        {
+            cublas::SetMatrix(other.n_rows(), other.n_cols(),
+                              other.array().val(),
+                              other.leading_dim,
+                              this->array().val(),
+                              this->leading_dim);
+        }
+
+        std::cout<<__FUNCTION__<<std::endl;
+        return *this;
+    }
 
     template<typename T2>
     void push_to(std::vector<T2> & dst) const;
@@ -152,18 +186,6 @@ public:
     template<typename X>
      Vector<T, BW> & operator = (const SciPAL::Expr<X> & e);
 
-     template<typename L, typename Op, typename R >
-     Vector<T, BW> & operator= (const SciPAL::BinaryExpr<L, Op, R> & Ax);
-
-#ifdef USE_OLD_ET
-    template<typename M, typename Op>
-    Vector<T, BW> & operator = (const X_read_read<M, Op, Vector<T, BW> > & Ax);
-
-    template<typename M, typename T_src>
-    Vector<T, BW> & operator=(const
-                                    X_read_read<M, vmu, ColVectorView<T, T_src> >
-                                    & Ax);
-#endif
 
     Vector<T, BW> & operator += (const Vector<T, BW> & other);
 
@@ -240,29 +262,6 @@ protected:
 };
 }
 
-//namespace SciPAL {
-//template<>
-//template<>
-//Vector<double, cublas> &
-//Vector<double, cublas>::operator = (const Vector<double, blas> & other)
-//{
-
-//    if(this->size() != other.size())
-//    {
-//        size_t new_size = other.size();
-//        this->reinit(new_size);
-//    }
-//    //! Elementweise Kopie des arrays.
-
-//    const double * src_ptr = other.array().val();
-
-//    size_t incx = 1;
-//    size_t incy = 1;
-//    cublas::SetVector(other.size(), src_ptr, incx, this->data(), incy);
-
-//    return *this;
-//}
-//}
 
 // @sect3{SciPAL::Vector Methoden}
 
@@ -532,50 +531,6 @@ SciPAL::Vector<T, BW>::add(int k,const T value)
 
 
 
-// @sect4{Operator: =}
-//!
-//! Elementweise Kopie eines Vektors. Das Ziel wird bei Bedarf
-//! in der Groesse der Quelle angepassst.
-//! @param other : rechte Seite des = ist ein Vector
-template<typename T, typename BW>
-template<typename BW2>
-SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const Vector<T, BW2> & other)
-{
-    if(this->n_elements() != other.n_elements())
-        this->reinit(other.n_elements());
-
-    // element-wise copy of array.
-    int inc_src  = 1;
-    int inc_this = 1;
-    //! same blas type no problem
-    if(typeid(BW) == typeid(BW2) )
-        BW::copy(this->n_elements(), other.val(), inc_src,
-                 this->val(), inc_this);
-
-    //! copy from cublas matrix to blas matrix -> GetMatrix
-    //! TODO: what is with asyn copy?
-    if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
-    {
-        cublas::GetMatrix(other.n_rows(), other.n_cols(), other.array().val(),
-                          other.leading_dim, this->array().val(), this->leading_dim);
-    }
-
-    //! copy from cublas matrix to blas matrix -> SetMatrix
-    //! TODO: what is with asyn copy?
-    if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
-    {
-        cublas::SetMatrix(other.n_rows(), other.n_cols(),
-                          other.array().val(),
-                          other.leading_dim,
-                          this->array().val(),
-                          this->leading_dim);
-    }
-
-    std::cout<<__FUNCTION__<<std::endl;
-    return *this;
-}
-
 
 
 // @sect4{Operator: =}
@@ -599,6 +554,19 @@ SciPAL::Vector<T, BW>::operator = (const std::vector<T> & other)
     return *this;
 }
 
+
+template <typename T, typename BW>
+template <typename X>
+SciPAL::Vector<T, BW> & SciPAL::Vector<T, BW>::operator =
+(const SciPAL::Expr<X> & e)
+{
+#ifdef DEBUG
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
+#endif
+
+    SciPAL::LAOOperations::apply(*this, ~e);
+    return *this;
+}
 
 template<typename T, typename BW>
 template<typename T2>
@@ -893,31 +861,6 @@ SciPAL::Vector<T, BW>::sadd (T alpha, const Vector<T, BW> & other)
 }
 
 
-
-template <typename T, typename BW>
-template <typename X>
-SciPAL::Vector<T, BW> & SciPAL::Vector<T, BW>::operator =
-(const SciPAL::Expr<X> & e)
-{
-#ifdef DEBUG
-    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
-#endif
-
-    SciPAL::LAOOperations::apply(*this, ~e);
-    return *this;
-}
-
-template <typename T, typename BW>
-template<typename L, typename Op, typename R >
-SciPAL::Vector<T, BW> &  SciPAL::Vector<T, BW>::operator=
-(const SciPAL::BinaryExpr<L, Op, R> & Ax)
-{
-#ifdef DEBUG
-   std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
-#endif
-    SciPAL::LAOOperations::apply(*this, ~Ax);
-    return *this;
-}
 
 // @sect4{struct: vmu}
 //!

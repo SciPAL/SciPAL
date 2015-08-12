@@ -45,6 +45,10 @@ public:
     __host__ __device__
     Literal(const T _val) : val(_val) {}
 
+    template<typename T2>
+    __host__ __device__
+    Literal(const T2 _val) : val(T(_val)) {}
+
     operator value_type () const {
     return val;
     }

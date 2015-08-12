@@ -19,12 +19,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #ifndef COMPLEX_H
 #define COMPLEX_H
-#include <base/ParallelArch.h>
-#include <complex>
+#include <base/ForewardDeclarations.h>
 #include "CudaComplex.h"
 
-template<typename T, ParallelArch arch>
-struct ComplexTraits;
 
 template<typename T>
 struct ComplexTraits<T, cpu>

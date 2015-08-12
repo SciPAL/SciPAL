@@ -25,21 +25,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <lac/cublas_Matrix.h>
 
-namespace SciPAL {
-
-    template<typename, typename> class Array;
-}
-
-namespace SciPAL {
-
-    template<typename, typename> class Matrix;
-
-    template<typename, typename> class VectorView;
-    template<typename, typename> class SubMatrixView;
-}
-
-template<typename T> struct ComplexAdapter;
-
+#include <base/ForewardDeclarations.h>
 
 template <>
         struct ComplexAdapter<float2>

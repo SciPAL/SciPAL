@@ -38,20 +38,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <base/ArchTraits.h>
 #include <base/CUDA_error_check.h>
 
+#include <base/ForewardDeclarations.h>
 
-template<typename> class FullMatrixAccessor;
-
-
-namespace SciPAL {
-
-template<typename, typename> class Matrix;
-
-template<typename, typename> class Vector;
-
-template<typename, typename> class VectorView;
-
-template<typename, typename> class SubMatrixView;
-}
 
 
 namespace SciPAL {

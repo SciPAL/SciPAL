@@ -20,13 +20,11 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef LITERAL_H
 #define LITERAL_H
 #include <lac/Expr.h>
-#include<lac/BlasVectorOperations.h>
+#include <lac/BlasVectorOperations.h>
+
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
-
-//forward declarations
-template <typename T> class DevLiteral;
-template <typename T> struct Setter;
 
 // @sect3{Struct: Literal}
 //

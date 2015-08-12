@@ -22,16 +22,11 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <lac/expression_templates_host.h>
 
-
 #include <lac/scipal_kernels_wrapper.cu.h>
 #include <lac/UnaryFunctions.h>
 
+#include <base/ForewardDeclarations.h>
 
-namespace SciPAL {
-template<typename, typename> class Matrix;
-template<typename, typename> class Vector;
-template<typename T> struct Literal;
-}
 
 // TODO: rename this file to CustomOperations.h. Currently, "custom" means generic array arithmetic applying both to matrices and vectors.
 

@@ -26,22 +26,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/DevLiteral.h>
 #include <base/CudaComplex.h>
 #include <cstdio>
-struct blas;
 
-struct cublas;
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
-
-//declare device expression types
-template <typename _L, typename Operator, typename _R> struct DevBinaryExpr;
-template <typename _L, typename Operation > struct DevUnaryExpr;
-
-//declare host expression types
-template <typename _L, typename Operator, typename _R> struct BinaryExpr;
-template <typename _L, typename Operation > struct UnaryExpr;
-
-//! aux structure to solve the missing Type problem in ShapeData
-template<typename T> struct GetMyType;
 
 template<typename T> struct GetMyType<SciPAL::ShapeData<T> >
 {
@@ -52,9 +40,6 @@ template<typename T> struct GetMyType {
 
     typedef typename T::Type Type;
 };
-
-//!definitions of operations for DevBinaryExpr
-template<typename OpTag, typename T> struct  binary;
 
 template<typename T>
 struct  binary<plus, T>
@@ -110,10 +95,6 @@ binary<pdivide, T>
 //do nothing if it is not +-*/
 template<typename OpTag, typename T> struct  binary {};
 
-
-//! This structure provides the functions for evaluating the expression tree in array arithmetic.
-//!
-template <typename T> struct ExprTree;
 
 template <typename T>
 struct ExprTree {

@@ -43,9 +43,7 @@ struct vmu;
 #include <lac/cublas_SubMatrixView.h>
 #include <lac/cublas_VectorView.h>
 
-template<typename> class FullMatrixAccessor;
-
-
+#include <base/ForewardDeclarations.h>
 
 
 namespace SciPAL {

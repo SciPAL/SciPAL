@@ -20,16 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef VECTOROPERATIONS_H
 #define VECTOROPERATIONS_H
 
-
-
-namespace SciPAL {
-template<typename, typename> class Matrix;
-template<typename, typename> class Vector;
-template<typename T> struct Literal;
-template<typename T> struct DevLiteral;
-template<typename T, ParallelArch arch> struct Kernels;
-template<typename M> struct transpose;
-}
+#include <base/ForewardDeclarations.h>
 
 #include <lac/expression_templates_host.h>
 #include <lac/VectorCustomOperations.h>

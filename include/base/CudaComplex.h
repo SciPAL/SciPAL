@@ -24,9 +24,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef CUDACOMPLEX_H
 #define CUDACOMPLEX_H
 //SciPAL precision traits include
-#include<lac/Expr.h>
-#include<cuComplex.h>
-#include<base/PrecisionTraits.h>
+#include <lac/Expr.h>
+#include <cuComplex.h>
+#include <base/PrecisionTraits.h>
 #include <sstream>
 
 

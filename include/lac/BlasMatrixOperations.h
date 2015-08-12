@@ -23,11 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <lac/expression_templates_host.h>
 
-namespace SciPAL {
-template<typename, typename> class Matrix;
-template<typename, typename> class Vector;
-template<typename T> struct Literal;
-}
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
 

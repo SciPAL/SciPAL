@@ -23,7 +23,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <omp.h>
 #endif
 //SciPAL includes
-#include <base/ParallelArch.h>
 #include <base/PrecisionTraits.h>
 #include <lac/ShapeData.h>
 #include <base/CudaComplex.h>
@@ -32,15 +31,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 
 #include <iostream>
-namespace SciPAL {
 
-template <class E> struct Expr;
-template<typename _L,
-         typename Operation,
-         typename _R>
-struct BinaryExpr;
-template<typename _L, typename _o> struct UnaryExpr;
-}
+#include <base/ForewardDeclarations.h>
 
 template <typename T> class ImplCUDA {
 public:

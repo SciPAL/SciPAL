@@ -23,22 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/Expr.h>
 #include <base/CudaComplex.h>
 
-// Forward declarations of blas wrappers. We need them to chose the correct implementation strategy of the Unary
-// Functions. We can not include blas++.h, because this file is also seen by nvcc.
-struct blas;
-
-struct cublas;
-
-namespace SciPAL {
-
-//declare device expression types
-template <typename _L, typename Operator, typename _R> struct DevBinaryExpr;
-template <typename _L, typename Operation > struct DevUnaryExpr;
-
-//declare host expression types
-template <typename _L, typename Operator, typename _R> struct BinaryExpr;
-template <typename _L, typename Operation > struct UnaryExpr;
-}
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
 

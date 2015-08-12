@@ -40,13 +40,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 //implementation scheme
 //http://www.angelikalanger.com/Articles/Cuj/ExpressionTemplates/TemplateBasedExpression.gif
 
-
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
-
-//declare device expression types
-template <typename _L, typename Operator, typename _R> struct DevBinaryExpr;
-template <typename _L, typename Operation > struct DevUnaryExpr;
 
 // @sect4{Struct: transpose}
 // Interpret Matrices and Vectors in transposed manner.

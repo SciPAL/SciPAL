@@ -22,9 +22,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <lac/cublas_Vector.h>
 
-namespace SciPAL {
+#include <base/ForewardDeclarations.h>
 
-    template<typename, typename> class SubMatrixView ;
+namespace SciPAL {
 
     template<typename T, typename BW>
     struct SMSMmult : SciPAL::Expr<SMSMmult<T, BW> >  {

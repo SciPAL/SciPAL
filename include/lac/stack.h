@@ -5,8 +5,6 @@
 #include <lac/expression_templates_host.h>
 #include <complex>
 #include <float.h>
-//! Vorwaertsdeklaration fuer expression templates
-struct vmu;
 
 //SciPAL implementation for expression templates
 
@@ -20,23 +18,9 @@ struct vmu;
 #include <base/PrecisionTraits.h>
 #include <base/Zero_One_Traits.h>
 
-template<typename> class FullMatrixAccessor;
-
-
-namespace SciPAL {
-
-template<typename, typename> class Array;
-template<typename, typename> class Matrix;
-
-template<typename, typename> class VectorView;
-template<typename, typename> class ColVectorView;
-
-template<typename, typename> class SubMatrixView;
-}
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
-
-
 
 // @sect3{Class: Stack}
 //!

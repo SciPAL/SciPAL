@@ -40,6 +40,7 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <deal.II/lac/vector.h>
 
 //Our stuff
+//#include "ImageDecomposition.h"
 #include "cuda_driver_step-35.hh"
 #include "cuda_kernel_wrapper_step-35.cu.h"
 #include "patch.h"
@@ -168,7 +169,7 @@ struct runStruct<cset_dyadic,T,c > {
     //@brief Run function of CUDADriver for cset_dyadic, only calls nostream_handler()
     //@param pt pointer to the friended CUDADriver instance
     void run_func(CUDADriver<cset_dyadic,T, c> *pt) {
-        pt->nostream_handler();
+        pt->nostream_handler2();
     }
 };
 
@@ -213,6 +214,9 @@ class CUDADriver {
     //Worker thread handles
     std::thread* thread_handles;
 
+    //Contains dimensions of rectangles
+    std::vector<int> dimRect;
+
 #ifdef TIME_KERNELS
     // Total GPU time for dykstra kernels in ms
     float kernel_time;
@@ -244,7 +248,8 @@ class CUDADriver {
     // FIXME: more vector instantiations go here
           tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix),
           tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix),
-          tmp_h(inf->ext_num_pix)
+          tmp_h(inf->ext_num_pix),
+          dimRect(11)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -265,6 +270,9 @@ class CUDADriver {
 
         //The info class holds all real variables
 
+        //Assign dimensions of rectangles for decomposition
+        for (int i = 0; i < 11; i++)
+            dimRect[i] = 1 << i;
 
         //Cufft setup
         int fm1_size=inf->ext_depth*inf->ext_width*(inf->ext_height/2+1)*sizeof(complex);
@@ -360,7 +368,7 @@ class CUDADriver {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
             for (int so=0; so<5; so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                    kernels.dyadic_dykstra(inf->e_d,inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
                 }
             }
         }
@@ -378,6 +386,33 @@ class CUDADriver {
         cudaEventElapsedTime(&time, start, stop);
         kernel_time += time;
 #endif
+    }
+
+    //@sect5{Function: nostream_handler2}
+    //@brief Wrapper if we use the stoch_dykstra Kernel.
+    void nostream_handler2() {
+        int randomPower = 5;//rand() % 11;
+
+        step35::Kernels<Mdouble> kernels;
+            std::cout << "random number:" << randomPower << std::endl;
+
+        if (inf->dim == 2) {
+//            for(int i = 50000;i<1024+50000;i++)
+//                std::cout << inf->e_d(i)<< " " ;
+            //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
+            for (int so=-1; so<5; so++) {
+                for (int z=0; z<inf->ext_depth; z++) {
+                    kernels.stoch_dykstra(inf->e_d,inf->ext_height, inf->ext_width, inf->ext_depth, (so<0)? 0: (1 << so), (so<0)? 0: (1 << so), z, so, randomPower);
+                }
+            }
+        }
+        else { //TODO 3d
+            for (int so=0; so<5; so++) {
+                for (int z=0; z<inf->ext_depth; z++) {
+                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                }
+            }
+        }
     }
 
     //@sect5{Function: stream_handler}

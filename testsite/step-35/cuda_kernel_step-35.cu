@@ -409,6 +409,205 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
     }
 }
 
+//@sect5{Kernel: __stoch_dykstra}
+//@brief CUDA adapted approximate Dykstra
+//@param A pointer to the image
+//@param ni height of the image
+//@param nj width of the image
+//@param offseti offset in vertical direction
+//@param offsetj offset in horizontal direction
+//@param smin minimum frame size is $2^{smin}$
+template<typename T>
+__global__ void
+__stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int smin, const int powerx) {
+
+    int resolution_depth;
+    if (powerx > 10-powerx)
+        resolution_depth = powerx;
+    else
+        resolution_depth = 10-powerx;
+
+//    const int resolution_depth = resolution_depth_tmp;//*(resolution_depth+1);
+    // x and y dimension of rectangle
+    const int xdim = 1<<powerx;
+    const int ydim = 1<<(10-powerx);
+    //Shared memory
+    //__shared__ float q[6144];
+    //__shared__ float f[1024];
+    __shared__ T e[1024];
+    //sum of errors in chunk,1024 values is max, not always needed completely
+    __shared__ T c_err[1024];
+//    __shared__ int help[1024];
+
+//    for(int i = 0;i<1024;i++)
+//        help[i]=i+1;
+//__syncthreads();
+    //temp storage for dykstra's algorithm
+    T q[11];
+    T f;
+
+    // Set q = 0
+    for (int s=resolution_depth; s>=0; s--) {
+        q[s]=0.;
+    }
+//    if (threadIdx.x==0 && threadIdx.y ==0 && blockIdx.x==0 && blockIdx.y==0)
+//        printf("offx%d offy%d im_height%d im_width%d powerx%d\n",offsetx,offsety,im_height,im_width,powerx);
+
+    // Temporary variables
+    //int is, js, ks, m;
+    // Pixel index this thread is processing
+    int idx = (threadIdx.y+offsety+blockIdx.y*blockDim.y)%im_height+((blockIdx.x*blockDim.x+offsetx+threadIdx.x)%im_width)*im_height; //ks*ni*nj + is*nj + js;;
+    //current error index
+    int e_idx = threadIdx.y + threadIdx.x*blockDim.y;
+//    if (threadIdx.x==0&&blockIdx.x==0)
+//    printf("dst.data_ptr%f",(float)dst.data_ptr[idx]);
+//    if(idx>=1024*1024||idx<0)
+//        printf("ERROOOOOORRR");
+//if(help[e_idx]==0) {
+//    printf("ERROOOOOOORRRRRRR");
+////    for (int i = 0; i < 1024;i++)
+////        printf("%d ",help[i]);
+////    return;
+//}
+//help[e_idx]=0;
+    // Iteration counter
+    int it=0;
+
+//    if (idx%891==0)
+//        printf("idx%d e_idx%d\n",idx,e_idx);
+//if (e_idx > 1023){
+//    printf("idx%d e_idx%d\n",idx,e_idx);
+//    return;
+//}
+    int chunkHeight;
+    int chunkWidth;
+
+    // FIXME: make adjustable from outside
+    // Maximum iteration count
+    const int itmax=300;
+
+    // FIXME: make adjustable from outside
+    // Tolerance for convergence check
+    const T tol = 1e-2;
+    // Increment
+    T delta=2.0*tol;
+    while ( delta > tol && it < itmax ) {
+        it++;
+        delta=0;
+        // In each threadblock we apply dykstra's algorithm to
+        // subsets with edge lengths 32, 16, 8, 4, 2 and 1.
+        //\image html s5.png
+        //\image html s4.png
+        //\image html s3.png
+        //\image html s2.png
+        //\image html s1.png
+        //\image html s0.png
+        // Wait for every step before starting the iteration
+        __syncthreads();
+        //        if (resolution_depth != 5) {
+        //multi-resolution only for rectangles
+        for (int s=resolution_depth; s>0; s--) {
+            //Number of chunks in one threadblock = $2^{5-s}$
+            //                int chunkNum =1<<(resolution_depth-s);
+            //Number of pixels in one = $2^{2\cdot s}$
+            //                int chunkSize = chunkHeight*chunkWidth;
+
+            //i = blockInd + row * MaxBlock + col * MaxRow * MaxBlock \n
+            //row= ( i / MaxBlock ) % MaxRow                          \n
+            //col = ( i / MaxRow ) / MaxBlock
+
+            //            //Line in global image
+            //            is = chunkHeight*((threadIdx.x/ChunkSize)%ChunkNum) +
+            //                 (threadIdx.x%ChunkSize)%ChunkLength + blockIdx.x*32 + offseti;
+            //            //Column in global image
+            //            js = ChunkLength*((threadIdx.x/ChunkSize)/ChunkNum) +
+            //                 (threadIdx.x%ChunkSize)/ChunkLength + blockIdx.y*32 + offsetj;
+            //            ks=offsetk;
+            //            is=is%ni;
+            //            js=js%nj;
+            //Pixel index in the current in the global image
+            //idx = (threadIdx.y+offsety+blockIdx.y*blockDim.y)%im_height+((blockIdx.x*blockDim.x+offsetx+threadIdx.x)%im_width)*im_height; //ks*ni*nj + is*nj + js;
+            //            if (threadIdx.x ==0 && threadIdx.y==0 && blockIdx.x < 10)
+            //                printf( "idx%d blockIdx.x%d blockIdx.y%d\n" , idx,blockIdx.x ,blockIdx.y );
+#ifdef DY_DEBUG
+            if (idx%891==0)
+                printf("A_%d : %f, ", idx, src_dst.data_ptr[idx] );
+#endif
+            //thread_id = threadIdx.y+threadIdx.x*blockIdx.x;
+            //Fill shared memory with variables we later use
+            f = src_dst.data_ptr[idx] - q[s];
+            //indix corresponding to the error
+            //                int e_idx = threadIdx.y + threadIdx.x*blockDim.y;
+            //   if (idx%891==0)
+            //                T ddd=f*f;
+            //                __syncthreads();
+            //                if (threadIdx.x==0&&blockIdx.x==0) printf("%f\n",f);
+            e[e_idx] = f*f;
+            //                e[e_idx] = (T)help[e_idx];
+            __syncthreads();
+
+            //chunk index
+            int c_idx;
+            if (xdim>ydim && s>10-resolution_depth) {
+                chunkHeight = 1<<(10-resolution_depth);
+                chunkWidth = 1<<s;
+                c_idx = (int)(threadIdx.x/chunkWidth);
+                //                    __syncthreads();
+                c_err[c_idx] = 0;
+                for (int i = c_idx*chunkWidth; i<(c_idx+1)*chunkWidth;i++)
+                    for (int j = 0; j < ydim; j++)
+                        c_err[c_idx]+= e[i*chunkHeight+j];
+                __syncthreads();
+            }
+            if (xdim<ydim && s>10-resolution_depth){
+                chunkHeight = 1<<s;
+                chunkWidth = 1<<(10-resolution_depth);
+                c_idx = (int)(threadIdx.y/chunkHeight);
+                //                    __syncthreads();
+                c_err[c_idx] = 0;
+                for (int i = 0; i<xdim;i++)
+                    for (int j = c_idx*chunkHeight; j < (c_idx+1)*chunkHeight; j++)
+                        c_err[c_idx]+= e[i*chunkHeight+j];
+                __syncthreads();
+            }
+            if (s<=10-resolution_depth) {
+                chunkHeight = 1 << s;
+                chunkWidth = chunkHeight;
+                c_idx = (int)(threadIdx.y/chunkHeight)+(int)(threadIdx.x/chunkWidth)*(int)(ydim/chunkHeight);
+                c_err[c_idx] = 0;
+                for (int i = (int)(threadIdx.x/chunkWidth)*chunkWidth; i<(int)(threadIdx.x/chunkWidth+1)*chunkWidth;i++)
+                    for (int j = (int)(threadIdx.y/chunkHeight)*chunkHeight; j < (int)(threadIdx.y/chunkHeight+1)*chunkHeight; j++)
+                        c_err[c_idx]+= e[i*chunkHeight+j];
+                __syncthreads();
+            }
+
+            //                //sum errors
+            ////                for (int i = )
+            ////                c_err[c_idx]+= e[e_idx];
+            ////                __syncthreads();
+
+            //$q = x_{r+1} - x_r$
+            q[s] = -f;
+            //                __syncthreads();
+            if (cs[s]*c_err[c_idx] > 1.0)
+                f = f/(sqrt(cs[s]*c_err[c_idx]));
+
+            // Update $q$
+            q[s] += f;
+
+            // Templatized abs function
+            __abs<T> mabs;
+            // Calculate increment
+            delta+=mabs(src_dst.data_ptr[idx]-f);
+            // Update image
+            src_dst.data_ptr[idx] = f;
+            __syncthreads();
+            //            }
+        }
+    }
+}
+
+
 //@sect5{Kernel: __sum}
 //@brief Elementwise sum with offset in one array. Writes output to arr1.
 //@param arr1 first input array, output is written here.
@@ -841,6 +1040,25 @@ void step35::Kernels<T>::dykstra(T *qg, T *A,  int **cinfo, const int * q_offset
     dim3 grid(num_of_cluster,1);
     dim3 blocks(numpx,1);
     __dykstra<T><<<grid, blocks, 3*numpx*sizeof(T), *mystream>>> (qg, A, cinfo, q_offset, ni, nj);
+}
+
+//@sect5{Function: stoch_dykstra}
+//@brief This is a wrapper for the __stoch_dykstra Kernel function.
+//@param A pointer to the image
+//@param ni height of the image
+//@param nj width of the image
+//@param offseti offset in vertical direction
+//@param offsetj offset in horizontal direction
+//@param smin minimum frame size is $2^{smin}$
+template<typename T>
+void step35::Kernels<T>::stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int so, const int powerx) {
+    int gridsx=im_width/(1<<powerx);
+    int gridsy=im_height/(1<<(10-powerx));
+    dim3 grid(gridsx,gridsy);
+    dim3 blocks(1<<powerx,1<<(10-powerx));
+    __stoch_dykstra<T><<<grid,blocks>>> (src_dst, im_height, im_width, nk, offsetx, offsety, offsetk, so,powerx);
+    getLastCudaError("__incomplete_dykstra<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
 }
 
 //@sect5{Function: dyadyc_dykstra}

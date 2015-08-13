@@ -722,20 +722,18 @@ void step42::CUDADriver::views(){
 }
 
 void step42::CUDADriver::operator_precedence(){
+
+    std::cout<<"\n=====Test aoperator_precedence====="<<std::endl;
+
     const unsigned int n_rows = 2;
     const unsigned int n_cols = 2;
     const unsigned int n_elements = n_rows * n_cols;
-
-    Number alpha = 1.1;
-    Number beta = 2.;
 
     std::vector<Number>
             a(n_elements, 1.),
             b(n_elements, 2.);
 
-
-    for (unsigned int i = 0; i < a.size(); i++ )
-        a[i] = i+1;
+    std::iota(a.begin(), a.end(), 1);
 
     SciPAL::Vector<Number, BW> vA, vB(n_elements), vC, vD(n_elements);
     vA = a;
@@ -775,6 +773,7 @@ void step42::CUDADriver::operator_precedence(){
     test = (SciPAL::transpose<SciPAL::Vector<Number, BW> >(vA)) * vB;
     std::cout<< test << std::endl;
 }
+
 void step42::CUDADriver::stacks_of_LAOs(){
 
     // some dummy vectors
@@ -786,18 +785,23 @@ void step42::CUDADriver::stacks_of_LAOs(){
         std::cout <<" Stack of vector test with real numbers\n";
         typedef Number test_nmbr;
         typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
-        std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
-        for(auto &i : h_test)
-            std::iota(i.begin(), i.end(), 1);
 
-        std::vector<SciPAL::Vector<test_nmbr, BW> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
+        std::vector<SciPAL::Vector<test_nmbr, blas> > h_test(3, std::vector<test_nmbr>(n_elements));
+        std::vector<test_nmbr> tmp(n_elements);
+         std::iota(tmp.begin(), tmp.end(), 1);
+
+         for(auto &i : h_test)
+            i = tmp;
+
+        std::vector<SciPAL::Vector<test_nmbr, cublas> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
 
         //element wise copy works
-        for(uint ii=0; ii<h_test.size(); ii++)
-            d_test[ii] = h_test[ii];
+//        for(uint ii=0; ii<h_test.size(); ii++)
+//            d_test[ii] = h_test[ii];
 
         //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
-        //    d_test = h_test;
+//            d_test = h_test;
+            std::copy(h_test.begin(), h_test.end(), d_test.begin());
 
         std::cout<<"initialization \n";
         d_test[0].print();
@@ -826,77 +830,72 @@ void step42::CUDADriver::stacks_of_LAOs(){
     //    }
 
     ////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    //     {
-    //        std::cout <<" Stack of mtx test with real numbers\n";
-    //        typedef Number test_nmbr;
-    //        typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
-    //        typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
+         {
+            std::cout <<" Stack of mtx test with real numbers\n";
+            typedef Number test_nmbr;
+            typedef SciPAL::Matrix<test_nmbr, BW> test_LAO_d;
+            typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
 
-    //        std::vector<test_nmbr> a(n_elements);
+            std::vector<test_nmbr> a(n_elements);
 
-    //        std::iota(a.begin(), a.end(), 2);
+            std::iota(a.begin(), a.end(), 2);
 
-    //        test_LAO_h host_init_mtx(n_rows, n_cols, a);
-    //        std::cout<<"host init mtx \n";
-    //        host_init_mtx.print();
+            test_LAO_h host_init_mtx(n_rows, n_cols, a);
+            std::cout<<"host init mtx \n";
+            host_init_mtx.print();
 
-    //        //this is some how ugly how we have to create the stack of mtx on the host
-    //        std::vector<test_LAO_h> h_test(3);
+            //this is some how ugly how we have to create the stack of mtx on the host
+            std::vector<test_LAO_h> h_test(3);
 
-    //        for(uint ii = 0; ii< h_test.size(); ii++)
-    //            h_test[ii] = host_init_mtx;
+            for(auto &ii : h_test)
+                ii = host_init_mtx;
 
-    //        SciPAL::Stack<test_LAO> d_test(3,1);
-    //        d_test = h_test;
+            std::vector<test_LAO_d> d_test(3);
+            std::copy(h_test.begin(), h_test.end(), d_test.begin());
 
-    //        std::cout<<"host initialization \n";
-    //        h_test[0].print();
+            std::cout<<"host initialization \n";
+            h_test[0].print();
 
-    //        std::cout<<"initialization \n";
-    //        d_test[0].print();
-    //        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-    //        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-    //        d_test[2].print();
-    //    }
+            std::cout<<"initialization \n";
+            d_test[0].print();
+            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+            d_test[2].print();
+        }
 
     ////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    //         {
-    //            std::cout <<" Stack of mtx test with cplx numbers\n";
-    //            typedef cplxNumber test_nmbr;
-    //            typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
-    //            typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
+             {
+                std::cout <<" Stack of mtx test with cplx numbers\n";
+                typedef cplxNumber test_nmbr;
+                typedef SciPAL::Matrix<test_nmbr, BW> test_LAO_d;
+                typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
 
-    //            std::vector<test_nmbr> a(n_elements);
+                std::vector<test_nmbr> a(n_elements);
 
-    //            std::iota(a.begin(), a.end(), 2);
+                std::iota(a.begin(), a.end(), 2);
 
-    //            test_LAO_h host_init_mtx(n_rows, n_cols, a);
-    //            std::cout<<"host init mtx \n";
-    //            host_init_mtx.print();
+                test_LAO_h host_init_mtx(n_rows, n_cols, a);
+                std::cout<<"host init mtx \n";
+                host_init_mtx.print();
 
-    //            //this is some how ugly how we have to create the stack of mtx on the host
-    //            std::vector<test_LAO_h> h_test(3);
+                //this is some how ugly how we have to create the stack of mtx on the host
+                std::vector<test_LAO_h> h_test(3);
 
-    //            for(uint ii = 0; ii< h_test.size(); ii++)
-    //                h_test[ii] = host_init_mtx;
+                for(auto &ii : h_test)
+                    ii = host_init_mtx;
 
-    //            //in this case we CAN NOT write SciPAL::Stack<test_LAO> d_test(3,1);
-    //            //as for the real case, because internally this maps to a construction
-    //            //of a dealii::Identity matrix, which is sadly not defined for SciPAL's
-    //            //complex numbers. The usage of this constructor becomes only a problem
-    //            //if we try to copy uninitialized Stack elements.
-    //            SciPAL::Stack<test_LAO> d_test;
-    //            d_test = h_test;
+                std::vector<test_LAO_d> d_test(3);
+                std::copy(h_test.begin(), h_test.end(), d_test.begin());
 
-    //            std::cout<<"host initialization \n";
-    //            h_test[0].print();
+                std::cout<<"host initialization \n";
+                h_test[0].print();
 
-    //            std::cout<<"initialization \n";
-    //            d_test[0].print();
-    //            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-    //            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-    //            d_test[2].print();
-    //        }
+                std::cout<<"initialization \n";
+                d_test[0].print();
+                d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+                std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+                d_test[2].print();
+            }
 }
 
 #endif //CUDA_DRIVER

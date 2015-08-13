@@ -146,7 +146,7 @@ public:
     Vector<T, BW> & operator = (const Vector<T, BW2> & other)
     {
 //        if(this->n_elements() != other.n_elements())
-            this->reinit(other.n_elements());
+            this->array().reinit(other.array().n_elements());
 
         // element-wise copy of array.
         int inc_src  = 1;
@@ -156,21 +156,22 @@ public:
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
         {
-            cublas::GetMatrix(other.n_rows(), other.n_cols(),
+            cublas::GetVector(other.array().n_elements(),
                               other.array().val(),
-                              other.leading_dim,
-                              this->array().val(), this->leading_dim);
+                              other.stride,
+                              this->array().val(),
+                              this->stride);
         }
 
         //! copy from cublas matrix to blas matrix -> SetMatrix
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
         {
-            cublas::SetMatrix(other.n_rows(), other.n_cols(),
+            cublas::SetVector(other.array().n_elements(),
                               other.array().val(),
-                              other.leading_dim,
+                              other.stride,
                               this->array().val(),
-                              this->leading_dim);
+                              this->stride);
         }
 
         std::cout<<__FUNCTION__<<std::endl;

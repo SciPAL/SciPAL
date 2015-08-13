@@ -56,6 +56,7 @@ DEFINES += nUSE_CUDA_COMPLEX_VERSION
     # This 2 levels above the source folder of your step-
     SciPAL_DIR = $$_PRO_FILE_PWD_/../../
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/../
+    STEP_DIR = $$_PRO_FILE_PWD_/
 
 message("SciPALs home :" $$SciPAL_DIR)
 message("step home :" $$STEP_PARENT_DIR)

@@ -40,14 +40,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <lac/stack.h>
 
-        // @sect4{Constructor: CUDADriver}
-        //
-        // The constructor of the driver class allocates memory
-        // on the GPU and copies data from host to device.
-        // Furthermore, it keeps a pointer to the original host data for the
-        // case that it has to be modified by the GPU results.
-        // @param v_h : Pointer to a linear array in host-side memory that is to be copied to the GPU.
-        // @param n : Number of entries of @p v_h.
+// @sect4{Constructor: CUDADriver}
+//
+// The constructor of the driver class allocates memory
+// on the GPU and copies data from host to device.
+// Furthermore, it keeps a pointer to the original host data for the
+// case that it has to be modified by the GPU results.
+// @param v_h : Pointer to a linear array in host-side memory that is to be copied to the GPU.
+// @param n : Number of entries of @p v_h.
 step42::CUDADriver::CUDADriver() {
 
     BW::Init();
@@ -56,10 +56,10 @@ step42::CUDADriver::CUDADriver() {
 
 
 
-        // @sect4{Function: gemm_tests}
-        //
-        // This function tests the various special cases contained
-        // in BLAS' gemm function.
+// @sect4{Function: gemm_tests}
+//
+// This function tests the various special cases contained
+// in BLAS' gemm function.
 void step42::CUDADriver::gemm_tests()
 {
 
@@ -82,64 +82,64 @@ void step42::CUDADriver::gemm_tests()
             B(n_cols, n_rows, b),
             C(n_rows, n_rows, c);
 
-     Number alpha = 1.1;
-     Number beta = 2.;
+    Number alpha = 1.1;
+    Number beta = 2.;
 
-     std::cout << "A : " << std::endl;
-     A.print();
+    std::cout << "A : " << std::endl;
+    A.print();
 
-     std::cout << "B : " << std::endl;
-     B.print();
+    std::cout << "B : " << std::endl;
+    B.print();
 
-     std::cout << "C : " << std::endl;
-     C.print();
-
-
-
-     std::cout << " ============ C = " << alpha << " * A ======" << std::endl;
-     C = alpha * A; // * B + beta * C;
-       std::cout << "C : " << std::endl;
-     C.print();
-
-     std::cout << " ============ C = A * B ======" << std::endl;
-     C = A * B;   std::cout << "C : " << std::endl; C.print();
-
-     std::cout << " ============ C = B * A ======" << std::endl;
-     C = B * A;   std::cout << "C : " << std::endl; C.print();
-
-     std::cout << " ============ C = alpha * A * B ======" << std::endl;
-     C = alpha * A * B; std::cout << "C : " << std::endl; C.print();
-
-
-     //sMMaM test
-     std::cout << " ============ C = " << alpha << " * A * B + "<<"C======" << std::endl;
-     c.clear();
-     c.resize(n_rows * n_rows, 1.);
-     SciPAL::Matrix<Number, BW>
-             D(n_rows, n_rows, c);
+    std::cout << "C : " << std::endl;
+    C.print();
 
 
 
-     C = D;
-     std::cout << "C : " << std::endl; C.print();
-     C = alpha * A * B + // beta *
-             C; std::cout << "C : " << std::endl; C.print();
+    std::cout << " ============ C = " << alpha << " * A ======" << std::endl;
+    C = alpha * A; // * B + beta * C;
+    std::cout << "C : " << std::endl;
+    C.print();
 
-     //MMaM test
-      std::cout << " ============ C = A * B + C======" << std::endl;
-      C = D;
-      std::cout << "C : " << std::endl; C.print();
+    std::cout << " ============ C = A * B ======" << std::endl;
+    C = A * B;   std::cout << "C : " << std::endl; C.print();
 
-      C =  A * B + C;
-      std::cout << "C : " << std::endl; C.print();
+    std::cout << " ============ C = B * A ======" << std::endl;
+    C = B * A;   std::cout << "C : " << std::endl; C.print();
+
+    std::cout << " ============ C = alpha * A * B ======" << std::endl;
+    C = alpha * A * B; std::cout << "C : " << std::endl; C.print();
+
+
+    //sMMaM test
+    std::cout << " ============ C = " << alpha << " * A * B + "<<"C======" << std::endl;
+    c.clear();
+    c.resize(n_rows * n_rows, 1.);
+    SciPAL::Matrix<Number, BW>
+            D(n_rows, n_rows, c);
+
+
+
+    C = D;
+    std::cout << "C : " << std::endl; C.print();
+    C = alpha * A * B + // beta *
+            C; std::cout << "C : " << std::endl; C.print();
+
+    //MMaM test
+    std::cout << " ============ C = A * B + C======" << std::endl;
+    C = D;
+    std::cout << "C : " << std::endl; C.print();
+
+    C =  A * B + C;
+    std::cout << "C : " << std::endl; C.print();
 
     //gemm test
-     std::cout << " ============ C = " << alpha << " * A * B + "  << beta  << " * C======" << std::endl;
-     C = D;
-     std::cout << "C : " << std::endl; C.print();
+    std::cout << " ============ C = " << alpha << " * A * B + "  << beta  << " * C======" << std::endl;
+    C = D;
+    std::cout << "C : " << std::endl; C.print();
 
-     C = alpha * A * B + beta * C;
-     std::cout << "C : " << std::endl; C.print();
+    C = alpha * A * B + beta * C;
+    std::cout << "C : " << std::endl; C.print();
 }
 
 
@@ -153,168 +153,168 @@ void step42::CUDADriver::gemm_tests()
 void step42::CUDADriver::gemv_tests()
 {
 #ifndef nUSE_ARRAY_EXPRESSIONS
-     const unsigned int n_rows = 4;
-     const unsigned int n_cols = 4;
-     const unsigned int n_elements = n_rows * n_cols;
+    const unsigned int n_rows = 4;
+    const unsigned int n_cols = 4;
+    const unsigned int n_elements = n_rows * n_cols;
 
-     Number alpha = 1.1;
-     Number beta = 2.;
+    Number alpha = 1.1;
+    Number beta = 2.;
 
-     std::vector<Number>
-                a(n_elements, 1.),
-                b(n_elements, 2.);
-
-
-     for (unsigned int i = 0; i < a.size(); i++ )
-         a[i] = i+1;
-
-     SciPAL::Vector<Number, BW> vA, vB(n_elements), vC;
-       vA = a;
-       // This sets all elements of vB to 2.3, note: vector needs to be initialized.
-       vB = SciPAL::Literal<Number>(2.3);
-       vC = a;
+    std::vector<Number>
+            a(n_elements, 1.),
+            b(n_elements, 2.);
 
 
-       std::cout << "vA : " << std::endl;
-       vA.print();
+    for (unsigned int i = 0; i < a.size(); i++ )
+        a[i] = i+1;
 
-       std::cout << "vB : " << std::endl;
-       vB.print();
-
-       std::cout << " ============ vC = " << alpha << " * vA ======" << std::endl;
-       vC = alpha * vA;
-         std::cout << "vC : " << std::endl;
-       vC.print();
-
-       std::cout << " ============ vC = " << alpha << " * vA + vB ======" << std::endl;
-
-       vC = alpha * vA + vB;
-         std::cout << "vC : " << std::endl;
-       vC.print();
-
-       std::cout << " ============ vD = sin(vD) ======" << std::endl;
-       const unsigned int n_sin_elements = n_elements;
-       std::vector<Number> d(n_sin_elements);
-       for(uint i = 0; i < d.size(); i++)
-           d[i] = i* 2.* M_PI / d.size();
-
-       SciPAL::Vector<Number, BW> vD; vD = d; //(n_sin_elements, 1, d);
-      vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
-         std::cout << "sin(vD) : " << std::endl;
-       vD.print();
-       //vC = alpha * sin(vA) + vB;
+    SciPAL::Vector<Number, BW> vA, vB(n_elements), vC;
+    vA = a;
+    // This sets all elements of vB to 2.3, note: vector needs to be initialized.
+    vB = SciPAL::Literal<Number>(2.3);
+    vC = a;
 
 
-       std::cout << " ============ linear combination test ======" << std::endl;
-       vC = 2.0 * vA;
-       std::cout << "vC = 2.0 * vA" << std::endl;
-       vC.print();
+    std::cout << "vA : " << std::endl;
+    vA.print();
 
-       std::cout << "vA : " << std::endl;
-       vA.print();
+    std::cout << "vB : " << std::endl;
+    vB.print();
 
-       std::cout << "vB : " << std::endl;
-       vB.print();
-       vC = vA + vB;
-       std::cout << "vC = vA + vB" << std::endl;
-       vC.print();
-       std::cout << "vA : " << std::endl;
-       vA.print();
+    std::cout << " ============ vC = " << alpha << " * vA ======" << std::endl;
+    vC = alpha * vA;
+    std::cout << "vC : " << std::endl;
+    vC.print();
 
-       std::cout << "vB : " << std::endl;
-       vB.print();
+    std::cout << " ============ vC = " << alpha << " * vA + vB ======" << std::endl;
 
-       vC = vA + 2.0 * vB;
-       std::cout << "vC = vA + 2.0 * vB" << std::endl;
-       vC.print();
+    vC = alpha * vA + vB;
+    std::cout << "vC : " << std::endl;
+    vC.print();
 
-       vC = 2.0 * vA + 3.0 * vB;
-       std::cout << "vC = 2.0 * vA + 3.0 * vB" << std::endl;
-       vC.print();
+    std::cout << " ============ vD = sin(vD) ======" << std::endl;
+    const unsigned int n_sin_elements = n_elements;
+    std::vector<Number> d(n_sin_elements);
+    for(uint i = 0; i < d.size(); i++)
+        d[i] = i* 2.* M_PI / d.size();
 
-//       vC = 2.0 * vA + 3.0 * vB + 4.0 * vD;
-//       std::cout << "vC = 2.0 * vA + 3.0 * vB + 4.0 * vD" << std::endl;
-//       vC.print();
+    SciPAL::Vector<Number, BW> vD; vD = d; //(n_sin_elements, 1, d);
+    vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
+    std::cout << "sin(vD) : " << std::endl;
+    vD.print();
+    //vC = alpha * sin(vA) + vB;
 
-       //combined expr test
-       vC =sin(2.0 * vA + 3.0 * vB);
-       std::cout << "vC = sin(2.0 * vA + 3.0 * vB)" << std::endl;
-       vC.print();
 
-       //test pointwise sqrt
-       vC = sqrt(vC);
-       std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
-       vC.print();
+    std::cout << " ============ linear combination test ======" << std::endl;
+    vC = 2.0 * vA;
+    std::cout << "vC = 2.0 * vA" << std::endl;
+    vC.print();
 
-       //test pointwise *
-       vC = vA && vB;
-       std::cout << "vC = vA .* vB" << std::endl;
-       vC.print();
+    std::cout << "vA : " << std::endl;
+    vA.print();
 
-       //test pointwise /
-       vC = vA || vB;
-       std::cout << "vC = vA ./ vB" << std::endl;
-       vC.print();
+    std::cout << "vB : " << std::endl;
+    vB.print();
+    vC = vA + vB;
+    std::cout << "vC = vA + vB" << std::endl;
+    vC.print();
+    std::cout << "vA : " << std::endl;
+    vA.print();
 
-       //combined expr test
-       vC = (vA + vB) || (vA - vB);
-       std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
-       vC.print();
+    std::cout << "vB : " << std::endl;
+    vB.print();
 
-       //combined expr test
-//       vC =abs(cos(2.0 * vA + 3.0 * vB));
-//       std::cout << "vC = abs(cos(2.0 * vA + 3.0 * vB)" << std::endl;
-//       vC.print();
+    vC = vA + 2.0 * vB;
+    std::cout << "vC = vA + 2.0 * vB" << std::endl;
+    vC.print();
 
-       std::cout << " ============ pointwise arithmetic with matrices======" << std::endl;
-{       // After the element-wise sine of a vector we do the same for a matrix.
+    vC = 2.0 * vA + 3.0 * vB;
+    std::cout << "vC = 2.0 * vA + 3.0 * vB" << std::endl;
+    vC.print();
 
-       SciPAL::Matrix<Number, BW> A(n_rows, n_cols, d);
-       A = sin(A);
-       SciPAL::Matrix<Number, BW> B(n_rows, n_cols, b);
-       SciPAL::Matrix<Number, BW> C(n_rows, n_cols);
+    //       vC = 2.0 * vA + 3.0 * vB + 4.0 * vD;
+    //       std::cout << "vC = 2.0 * vA + 3.0 * vB + 4.0 * vD" << std::endl;
+    //       vC.print();
 
-       std::cout << " A =" << std::endl;
+    //combined expr test
+    vC =sin(2.0 * vA + 3.0 * vB);
+    std::cout << "vC = sin(2.0 * vA + 3.0 * vB)" << std::endl;
+    vC.print();
 
-       A.print();
-       std::cout << " B =" << std::endl;
-       B.print();
-       std::cout << " C =" << std::endl;
-       C.print();
+    //test pointwise sqrt
+    vC = sqrt(vC);
+    std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
+    vC.print();
 
-       C = abs(A);
-       std::cout << "C = abs(A)" << std::endl;
-       C.print();
+    //test pointwise *
+    vC = vA && vB;
+    std::cout << "vC = vA .* vB" << std::endl;
+    vC.print();
 
-       //test pointwise * on same matrix
-//       C = C && C;
-       std::cout << "C = C .* C" << std::endl;
-       C.print();
+    //test pointwise /
+    vC = vA || vB;
+    std::cout << "vC = vA ./ vB" << std::endl;
+    vC.print();
 
-       //test pointwise *
-//       C = A && B;
-       std::cout << "C = A .* B" << std::endl;
-       C.print();
+    //combined expr test
+    vC = (vA + vB) || (vA - vB);
+    std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
+    vC.print();
 
-       //test pointwise /
-       C = A || B;
-       std::cout << "C = A ./ B" << std::endl;
-       C.print();
+    //combined expr test
+    //       vC =abs(cos(2.0 * vA + 3.0 * vB));
+    //       std::cout << "vC = abs(cos(2.0 * vA + 3.0 * vB)" << std::endl;
+    //       vC.print();
 
-       //concatuated expr test
-       C = (A + B) || (A - B);
-       std::cout << "C = (A + B) || (A - B)" << std::endl;
-       C.print();
+    std::cout << " ============ pointwise arithmetic with matrices======" << std::endl;
+    {       // After the element-wise sine of a vector we do the same for a matrix.
 
-       //combined bin-un-expr test
-       C = abs(A);
-       C = (A + B) || C;
-       //TODO not working:
-//       C = (A + B) || abs(A);
-       std::cout << "C =  (A + B) || abs(A)" << std::endl;
-       C.print();
+        SciPAL::Matrix<Number, BW> A(n_rows, n_cols, d);
+        A = sin(A);
+        SciPAL::Matrix<Number, BW> B(n_rows, n_cols, b);
+        SciPAL::Matrix<Number, BW> C(n_rows, n_cols);
 
-}
+        std::cout << " A =" << std::endl;
+
+        A.print();
+        std::cout << " B =" << std::endl;
+        B.print();
+        std::cout << " C =" << std::endl;
+        C.print();
+
+        C = abs(A);
+        std::cout << "C = abs(A)" << std::endl;
+        C.print();
+
+        //test pointwise * on same matrix
+        //       C = C && C;
+        std::cout << "C = C .* C" << std::endl;
+        C.print();
+
+        //test pointwise *
+        //       C = A && B;
+        std::cout << "C = A .* B" << std::endl;
+        C.print();
+
+        //test pointwise /
+        C = A || B;
+        std::cout << "C = A ./ B" << std::endl;
+        C.print();
+
+        //concatuated expr test
+        C = (A + B) || (A - B);
+        std::cout << "C = (A + B) || (A - B)" << std::endl;
+        C.print();
+
+        //combined bin-un-expr test
+        C = abs(A);
+        C = (A + B) || C;
+        //TODO not working:
+        //       C = (A + B) || abs(A);
+        std::cout << "C =  (A + B) || abs(A)" << std::endl;
+        C.print();
+
+    }
 #endif
 }
 
@@ -322,204 +322,204 @@ void step42::CUDADriver::complex_tests()
 {
     std::cout<<"Entering tests for complex number array exptessions."<<std::endl;
 #ifndef nUSE_ARRAY_EXPRESSIONS
-     const unsigned int n_rows = 4;
-     const unsigned int n_cols = 4;
-     const unsigned int n_elements = n_rows * n_cols;
+    const unsigned int n_rows = 4;
+    const unsigned int n_cols = 4;
+    const unsigned int n_elements = n_rows * n_cols;
 
-     SciPAL::CudaComplex<Number> alpha(1.1);
-     SciPAL::CudaComplex<Number> beta (2.);
+    SciPAL::CudaComplex<Number> alpha(1.1);
+    SciPAL::CudaComplex<Number> beta (2.);
 
-     std::vector<SciPAL::CudaComplex<Number> >
-                a(n_elements, 1.),
-                b(n_elements, SciPAL::CudaComplex<Number>(2., 2.0)),
-                c(n_elements);
-     std::iota(c.begin(), c.end(), 1);
-
-
-     for (unsigned int i = 0; i < a.size(); i++ )
-         a[i] = std::complex<Number>(i+1, (i+1)/2.); //generate some inputs
-
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> //vA, vB, vC;
-//       vA = a;
-//       vB = b;
-//       vC = a;
-               vA( a),
-               vB( b),
-               vC( a);
-
-       std::cout << "vA : " << std::endl;
-       vA.print();
-
-       std::cout << "vB : " << std::endl;
-       vB.print();
-
-       std::cout << " ============ vC = " << alpha.real() << " * vA ======" << std::endl;
-       vC = alpha * vA;
-         std::cout << "vC : " << std::endl;
-       vC.print();
-
-       std::cout << " ============ vC = " << alpha.real() << " * vA + vB ======" << std::endl;
-       vC = alpha * vA + vB;
-         std::cout << "vC : " << std::endl;
-       vC.print();
-
-       std::cout << " ============ vA = sin(vC) ======" << std::endl;
-       const unsigned int n_sin_elements = n_elements;
-        std::vector<SciPAL::CudaComplex<Number> > d(n_sin_elements);
-       for(uint i = 0; i < d.size(); i++)
-           d[i] = SciPAL::CudaComplex<Number>(i* 2.* M_PI / d.size(), i* 4.* M_PI / d.size()) ;
-
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vD; vD = d; //(n_sin_elements, 1, d);
-      vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
-         std::cout << "sin(vD) : " << std::endl;
-       vD.print();
-       //vC = alpha * sin(vA) + vB;
-
-       std::cout << " ============ linear combination test ======" << std::endl;
-
-       //This does not work : vC = 2.0 * vA; because of mismatching type.
-       // Thus we hav to use numbers wrapped in CudaComplexes
-       vC = beta * vA; ;
-       std::cout << "vC = 2.0 * vA" << std::endl;
-       vC.print();
+    std::vector<SciPAL::CudaComplex<Number> >
+            a(n_elements, 1.),
+            b(n_elements, SciPAL::CudaComplex<Number>(2., 2.0)),
+            c(n_elements);
+    std::iota(c.begin(), c.end(), 1);
 
 
-       vC = vA + vB;
-       std::cout << "vC = vA + vB" << std::endl;
-       vC.print();
+    for (unsigned int i = 0; i < a.size(); i++ )
+        a[i] = std::complex<Number>(i+1, (i+1)/2.); //generate some inputs
+
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> //vA, vB, vC;
+            //       vA = a;
+            //       vB = b;
+            //       vC = a;
+            vA( a),
+            vB( b),
+            vC( a);
+
+    std::cout << "vA : " << std::endl;
+    vA.print();
+
+    std::cout << "vB : " << std::endl;
+    vB.print();
+
+    std::cout << " ============ vC = " << alpha.real() << " * vA ======" << std::endl;
+    vC = alpha * vA;
+    std::cout << "vC : " << std::endl;
+    vC.print();
+
+    std::cout << " ============ vC = " << alpha.real() << " * vA + vB ======" << std::endl;
+    vC = alpha * vA + vB;
+    std::cout << "vC : " << std::endl;
+    vC.print();
+
+    std::cout << " ============ vA = sin(vC) ======" << std::endl;
+    const unsigned int n_sin_elements = n_elements;
+    std::vector<SciPAL::CudaComplex<Number> > d(n_sin_elements);
+    for(uint i = 0; i < d.size(); i++)
+        d[i] = SciPAL::CudaComplex<Number>(i* 2.* M_PI / d.size(), i* 4.* M_PI / d.size()) ;
+
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vD; vD = d; //(n_sin_elements, 1, d);
+    vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
+    std::cout << "sin(vD) : " << std::endl;
+    vD.print();
+    //vC = alpha * sin(vA) + vB;
+
+    std::cout << " ============ linear combination test ======" << std::endl;
+
+    //This does not work : vC = 2.0 * vA; because of mismatching type.
+    // Thus we hav to use numbers wrapped in CudaComplexes
+    vC = beta * vA; ;
+    std::cout << "vC = 2.0 * vA" << std::endl;
+    vC.print();
 
 
-       vC = vA + beta * vB;
-       std::cout << "vC = vA + 2.0 * vB" << std::endl;
-       vC.print();
-
-       vC = cplxNumber(2.0) * vA + cplxNumber(3.0) * vB;
-       std::cout << "vC = 2.0 * vA + 3.0 * vB" << std::endl;
-       vC.print();
-
-       //combined expr test
-       vC =sin(cplxNumber(2.0) * vA + cplxNumber(3.0) * vB);
-       std::cout << "vC = sin(2.0 * vA + 3.0 * vB)" << std::endl;
-       vC.print();
-
-       //test pointwise sqrt
-       vC = sqrt(vC);
-       std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
-       vC.print();
-
-//       //test pointwise *
-//       vC = vA && vB;
-//       std::cout << "vC = vA .* vB" << std::endl;
-//       vC.print();
-
-//       //test pointwise /
-//       vC = vA || vB;
-//       std::cout << "vC = vA ./ vB" << std::endl;
-//       vC.print();
-
-//       //combined expr test
-//       vC = (vA + vB) || (vA - vB);
-//       std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
-//       vC.print();
-
-       //combined expr test
-//       vC =abs(cos(2.0 * vA + 3.0 * vB));
-//       std::cout << "vC = abs(cos(2.0 * vA + 3.0 * vB)" << std::endl;
-//       vC.print();
-
-       std::cout << " ============ matrix test ======" << std::endl;
-{       std::cout << " ============ Matrix A = sin(A) ======" << std::endl;
-       // After the element-wise sine of a vector we do the same for a matrix.
-       SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW> A(n_rows, n_cols, c);
-       SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW> B(n_rows, n_cols, b);
-       SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW> C(n_rows, n_cols);
-
-       std::vector<Number> tmp(n_elements);
-       std::iota(tmp.begin(), tmp.end(), 1);
-       SciPAL::Matrix<Number, BW> D(n_rows, n_cols, tmp);
-       SciPAL::Matrix<Number, BW> E(n_rows, n_cols, tmp);
+    vC = vA + vB;
+    std::cout << "vC = vA + vB" << std::endl;
+    vC.print();
 
 
-       std::cout << " A =" << std::endl;
+    vC = vA + beta * vB;
+    std::cout << "vC = vA + 2.0 * vB" << std::endl;
+    vC.print();
 
-       A.print();
-       std::cout << " B =" << std::endl;
-       B.print();
-       std::cout << " C =" << std::endl;
-       C.print();
-       std::cout << " D =" << std::endl;
-       D.print();
-       std::cout << " E =" << std::endl;
-       E.print();
+    vC = cplxNumber(2.0) * vA + cplxNumber(3.0) * vB;
+    std::cout << "vC = 2.0 * vA + 3.0 * vB" << std::endl;
+    vC.print();
 
-       C = abs(A);
-       std::cout << "C = abs(A)" << std::endl;
-       C.print();
+    //combined expr test
+    vC =sin(cplxNumber(2.0) * vA + cplxNumber(3.0) * vB);
+    std::cout << "vC = sin(2.0 * vA + 3.0 * vB)" << std::endl;
+    vC.print();
 
-       //test pointwise * on same matrix
-       C = C && C;
-       std::cout << "C = C .* C" << std::endl;
-       C.print();
+    //test pointwise sqrt
+    vC = sqrt(vC);
+    std::cout << "sqrt(sin(2.0 * vA + 3.0 * vB))" << std::endl;
+    vC.print();
 
-       //test pointwise *
-       C = A && B;
-       std::cout << "C = A .* B" << std::endl;
-       C.print();
+    //       //test pointwise *
+    //       vC = vA && vB;
+    //       std::cout << "vC = vA .* vB" << std::endl;
+    //       vC.print();
 
-       //test && for mixed numbertypes
-//       C = B && D;
-       std::cout << "totally wrong: mixed numbertypes: C = A && D;" << std::endl;
-       C.print();
+    //       //test pointwise /
+    //       vC = vA || vB;
+    //       std::cout << "vC = vA ./ vB" << std::endl;
+    //       vC.print();
+
+    //       //combined expr test
+    //       vC = (vA + vB) || (vA - vB);
+    //       std::cout << "vC = (vA + vB) || (vA - vB)" << std::endl;
+    //       vC.print();
+
+    //combined expr test
+    //       vC =abs(cos(2.0 * vA + 3.0 * vB));
+    //       std::cout << "vC = abs(cos(2.0 * vA + 3.0 * vB)" << std::endl;
+    //       vC.print();
+
+    std::cout << " ============ matrix test ======" << std::endl;
+    {       std::cout << " ============ Matrix A = sin(A) ======" << std::endl;
+        // After the element-wise sine of a vector we do the same for a matrix.
+        SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW> A(n_rows, n_cols, c);
+        SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW> B(n_rows, n_cols, b);
+        SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW> C(n_rows, n_cols);
+
+        std::vector<Number> tmp(n_elements);
+        std::iota(tmp.begin(), tmp.end(), 1);
+        SciPAL::Matrix<Number, BW> D(n_rows, n_cols, tmp);
+        SciPAL::Matrix<Number, BW> E(n_rows, n_cols, tmp);
 
 
-       //test pointwise /
-       C = A || B;
-       std::cout << "C = A ./ B" << std::endl;
-       C.print();
+        std::cout << " A =" << std::endl;
 
-       //concatuated expr test
-       C = (A + B) || (A - B);
-       std::cout << "C = (A + B) || (A - B)" << std::endl;
-       C.print();
+        A.print();
+        std::cout << " B =" << std::endl;
+        B.print();
+        std::cout << " C =" << std::endl;
+        C.print();
+        std::cout << " D =" << std::endl;
+        D.print();
+        std::cout << " E =" << std::endl;
+        E.print();
 
-       //combined bin-un-expr test
-       D = abs(A);
-//       C = (B || D) && D;
-       std::cout << "C = (B || abs(A)) && abs(A);" << std::endl;
-       C.print();
+        C = abs(A);
+        std::cout << "C = abs(A)" << std::endl;
+        C.print();
 
-       std::cout << "D = abs(C)" << std::endl;
-       D = abs(C);
-       D.print();
+        //test pointwise * on same matrix
+        C = C && C;
+        std::cout << "C = C .* C" << std::endl;
+        C.print();
 
-       //combined bin-un-expr test
-       D = abs(B);
-//       B = (B || D) && E ;
-       std::cout << "fails horribly: B = (B || abs(B)) && E;" << std::endl;
-       B.print();
+        //test pointwise *
+        C = A && B;
+        std::cout << "C = A .* B" << std::endl;
+        C.print();
 
-       std::cout << "D = abs(B)" << std::endl;
-       D = abs(B);
-       D.print();
+        //test && for mixed numbertypes
+        //       C = B && D;
+        std::cout << "totally wrong: mixed numbertypes: C = A && D;" << std::endl;
+        C.print();
 
-       std::cout << " ============ Matrix B = sqrt(A) ======" << std::endl;
-       // After the element-wise sine of a vector we do the same for a matrix.
-       B = sqrt(A);
-       B.print();
 
-       std::cout << " ============ Matrix A = .exp(B) ======" << std::endl;
-       // After the element-wise sine of a vector we do the same for a matrix.
-//       SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW>
-//               A(B);
-       A = exp(B);
-       A.print();
+        //test pointwise /
+        C = A || B;
+        std::cout << "C = A ./ B" << std::endl;
+        C.print();
 
-       std::cout << " ============ Matrix A = B*C ======" << std::endl;
-       // After the element-wise sine of a vector we do the same for a matrix.
+        //concatuated expr test
+        C = (A + B) || (A - B);
+        std::cout << "C = (A + B) || (A - B)" << std::endl;
+        C.print();
 
-       A = B*C;
-       A.print();
-}
+        //combined bin-un-expr test
+        D = abs(A);
+        //       C = (B || D) && D;
+        std::cout << "C = (B || abs(A)) && abs(A);" << std::endl;
+        C.print();
+
+        std::cout << "D = abs(C)" << std::endl;
+        D = abs(C);
+        D.print();
+
+        //combined bin-un-expr test
+        D = abs(B);
+        //       B = (B || D) && E ;
+        std::cout << "fails horribly: B = (B || abs(B)) && E;" << std::endl;
+        B.print();
+
+        std::cout << "D = abs(B)" << std::endl;
+        D = abs(B);
+        D.print();
+
+        std::cout << " ============ Matrix B = sqrt(A) ======" << std::endl;
+        // After the element-wise sine of a vector we do the same for a matrix.
+        B = sqrt(A);
+        B.print();
+
+        std::cout << " ============ Matrix A = .exp(B) ======" << std::endl;
+        // After the element-wise sine of a vector we do the same for a matrix.
+        //       SciPAL::Matrix<SciPAL::CudaComplex<Number>, BW>
+        //               A(B);
+        A = exp(B);
+        A.print();
+
+        std::cout << " ============ Matrix A = B*C ======" << std::endl;
+        // After the element-wise sine of a vector we do the same for a matrix.
+
+        A = B*C;
+        A.print();
+    }
 
 #endif
 }
@@ -538,39 +538,69 @@ void step42::CUDADriver::feature_demonstration()
 
     SciPAL::Vector<Number*, cublas> d_testV(5);
 
- d_testV = h_testV;
- d_testV.print();
+    d_testV = h_testV;
+    d_testV.print();
 
 
- std::cout<<"Test arbitrary copy directions"<<std::endl;
- SciPAL::Matrix<Number, blas> M1(2,2);
- M1(0,0,1.); M1(0,1,2.);
- M1(1,0,3.); M1(1,1,4.);
+    {
+        std::cout<<"Test arbitrary copy directions real type"<<std::endl;
+        SciPAL::Matrix<Number, blas> M1(2,2);
+        M1(0,0,1.); M1(0,1,2.);
+        M1(1,0,3.); M1(1,1,4.);
 
- std::cout<<"Matrix on host\n M1:"<<std::endl;
-M1.print();
+        std::cout<<"Matrix on host\n M1:"<<std::endl;
+        M1.print();
 
- SciPAL::Matrix<Number, blas> M2(2,2);
- std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
- M2 = M1;
- M2.print();
+        SciPAL::Matrix<Number, blas> M2(2,2);
+        std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
+        M2 = M1;
+        M2.print();
 
- SciPAL::Matrix<Number, cublas> M3(2,2);
- std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
- M3 = M2;
- M3.print();
+        SciPAL::Matrix<Number, cublas> M3(2,2);
+        std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
+        M3 = M2;
+        M3.print();
 
- SciPAL::Matrix<Number, cublas> M4(2,2);
- std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
- M4 = M3;
- M4.print();
+        SciPAL::Matrix<Number, cublas> M4(2,2);
+        std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
+        M4 = M3;
+        M4.print();
 
- SciPAL::Matrix<Number, blas> M5(2,2);
- std::cout<<"back on host\n M5=M4:"<<std::endl;
- M5 = M4;
- M5.print();
+        SciPAL::Matrix<Number, blas> M5(2,2);
+        std::cout<<"back on host\n M5=M4:"<<std::endl;
+        M5 = M4;
+        M5.print();
+    }
+    {//complex
+    std::cout<<"=====Test arbitrary copy directions complex type====="<<std::endl;
 
+    SciPAL::Matrix<cplxNumber, blas> M1(2,2);
+    M1(0,0,cplxNumber(1., 2)); M1(0,1,2.);
+    M1(1,0,3.); M1(1,1,cplxNumber(4., 5));
 
+    std::cout<<"Matrix on host\n M1:"<<std::endl;
+    M1.print();
+
+    SciPAL::Matrix<cplxNumber, blas> M2(2,2);
+    std::cout<<"Other Matrix on host\n M2=M1:"<<std::endl;
+    M2 = M1;
+    M2.print();
+
+    SciPAL::Matrix<cplxNumber, cublas> M3(2,2);
+    std::cout<<" Matrix on GPU\n M3=M2:"<<std::endl;
+    M3 = M2;
+    M3.print();
+
+    SciPAL::Matrix<cplxNumber, cublas> M4(2,2);
+    std::cout<<"Other Matrix on GPU\n M4=M3:"<<std::endl;
+    M4 = M3;
+    M4.print();
+
+    SciPAL::Matrix<cplxNumber, blas> M5(2,2);
+    std::cout<<"back on host\n M5=M4:"<<std::endl;
+    M5 = M4;
+    M5.print();
+    }
 
 
 
@@ -578,83 +608,83 @@ M1.print();
 
 void step42::CUDADriver::lin_combo(){
     std::cout<<"\n\nEntering tests for complex number array exptessions."<<std::endl;
-     const unsigned int n_rows = 4;
-     const unsigned int n_cols = 4;
-     const unsigned int n_elements = n_rows * n_cols;
+    const unsigned int n_rows = 4;
+    const unsigned int n_cols = 4;
+    const unsigned int n_elements = n_rows * n_cols;
 
-     SciPAL::CudaComplex<Number> alpha(1.1);
-     SciPAL::CudaComplex<Number> beta (2.);
+    SciPAL::CudaComplex<Number> alpha(1.1);
+    SciPAL::CudaComplex<Number> beta (2.);
 
-     std::vector<SciPAL::CudaComplex<Number> >
-                a(n_elements, 1.),
-                b(n_elements, std::complex<Number>(2., 2.0));
-
-
-     for (unsigned int i = 0; i < a.size(); i++ )
-         a[i] = SciPAL::CudaComplex<Number>(i+1, (i+1)/2.); //generate some inputs
-
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vA(n_elements), vB, vC;
-       vA = a;
-       vB = b;
-       vC = a;
-//               vA(n_elements, 1, a),
-//               vB(n_elements, 1, b),
-//               vC(n_elements, 1, a);
-
-       std::cout << "vA : " << std::endl;
-       vA.print();
-
-       std::cout << "vB : " << std::endl;
-       vB.print();
-
-       std::cout << " ============ vC = " << alpha.real() << " * vA ======" << std::endl;
-       vC = alpha * vA;
-         std::cout << "vC : " << std::endl;
-       vC.print();
-
-       std::cout << " ============ vC = " << alpha.real() << " * vA + vB ======" << std::endl;
-       vC = alpha * vA + vB;
-         std::cout << "vC : " << std::endl;
-       vC.print();
-
-       std::cout << " ============ vA = sin(vC) ======" << std::endl;
-       const unsigned int n_sin_elements = n_elements;
-        std::vector<SciPAL::CudaComplex<Number> > d(n_sin_elements);
-       for(uint i = 0; i < d.size(); i++)
-           d[i] = std::complex<Number>(i* 2.* M_PI / d.size(), i* 4.* M_PI / d.size()) ;
-
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vD; vD = d; //(n_sin_elements, 1, d);
-      vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
-         std::cout << "sin(vD) : " << std::endl;
-       vD.print();
-       //vC = alpha * sin(vA) + vB;
+    std::vector<SciPAL::CudaComplex<Number> >
+            a(n_elements, 1.),
+            b(n_elements, std::complex<Number>(2., 2.0));
 
 
-       std::cout << " ============ linear combination test ======" << std::endl;
+    for (unsigned int i = 0; i < a.size(); i++ )
+        a[i] = SciPAL::CudaComplex<Number>(i+1, (i+1)/2.); //generate some inputs
 
-       //This does not work : vC = 2.0 * vA; because of mismatching type.
-       // Thus we hav to use numbers wrapped in CudaComplexes
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vE(n_elements);
-       vE = beta * vA; ;
-       std::cout << "vE = 2.0 * vA" << std::endl;
-       vE.print();
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vA(n_elements), vB, vC;
+    vA = a;
+    vB = b;
+    vC = a;
+    //               vA(n_elements, 1, a),
+    //               vB(n_elements, 1, b),
+    //               vC(n_elements, 1, a);
 
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vF(n_elements);
-       vF = vA + vB;
-       std::cout << "vC = vA + vB" << std::endl;
-       vC.print();
+    std::cout << "vA : " << std::endl;
+    vA.print();
+
+    std::cout << "vB : " << std::endl;
+    vB.print();
+
+    std::cout << " ============ vC = " << alpha.real() << " * vA ======" << std::endl;
+    vC = alpha * vA;
+    std::cout << "vC : " << std::endl;
+    vC.print();
+
+    std::cout << " ============ vC = " << alpha.real() << " * vA + vB ======" << std::endl;
+    vC = alpha * vA + vB;
+    std::cout << "vC : " << std::endl;
+    vC.print();
+
+    std::cout << " ============ vA = sin(vC) ======" << std::endl;
+    const unsigned int n_sin_elements = n_elements;
+    std::vector<SciPAL::CudaComplex<Number> > d(n_sin_elements);
+    for(uint i = 0; i < d.size(); i++)
+        d[i] = std::complex<Number>(i* 2.* M_PI / d.size(), i* 4.* M_PI / d.size()) ;
+
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vD; vD = d; //(n_sin_elements, 1, d);
+    vD = sin(vD); // For this to work the device-side apply() function has to be explicitly specialized.
+    std::cout << "sin(vD) : " << std::endl;
+    vD.print();
+    //vC = alpha * sin(vA) + vB;
 
 
-       SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vG(n_elements);
-       vG = alpha*vA + beta*vB +alpha*vC + cplxNumber(3.0)*vD + alpha*vE + cplxNumber(4.0)*vF;
-       vG.print();
+    std::cout << " ============ linear combination test ======" << std::endl;
+
+    //This does not work : vC = 2.0 * vA; because of mismatching type.
+    // Thus we hav to use numbers wrapped in CudaComplexes
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vE(n_elements);
+    vE = beta * vA; ;
+    std::cout << "vE = 2.0 * vA" << std::endl;
+    vE.print();
+
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vF(n_elements);
+    vF = vA + vB;
+    std::cout << "vC = vA + vB" << std::endl;
+    vC.print();
+
+
+    SciPAL::Vector<SciPAL::CudaComplex<Number>, BW> vG(n_elements);
+    vG = alpha*vA + beta*vB +alpha*vC + cplxNumber(3.0)*vD + alpha*vE + cplxNumber(4.0)*vF;
+    vG.print();
 
 
 
 }
 
 void step42::CUDADriver::views(){
-std::cout<<"entering tests for Views"<<std::endl;
+    std::cout<<"entering tests for Views"<<std::endl;
     // some dummy vectors
     const unsigned int n_rows = 4;
     const unsigned int n_cols = 4;
@@ -692,36 +722,36 @@ std::cout<<"entering tests for Views"<<std::endl;
 }
 
 void step42::CUDADriver::operator_precedence(){
-const unsigned int n_rows = 2;
-const unsigned int n_cols = 2;
-const unsigned int n_elements = n_rows * n_cols;
+    const unsigned int n_rows = 2;
+    const unsigned int n_cols = 2;
+    const unsigned int n_elements = n_rows * n_cols;
 
-Number alpha = 1.1;
-Number beta = 2.;
+    Number alpha = 1.1;
+    Number beta = 2.;
 
-std::vector<Number>
-           a(n_elements, 1.),
-           b(n_elements, 2.);
-
-
-for (unsigned int i = 0; i < a.size(); i++ )
-    a[i] = i+1;
-
-SciPAL::Vector<Number, BW> vA, vB(n_elements), vC, vD(n_elements);
-  vA = a;
-  // This sets all elements of vB to 2.3, note: vector needs to be initialized.
-  vB = SciPAL::Literal<Number>(2.3);
-  vC = a;
+    std::vector<Number>
+            a(n_elements, 1.),
+            b(n_elements, 2.);
 
 
-  std::cout << "vA : " << std::endl;
-  vA.print();
+    for (unsigned int i = 0; i < a.size(); i++ )
+        a[i] = i+1;
 
-  std::cout << "vB : " << std::endl;
-  vB.print();
+    SciPAL::Vector<Number, BW> vA, vB(n_elements), vC, vD(n_elements);
+    vA = a;
+    // This sets all elements of vB to 2.3, note: vector needs to be initialized.
+    vB = SciPAL::Literal<Number>(2.3);
+    vC = a;
 
-  std::cout << "vC : " << std::endl;
-  vC.print();
+
+    std::cout << "vA : " << std::endl;
+    vA.print();
+
+    std::cout << "vB : " << std::endl;
+    vB.print();
+
+    std::cout << "vC : " << std::endl;
+    vC.print();
 
     std::cout << "vD = (vA && vB ) + vC" << std::endl;
     vD = (vA && vB ) + vC;
@@ -738,7 +768,7 @@ SciPAL::Vector<Number, BW> vA, vB(n_elements), vC, vD(n_elements);
     std::cout << std::endl;
 
     std::cout << "vD = vC + (vA && vB)" << std::endl;
-   vD = vC + vA * vB;
+    vD = vC + vA * vB;
     vD.print();
 
     SciPAL::Literal<Number> test(0);
@@ -751,122 +781,122 @@ void step42::CUDADriver::stacks_of_LAOs(){
     const unsigned int n_rows = 4;
     const unsigned int n_cols = 4;
     const unsigned int n_elements = n_rows * n_cols;
-//  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{
-    std::cout <<" Stack of vector test with real numbers\n";
-    typedef Number test_nmbr;
-    typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
-    std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
-    for(auto &i : h_test)
-        std::iota(i.begin(), i.end(), 1);
+    //  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    {
+        std::cout <<" Stack of vector test with real numbers\n";
+        typedef Number test_nmbr;
+        typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
+        std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
+        for(auto &i : h_test)
+            std::iota(i.begin(), i.end(), 1);
 
-    std::vector<SciPAL::Vector<test_nmbr, BW> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
+        std::vector<SciPAL::Vector<test_nmbr, BW> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
 
-    //element wise copy works
-    for(uint ii=0; ii<h_test.size(); ii++)
-        d_test[ii] = h_test[ii];
+        //element wise copy works
+        for(uint ii=0; ii<h_test.size(); ii++)
+            d_test[ii] = h_test[ii];
 
-    //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
-//    d_test = h_test;
+        //or copy whole stacks. note: this converts the std::vector in a SciPAL::Vector
+        //    d_test = h_test;
 
-    std::cout<<"initialization \n";
-    d_test[0].print();
-    d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1];
-    std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-    d_test[2].print();
-}
-////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//     {
-//        std::cout <<" Stack of vector test with cplx numbers\n";
-//        typedef cplxNumber test_nmbr;
-//        typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
-//        std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
-//        for(auto &i : h_test)
-//            std::iota(i.begin(), i.end(), 1);
+        std::cout<<"initialization \n";
+        d_test[0].print();
+        d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1];
+        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+        d_test[2].print();
+    }
+    ////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    //     {
+    //        std::cout <<" Stack of vector test with cplx numbers\n";
+    //        typedef cplxNumber test_nmbr;
+    //        typedef SciPAL::Vector<test_nmbr, BW> test_LAO;
+    //        std::vector<std::vector<test_nmbr>> h_test(3, std::vector<test_nmbr>(n_elements));
+    //        for(auto &i : h_test)
+    //            std::iota(i.begin(), i.end(), 1);
 
-//        SciPAL::Stack<test_LAO> d_test(3, 1);
+    //        SciPAL::Stack<test_LAO> d_test(3, 1);
 
-//        d_test = h_test;
+    //        d_test = h_test;
 
-//        std::cout<<"initialization \n";
-//        d_test[0].print();
-//        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-//        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-//        d_test[2].print();
-//    }
+    //        std::cout<<"initialization \n";
+    //        d_test[0].print();
+    //        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+    //        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+    //        d_test[2].print();
+    //    }
 
-////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//     {
-//        std::cout <<" Stack of mtx test with real numbers\n";
-//        typedef Number test_nmbr;
-//        typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
-//        typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
+    ////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    //     {
+    //        std::cout <<" Stack of mtx test with real numbers\n";
+    //        typedef Number test_nmbr;
+    //        typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
+    //        typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
 
-//        std::vector<test_nmbr> a(n_elements);
+    //        std::vector<test_nmbr> a(n_elements);
 
-//        std::iota(a.begin(), a.end(), 2);
+    //        std::iota(a.begin(), a.end(), 2);
 
-//        test_LAO_h host_init_mtx(n_rows, n_cols, a);
-//        std::cout<<"host init mtx \n";
-//        host_init_mtx.print();
+    //        test_LAO_h host_init_mtx(n_rows, n_cols, a);
+    //        std::cout<<"host init mtx \n";
+    //        host_init_mtx.print();
 
-//        //this is some how ugly how we have to create the stack of mtx on the host
-//        std::vector<test_LAO_h> h_test(3);
+    //        //this is some how ugly how we have to create the stack of mtx on the host
+    //        std::vector<test_LAO_h> h_test(3);
 
-//        for(uint ii = 0; ii< h_test.size(); ii++)
-//            h_test[ii] = host_init_mtx;
+    //        for(uint ii = 0; ii< h_test.size(); ii++)
+    //            h_test[ii] = host_init_mtx;
 
-//        SciPAL::Stack<test_LAO> d_test(3,1);
-//        d_test = h_test;
+    //        SciPAL::Stack<test_LAO> d_test(3,1);
+    //        d_test = h_test;
 
-//        std::cout<<"host initialization \n";
-//        h_test[0].print();
+    //        std::cout<<"host initialization \n";
+    //        h_test[0].print();
 
-//        std::cout<<"initialization \n";
-//        d_test[0].print();
-//        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-//        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-//        d_test[2].print();
-//    }
+    //        std::cout<<"initialization \n";
+    //        d_test[0].print();
+    //        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+    //        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+    //        d_test[2].print();
+    //    }
 
-////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//         {
-//            std::cout <<" Stack of mtx test with cplx numbers\n";
-//            typedef cplxNumber test_nmbr;
-//            typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
-//            typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
+    ////  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    //         {
+    //            std::cout <<" Stack of mtx test with cplx numbers\n";
+    //            typedef cplxNumber test_nmbr;
+    //            typedef SciPAL::Matrix<test_nmbr, BW> test_LAO;
+    //            typedef SciPAL::Matrix<test_nmbr, blas> test_LAO_h;
 
-//            std::vector<test_nmbr> a(n_elements);
+    //            std::vector<test_nmbr> a(n_elements);
 
-//            std::iota(a.begin(), a.end(), 2);
+    //            std::iota(a.begin(), a.end(), 2);
 
-//            test_LAO_h host_init_mtx(n_rows, n_cols, a);
-//            std::cout<<"host init mtx \n";
-//            host_init_mtx.print();
+    //            test_LAO_h host_init_mtx(n_rows, n_cols, a);
+    //            std::cout<<"host init mtx \n";
+    //            host_init_mtx.print();
 
-//            //this is some how ugly how we have to create the stack of mtx on the host
-//            std::vector<test_LAO_h> h_test(3);
+    //            //this is some how ugly how we have to create the stack of mtx on the host
+    //            std::vector<test_LAO_h> h_test(3);
 
-//            for(uint ii = 0; ii< h_test.size(); ii++)
-//                h_test[ii] = host_init_mtx;
+    //            for(uint ii = 0; ii< h_test.size(); ii++)
+    //                h_test[ii] = host_init_mtx;
 
-//            //in this case we CAN NOT write SciPAL::Stack<test_LAO> d_test(3,1);
-//            //as for the real case, because internally this maps to a construction
-//            //of a dealii::Identity matrix, which is sadly not defined for SciPAL's
-//            //complex numbers. The usage of this constructor becomes only a problem
-//            //if we try to copy uninitialized Stack elements.
-//            SciPAL::Stack<test_LAO> d_test;
-//            d_test = h_test;
+    //            //in this case we CAN NOT write SciPAL::Stack<test_LAO> d_test(3,1);
+    //            //as for the real case, because internally this maps to a construction
+    //            //of a dealii::Identity matrix, which is sadly not defined for SciPAL's
+    //            //complex numbers. The usage of this constructor becomes only a problem
+    //            //if we try to copy uninitialized Stack elements.
+    //            SciPAL::Stack<test_LAO> d_test;
+    //            d_test = h_test;
 
-//            std::cout<<"host initialization \n";
-//            h_test[0].print();
+    //            std::cout<<"host initialization \n";
+    //            h_test[0].print();
 
-//            std::cout<<"initialization \n";
-//            d_test[0].print();
-//            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
-//            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
-//            d_test[2].print();
-//        }
+    //            std::cout<<"initialization \n";
+    //            d_test[0].print();
+    //            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+    //            std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
+    //            d_test[2].print();
+    //        }
 }
 
 #endif //CUDA_DRIVER

@@ -59,18 +59,11 @@ public:
     //! Return the number of elements this array currently has.
     int n_elements() const { return __n; }
 
-    //! @param other: Array to copy.
-    Array<T, BW> & operator = (const Array<T, BW>& other);
-
 protected:
     //! The number of elements this array currently has. By having it in this class
     //! we do not have to put it again and again into the Data classes provided by the different blas wrappers.
     size_t __n;
 
-
-    //! To avoid undesired side effects the copy constructor is made private.
-    //! If gets accidentally used the compiler will throw an error message.
-    Array(const Array<T, BW>& other) {}
 
     //! The swap function exchanges the attributes of two arrays.
     //! Internally, only the data pointers are exchanged.
@@ -82,6 +75,15 @@ protected:
 
     //! Read-Write access to the data of the base class.
     Base& base() { return *this; }
+
+private:
+    //! To avoid undesired side effects the copy constructor is made private.
+    //! If gets accidentally used the compiler will throw an error message.
+    Array(const Array<T, BW>& other) {}
+
+    //! @param other: Array to copy.
+    Array<T, BW> & operator = (const Array<T, BW>& other);
+
 
 };
 

@@ -20,7 +20,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef CUDA_DRIVER_STEP_42_HH
 #define CUDA_DRIVER_STEP_42_HH
 
-
+#include<numeric>
 // The declaration of the interface to the CUDA-backend
 // is contained in the following header.
 #include <cuda_driver_step-42.h>

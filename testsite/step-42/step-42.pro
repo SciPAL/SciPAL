@@ -77,7 +77,7 @@ message("step home :" $$STEP_PARENT_DIR)
     # and here for the gcc
 INCLUDEPATH += . ..
 
-#put here your non standard libs
+#put here your non-standard libs
 LIBS +=
 
    # The PRAK variable is used inside scipal_conf.pro.
@@ -122,6 +122,6 @@ HEADERS += \
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator
    # which are not subject to compilation.
-OTHER_FILES = doxygen_filelist\
+OTHER_FILES += doxygen_filelist\
                 doc/*.dox
 

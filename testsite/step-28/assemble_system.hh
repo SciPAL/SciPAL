@@ -436,7 +436,10 @@ void DRSProblem<dim>::assemble_system_generic (uint cycle, step27::Architecture 
                     iteration_timer.restart();
 
 
-                    // Run the unchanged CPU implementation.
+                    // At this point we finally have reached a face which contributes
+                    // to the BEM part of the problem. Depending on the @p arch tag
+                    // this function executes the assembly either on the CPU or
+                    // using CUDA on the GPU.
                     this->bem_form->assemble_sl_dl(cell, f,
                                                    fem_bem.DL_matrix,
                                                    this->matrices.fm(MtxInfo::SLFullMatrix), // fem_bem.SL_matrix
@@ -478,25 +481,7 @@ void DRSProblem<dim>::assemble_system_generic (uint cycle, step27::Architecture 
 
     } // cell loop
 
-#ifdef BEM_DEBUG
-    printf("HALLO SL_MATRIX:\n");
-    this->matrices.fm(MtxInfo::SLFullMatrix).print_formatted(std::cout,
-                                      12, // const unsigned int 	precision = 3,
-                                      false, // const bool 	scientific = true,
-                                      0, // const unsigned int 	width = 0,
-                                      " * ", // const char * 	zero_string = " ",
-                                      1., //const double 	denominator = 1.,
-                                      0.); // const double 	threshold = 0.);
 
-    printf("HALLO DL_MATRIX:\n");
-    fem_bem.DL_matrix.print_formatted(std::cout,
-                                      12, // const unsigned int 	precision = 3,
-                                      false, // const bool 	scientific = true,
-                                      0, // const unsigned int 	width = 0,
-                                      " * ", // const char * 	zero_string = " ",
-                                      1., //const double 	denominator = 1.,
-                                      0.); // const double 	threshold = 0.);
-#endif
     // cell loop ended, so we save the total time needed for that
     timer.average_iteration_time += iteration_time;
     timer.iteration_counter += iteration_counter;
@@ -518,38 +503,6 @@ void DRSProblem<dim>::assemble_system_generic (uint cycle, step27::Architecture 
     // And lastly, write out the measured times together with important
     // problem size parameters
     timer.add_values_to_table(timing_table);
-
-    // FOR DEBUGGING:
-    //        FullMatrix<double> old_sl;
-    //        FullMatrix<double> old_dl;
-
-    //        old_sl.copy_from(fem_bem.SL_matrix);
-    //        old_dl.copy_from(fem_bem.DL_matrix);
-    //        setup_system ();
-    //        lsys.reinit(fem_bem.n_fem_dofs, bem_form->n_bc_dofs);
-    //        assemble_system_generic(0, step28::cuda);
-
-    //        old_sl.add(-1., fem_bem.SL_matrix);
-    //        old_dl.add(-1., fem_bem.DL_matrix);
-
-    //        printf("CONSISTENCY CHECK SL: %f\n", old_sl.frobenius_norm());
-    //        printf("CONSISTENCY CHECK DL: %f\n", old_dl.frobenius_norm());
-    //        old_sl.print_formatted(std::cout,
-    //                               3, // const unsigned int 	precision = 3,
-    //                               false, // const bool 	scientific = true,
-    //                               0, // const unsigned int 	width = 0,
-    //                               " * ", // const char * 	zero_string = " ",
-    //                               1., //const double 	denominator = 1.,
-    //                               0.); // const double 	threshold = 0.);
-    //        printf("CONSISTENCY CHECK DL:\n");
-    //        old_dl.print_formatted(std::cout,
-    //                               3, // const unsigned int 	precision = 3,
-    //                               false, // const bool 	scientific = true,
-    //                               0, // const unsigned int 	width = 0,
-    //                               " * ", // const char * 	zero_string = " ",
-    //                               1., //const double 	denominator = 1.,
-    //                               0.); // const double 	threshold = 0.);
-
 }
 
 
@@ -953,7 +906,7 @@ void DRSProblem<dim>::assemble_multigrid ()
                     // simple CPU implementation or  we want to both,
                     // i.e. CUDA and CPU for benchmarking purposes.
                     // At any rate, we have to run the unchanged CPU implementation.
-                    if (this->arch != step28::cuda)
+                    if (this->arch != step27::cuda)
                     {
 #ifdef USE_BEM_MG_PC
                         bem_form.assemble_SL_mg_preconditioner(cell, f, fem_bem.SL_mg_matrices[level]);

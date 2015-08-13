@@ -35,11 +35,16 @@ DEFINES += nUSE_CUDA_COMPLEX_VERSION
 DEFINES += "NUM_THREADS=512"
 DEFINES += "BLOCK_DIM_Y=4"
 
+#DEFINES += USE_STEP_32
+
 DEFINES += GPU_PART
+
+# enable the benchmarking of the GPU-based BEM assembly.
+DEFINES += BEM_DEBUG
 
     HOME = $$(HOME) # your home directory
     PRAK = $$_PRO_FILE_PWD_/../../ #$$HOME/cuda-2014/Praktikum_2013 # path to your copy of the lab course folder. Typically, this 2 levels above the source folder of your step-
-    SciPAL_DIR = $$PRAK/SciPAL
+    SciPAL_DIR = $$PRAK/
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/..
 
 message("SciPALs home :" $$SciPAL_DIR)
@@ -102,8 +107,9 @@ CUDA_CFLAGS += -rdc=true
 
 # Enter project specific source and header files here
 SOURCES = \
-    cuda_kernel_step-28.cu step-28.cpp
-#\
+  cuda_kernel_step-28.cu \
+step-28.cpp
+
  #   SimParams.cpp
 
 # add source files from other steps
@@ -118,13 +124,12 @@ HEADERS = \
     cuda_driver_step-28.hh \
     cuda_kernel_wrapper_step-28.cu.h \
     cuda_kernel_step-28.cu.c \
-    Architecture.h \
     drs_simulation.hh \
     assemble_system.hh \
-    cuda_utils.cu.h \
-    cuda_utils.cu.c \
     timing.h \
-    coupling_type.h
+    coupling_type.h \
+    cuda_utils.cu.h \
+    cuda_utils.cu.c
 
 #\UnitTestProblemData.hh \
 #    ../step-27/BoundaryDoFTools.hh \

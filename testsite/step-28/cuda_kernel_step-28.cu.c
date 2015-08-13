@@ -1,3 +1,6 @@
+#ifndef CUDA_KERNEL_STEP_28_CU_C
+#define CUDA_KERNEL_STEP_28_CU_C
+
 // @sect3{File: cuda_kernel_step-28.cu.c}
 
 // Include the header containing the declarations of the kernel wrapper functions - not the kernels themselves.
@@ -8,7 +11,7 @@
 
 
 #include <step-28/cuda_utils.cu.h>
-#include <lac/release/ShapeData.h>
+#include <lac/ShapeData.h>
 
 // @sect5{Device Function: SL_to_DL}
 
@@ -38,9 +41,9 @@
 // @param SL_ij : value of the single layer operator, $\mathrel{\widehat{=}} V_{h,ij}$
 
 template<int dim>
-__device__ double SL_to_DL(const double *normal, const uint normal_size,
-                           const double *x, const uint x_size,
-                           const double *q, const uint q_size,
+__device__ double SL_to_DL(const double *normal, const unsigned int normal_size,
+                           const double *x, const unsigned int x_size,
+                           const double *q, const unsigned int q_size,
                            const double G_ia, const double SL_ij)
 {
     return scalardiff<dim>(normal, normal_size, x, x_size, q, q_size)*pow(G_ia,2)*SL_ij;
@@ -76,20 +79,22 @@ __assemble_bem_matrices_Po2(SciPAL::ShapeData<double> DL_matrix,
                             )
 {
     // Each thread gets one pair (i,a) to calculate.
-    const uint a = threadIdx.x;
-    const uint i = blockIdx.y * blockDim.y + threadIdx.y;
+    const unsigned int a = threadIdx.x;
+    const unsigned int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+
 
     // The index of the location in shard memory where we store
     // this thread's contributino to the sums.
-    const uint tidy_a_bDy = ColMajor_index_2D(threadIdx.y, a, blockDim.y);
+    const unsigned int tidy_a_bDy = ColMajor_index_2D(threadIdx.y, a, blockDim.y);
 
-    const uint n_support_points = x.n_rows/dim; // x.n_rows has to become n_...points
+    const unsigned int n_support_points = x.n_rows/dim; // x.n_rows has to become n_...points
 
-    const uint n_q_points = q.n_rows/dim;
+    const unsigned int n_q_points = q.n_rows/dim;
 
-    const uint n_normals = n.n_rows/dim;
+    const unsigned int n_normals = n.n_rows/dim;
 
-    const uint num_js = W.n_cols;
+    const unsigned int num_js = W.n_cols;
 
     // Next set pointers to the data that does not change during the execution of an instance of
     // the kernel.
@@ -111,7 +116,7 @@ __assemble_bem_matrices_Po2(SciPAL::ShapeData<double> DL_matrix,
                                     q_a, n_q_points);
 
     // For loop over j
-    for(uint j = 0; j < num_js; ++j){
+    for(unsigned int j = 0; j < num_js; ++j){
         // Each thread calculates 'its' single layer value
         double local_SL = G_ia * W.data_ptr[ColMajor_index_2D(a, j, W.n_rows)];
 
@@ -132,7 +137,7 @@ __assemble_bem_matrices_Po2(SciPAL::ShapeData<double> DL_matrix,
         for(int k = blockDim.x/2; k > 0; k /=2)
             if(a < k)
             {
-                uint ps_pos = ColMajor_index_2D(threadIdx.y, a + k, blockDim.y);
+                unsigned int ps_pos = ColMajor_index_2D(threadIdx.y, a + k, blockDim.y);
 
                 SL_sum[tidy_a_bDy] += SL_sum[ps_pos];
                 DL_sum[tidy_a_bDy] += DL_sum[ps_pos];
@@ -149,6 +154,7 @@ __assemble_bem_matrices_Po2(SciPAL::ShapeData<double> DL_matrix,
     }
 }
 
+#ifdef USE_NON_POWER_OF_TWO_KERNEL
 // @sect5{Kernel: __assemble_bem_matrices}
 //
 // Kernel to assemble the BEM-Matrices if the number of quadrature points
@@ -166,13 +172,13 @@ __assemble_bem_matrices(double * DL_matrix, double * SL_matrix,
                         )
 {
     // Each thread gets one i. a's are calculated in blocks of 4
-    uint i = blockDim.x * blockIdx.x + threadIdx.x;
-    uint local_i = threadIdx.x;
-    uint thread_a_offset = threadIdx.y;
+    unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    unsigned int local_i = threadIdx.x;
+    unsigned int thread_a_offset = threadIdx.y;
 
-    uint num_js = W_n_cols;
-    uint num_as = q_size;
-    uint num_is = x_size;
+    unsigned int num_js = W_n_cols;
+    unsigned int num_as = q_size;
+    unsigned int num_is = x_size;
 
 
     // Shared memory for the double layer and the single layer matrices
@@ -187,21 +193,21 @@ __assemble_bem_matrices(double * DL_matrix, double * SL_matrix,
 
     // First, precalculate the needed values of G_ia in each thread
     double G_i [NUM_THREADS/4];
-    uint ctr = 0;
-    for( uint a = 0; a < num_as; a += BLOCK_DIM_Y)
+    unsigned int ctr = 0;
+    for( unsigned int a = 0; a < num_as; a += BLOCK_DIM_Y)
         G_i[ctr++] = single_layer<dim>( (x + i), x_size,
                                         (q + a + thread_a_offset), q_size);
 
     double local_SL;
     // Loop over all j's
-    for( uint j = 0; j < num_js; ++j){
+    for( unsigned int j = 0; j < num_js; ++j){
         // Calculate a's in snippets of BLOCK_DIM_Y (=4)
         ctr = 0;
         // Initialize shared mem to zero:
         SL_sum[ColMajor_index_2D(local_i, thread_a_offset, blockDim.x)] = 0;
         DL_sum[ColMajor_index_2D(local_i, thread_a_offset, blockDim.x)] = 0;
 
-        for( uint a = 0; a < num_as; a += BLOCK_DIM_Y){
+        for( unsigned int a = 0; a < num_as; a += BLOCK_DIM_Y){
 
             local_SL =  G_i[ctr] * W[ColMajor_index_2D(a + thread_a_offset, j, W_n_rows)];
 
@@ -242,6 +248,7 @@ __assemble_bem_matrices(double * DL_matrix, double * SL_matrix,
         }
     }
 }
+#endif
 
 // @sect5{Wrapper Function: assemble_bem_matrices}
 
@@ -266,29 +273,32 @@ void step28::BEMKernels<dim>::assemble_bem_matrices(SciPAL::ShapeData<double> DL
                                                     const double * n, const int n_size,
                                                     const double * W, const int W_n_rows, const int W_n_cols*/)
 {
+    const unsigned int q_size = q.n_rows/dim;
 
-    const uint q_size = q.n_rows/dim;
-
-    const uint x_size = x.n_rows/dim;
+    const unsigned int x_size = x.n_rows/dim;
 
     if(q_size > NUM_THREADS){
         fprintf(stderr, "To be implemented: number of quad points (%d() > NUMTHREADS(%d)",
                 q_size, NUM_THREADS);
         return;
     }
-    //Range of i: 0--x_size-1 \n
-    //Range of j: 0--W_n_cols-1 \n
-    //Range of a: 0--q_size-1 \n
+    //Range of i: [0,x_size) \n
+    //Range of j: [0,W_n_cols) \n
+    //Range of a: [0,q_size) \n
 
-    // We call different kernels, depending on whether we are dealing with a power of two
-    // here. The kernel for a power of two is significantly faster, but only works
-    // for powers of two
-    if(is_power_of_two(q_size)){
-
+    // Depending on whether we are dealing with a power of two for the number of quadrature points
+    // we could call different kernels here.
+    // The kernel for a power of two is significantly faster and the restriction to a power of two
+    // is not a serious limitation in practice therefore, we dropped the non-power-of-two-kernel at some point
+    // to shorten the code. It is left in the source though, in case someone has a need for it some day.
+#ifdef USE_NON_POWER_OF_TWO_KERNEL
+    if(q_size%4 == 0)
+    {
+ #endif
         // If @p q_size (the size of $\mathbf{x}_a$) is a power of two,
         // then we allocate one thread for each entry of $G_{ia}$ that we have to calculate.
 
-        //\htmlimage{visu_Po2.png, 350, Parallization strategy\, here for the single-layer operator $V_{h\,ij}$}
+        //\htmlimage{visu_Po2.png, 350, Parallelization strategy\, here for the single-layer operator $V_{h\,ij}$}
 
         // Then each thread calculates its entry $G_{ia}$, multiplies it with the
         // corresponding entry of $w_{aj}$ and writes it to a shared memory matrix.
@@ -296,15 +306,16 @@ void step28::BEMKernels<dim>::assemble_bem_matrices(SciPAL::ShapeData<double> DL
         // with a simple reduction, adding the second half-block onto the first half-block and then
         // halfing the blocksize in each step.\n
         // Lastly, there is a @p for() loop over all the @p j's.
-        uint blocksize_x = q_size;
-        uint blocksize_y = NUM_THREADS / blocksize_x;
+        unsigned int blocksize_x = q_size;
+        unsigned int blocksize_y = NUM_THREADS / blocksize_x;
 
-        uint n_blocks = (x_size + blocksize_y - 1)/blocksize_y;
+        unsigned int n_blocks = (x_size + blocksize_y - 1)/blocksize_y;
 
         dim3 block_size(blocksize_x, blocksize_y);
         dim3 grid_size (1, n_blocks);
 
-        __assemble_bem_matrices_Po2<dim><<<grid_size,block_size>>>(DL_matrix, SL_matrix,
+        __assemble_bem_matrices_Po2<dim><<<grid_size,block_size>>>(DL_matrix,
+                                                                   SL_matrix,
                                                                    // DL_SL_n_rows,
                                                                    // DL_SL_n_cols,
                                                                    x, // x_size,
@@ -312,6 +323,7 @@ void step28::BEMKernels<dim>::assemble_bem_matrices(SciPAL::ShapeData<double> DL
                                                                    n, // n_size,
                                                                    W //, W_n_rows, W_n_cols
                                                                    );
+#ifdef USE_NON_POWER_OF_TWO_KERNEL
     } else {
         // If @p q_size (the size of $\mathbf{x}_a$) is a not a power of two,
         // the reduction strategy outlined above does not work. So here, instead of
@@ -324,20 +336,20 @@ void step28::BEMKernels<dim>::assemble_bem_matrices(SciPAL::ShapeData<double> DL
         // So the parallelization strategy here is: pre-calculate the needed values of $G_{ia}$
         // in each thread (so the first thread calculates $a=0,4,8\dots$, the second calculates $a=1,5,9\dots$).
 
-        // Then each thread multiplies it's values of $G_{ia}$ with the corresponding values of $w_{aj}$ and
+        // Then each thread multiplies its values of $G_{ia}$ with the corresponding values of $w_{aj}$ and
         // adds up those partial sums. Now we only have to add up four values to calculate an entry
         // of e.g. $V_{h,ij}$ which is easily done using the reduction strategy above, since 4 is a power
         // of 2.\n
         // Lastly, we have a @p for() loop over j again, to calculate all values $i,j$.
-        uint blocksize_y = BLOCK_DIM_Y;
-        uint blocksize_x = NUM_THREADS/blocksize_y;
+        unsigned int blocksize_y = BLOCK_DIM_Y;
+        unsigned int blocksize_x = NUM_THREADS/blocksize_y;
 
-        uint n_blocks = (x_size + blocksize_x - 1)/blocksize_x;
+        unsigned int n_blocks = (x_size + blocksize_x - 1)/blocksize_x;
 
         dim3 block_size(blocksize_x, blocksize_y);
         dim3 grid_size (n_blocks, 1);
 
-#ifdef wergwerwerwerf
+
         __assemble_bem_matrices<dim><<<grid_size,block_size>>>(DL_matrix, SL_matrix,
                                                                DL_SL_n_rows,
                                                                DL_SL_n_cols,
@@ -346,8 +358,8 @@ void step28::BEMKernels<dim>::assemble_bem_matrices(SciPAL::ShapeData<double> DL
                                                                n, n_size,
                                                                W, W_n_rows, W_n_cols
                                                                );
-#endif
     }
+#endif
     cudaDeviceSynchronize();
 }
 
@@ -356,3 +368,5 @@ void step28::BEMKernels<dim>::assemble_bem_matrices(SciPAL::ShapeData<double> DL
 // before the class can be explictly instantiated by the compiler.
 //template class step28::BEMKernels<2>;
 template class step28::BEMKernels<3>;
+
+#endif

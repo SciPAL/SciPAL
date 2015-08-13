@@ -70,10 +70,7 @@ message("step home :" $$STEP_PARENT_DIR)
      #
      # build-step-2/Debug/Desktop_Qt_5_2_1_clang64/
      #
-        CUDA_INCLUDES = -I$$STEP_PARENT_DIR
-
-
-        CUDA_INCLUDES +=-I$$SciPAL_DIR/include
+        CUDA_INCLUDES += -I$$STEP_PARENT_DIR
 
 
     # and here for the gcc

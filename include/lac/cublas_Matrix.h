@@ -36,23 +36,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/cublas_Vector.h>
 #include <lac/Shape.h>
 #include <base/ArchTraits.h>
+#include <base/CUDA_error_check.h>
 
-// #include <lac/ScipalExpressions.h>
+#include <base/ForewardDeclarations.h>
 
-
-template<typename> class FullMatrixAccessor;
-
-
-namespace SciPAL {
-
-template<typename, typename> class Matrix;
-
-template<typename, typename> class Vector;
-
-template<typename, typename> class VectorView;
-
-template<typename, typename> class SubMatrixView;
-}
 
 
 namespace SciPAL {
@@ -148,7 +135,50 @@ public:
     Matrix<T, BW> & operator = (const dealii::IdentityMatrix & Id);
 
     //! Generate a deep copy of @p other
-    Matrix<T, BW> & operator = (const Matrix<T, BW> & array);
+    template <typename BW2>
+    Matrix<T, BW> & operator = (const Matrix<T, BW2> & other)
+    {
+        //! check it both matrices have the same layout
+        if((this->n_rows() != other.n_rows()) || this->n_cols() != other.n_cols())
+        {
+            size_t new_size = other.size();
+            //does not respect lda
+            this->reinit(other.n_rows(), other.n_cols());
+        }
+
+
+        // element-wise copy of array.
+        int inc_src  = 1;
+        int inc_this = 1;
+        //! same blas type no problem
+        if(typeid(BW) == typeid(BW2) )
+        BW::copy(this->n_elements(), other.array().val(), inc_src,
+                 this->array().val(), inc_this);
+
+        //! copy from cublas matrix to blas matrix -> GetMatrix
+        //! TODO: what is with asyn copy?
+        if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
+        {
+            cublas::GetMatrix(other.n_rows(), other.n_cols(),
+                              other.array().val(),
+                              other.leading_dim,
+                              this->array().val(), this->leading_dim);
+        }
+
+        //! copy from cublas matrix to blas matrix -> SetMatrix
+        //! TODO: what is with asyn copy?
+        if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
+        {
+            cublas::SetMatrix(other.n_rows(), other.n_cols(),
+                              other.array().val(),
+                              other.leading_dim,
+                              this->array().val(),
+                              this->leading_dim);
+        }
+
+
+        return *this;
+    }
 
     template<typename X>
     Matrix & operator= (const ::SciPAL::Expr<X> & e);
@@ -206,7 +236,9 @@ public:
 
     void operator () (const unsigned int i, const unsigned int j, T data);
 
-    T l2_norm() const;
+    typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
+
+    T sum() const;
 
     inline SciPAL::Array<T, BW> & array() { return *this; }
 
@@ -463,36 +495,6 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
     return *this;
 }
 
-
-//! Deep copy of a matrix. Any previous content in target is lost.
-//! @param other : Matrix which is to be copied.
-template<typename T, typename BW>
-SciPAL::Matrix<T, BW> &
-SciPAL::Matrix<T, BW>::operator = (const Matrix<T, BW> & other)
-{
-    // TODO: WHat to do?
-    //    this->leading_dim = other.leading_dim;
-    //    this->_stride = other._stride;
-
-    if (this != &other)
-        this->Array<T, BW>::reinit(other.n_rows() * other.n_cols());
-
-    this->MyShape::reinit(this->array().val(),
-                        other.n_rows(), other.n_cols(),
-                        other.n_rows() /*TODO: leading_dim*/,
-                        1 /*unit stride*/);
-
-
-    // element-wise copy of array.
-    int inc_src  = 1;
-    int inc_this = 1;
-
-    BW::copy(this->n_elements(), other.data(), inc_src,
-             this->data(), inc_this);
-
-    return *this;
-}
-
 // @sect4{Operator: +=}
 //!
 //! Incremental, element-wise addition of two matrices.
@@ -570,13 +572,23 @@ SciPAL::Matrix<T, BW>::operator *= (const T2 scale)
 // @sect4{Function: l2_norm}
 //! Consider the contents of the matrix as a vector and compute its L2-norm.
 template<typename T, typename BW>
-T SciPAL::Matrix<T, BW>::l2_norm() const
+typename PrecisionTraits<T, BW::arch>::NumberType SciPAL::Matrix<T, BW>::l2_norm() const
 {
-    T result = BW::nrm2(this->n_elements(), this->val(), 1/*incx*/);
+    typename PrecisionTraits<T, BW::arch>::NumberType result = BW::nrm2(this->n_elements(), this->val(), 1/*incx*/);
 
     return result;
 }
 
+
+// @sect4{Function: sum}
+//!
+//! sum over all entries.
+
+template<typename T, typename BW>
+T SciPAL::Matrix<T, BW>::sum() const
+{
+    return BW::asum(this->__n, &(this->val()[0]), 1);
+}
 
 // @sect4{Function: vmult}
 //!
@@ -776,6 +788,9 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
              src.data(), ldb,
              beta,
              dst.data(), ldc);
+
+    gpuErrchk( cudaPeekAtLastError() );
+
 }
 
 

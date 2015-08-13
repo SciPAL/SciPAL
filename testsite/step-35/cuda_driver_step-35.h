@@ -33,6 +33,11 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <base/PrecisionTraits.h>
 #include <lac/cublas_wrapper.hh>
 #include <lac/cublas_Vector.h>
+#include <lac/VectorCustomOperations.h>
+#include <numerics/FFTWrapper.h>
+
+//deal.II
+#include <deal.II/lac/vector.h>
 
 //Our stuff
 #include "cuda_driver_step-35.hh"
@@ -194,10 +199,11 @@ class CUDADriver {
     //Temporary fields that need not to be known outside of the driver
     // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
     complex *fm1,*fm1_h;
-    Mdouble *lag1,*lag2,*tmp2_d,*tmp_h,*tmp_haar,*tmp_haar2,*tmp_lagr; // *tmp_d,
+    //Mdouble *tmp_h; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,tmp_haar
+    dealii::Vector<Mdouble> tmp_h;
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr,tmp_haar;
 
 
     cufftHandle *plan_fft,*iplan_fft;
@@ -236,7 +242,9 @@ class CUDADriver {
           inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
                                             gamma, sigma, regType, dim)),
     // FIXME: more vector instantiations go here
-          tmp_d(inf->ext_num_pix)
+          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix),
+          tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix),
+          tmp_h(inf->ext_num_pix)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -277,18 +285,18 @@ class CUDADriver {
         checkCudaErrors(cudaMalloc((void **)&fm1, fm1_size));
         // checkCudaErrors(cudaMalloc((void **)&tmp_d, inf->n_bytes_per_frame));
         // FIXME: why is there host allocation when device arrays are alloc'd?
-        tmp_h=new Mdouble[inf->ext_num_pix];
-        checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
-        checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
-        checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
-        checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
-        checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
-        checkCudaErrors(cudaMalloc((void **)&tmp_haar2, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
+        //tmp_h=new Mdouble[inf->ext_num_pix];
+        //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
+        //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
+        //checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
+        //checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
+        //checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
+        //checkCudaErrors(cudaMalloc((void **)&tmp_haar2, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
 
         //Init the lagrangian fields
-        step35::Kernels<Mdouble> kernel;
-        kernel.reset(lag1, inf->ext_num_pix);
-        kernel.reset(lag2, inf->ext_num_pix);
+        //step35::Kernels<Mdouble> kernel;
+        //kernel.reset(lag1, inf->ext_num_pix);
+        //kernel.reset(lag2, inf->ext_num_pix);
         //Generate Mpatch element used to signal threads to shut down
         cend=new Mpatch(0);
 
@@ -325,7 +333,7 @@ class CUDADriver {
 
         //Cleanup
         delete[] fm1_h;
-        delete[] tmp_h;
+        //delete[] tmp_h;
         cufftDestroy(*plan_fft);
         cufftDestroy(*iplan_fft);
         delete plan_fft;
@@ -352,14 +360,14 @@ class CUDADriver {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
             for (int so=0; so<5; so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d, inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
                 }
             }
         }
         else { //TODO 3d
             for (int so=0; so<5; so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d, inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
                 }
             }
         }
@@ -476,7 +484,7 @@ class CUDADriver {
             cudaEventRecord(start, mystream);
 #endif
             //Calculate Dykstra's algorithm on all frames in the list of clusters we recieved
-            kernels.dykstra(d_q,inf->e_d, cluster_info_d, q_offset_d, num_of_cluster, inf->width, inf->height, 1024, &mystream);
+            kernels.dykstra(d_q,inf->e_d.array().val(), cluster_info_d, q_offset_d, num_of_cluster, inf->width, inf->height, 1024, &mystream);
 
 #ifdef TIME_KERNELS
             cudaEventRecord(stop, mystream);
@@ -530,7 +538,8 @@ class CUDADriver {
     //@brief Cyclic convolution, based on FFT
     //@param in input array
     //@param out output array
-    void conv2(Mdouble *in, Mdouble *out) {
+      void conv2(Mdouble *in, Mdouble *out) {
+
 #ifdef DOUBLE_PRECISION
         cufftExecD2Z(*plan_fft, in, fm1);
 #else
@@ -551,6 +560,37 @@ class CUDADriver {
 #endif
         checkCudaErrors(cudaDeviceSynchronize());
         getLastCudaError("cufft error!\n");
+    }
+
+    //@sect5{Function: conv2}
+    //@brief Cyclic convolution, based on FFT
+    //@param in input array
+    //@param out output array
+
+    void conv2_ET(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
+       //SciPAL FFT
+        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas> tmpfft_d(inf->ext_num_pix);
+       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda>
+               cuda_fft(inf->ext_height,inf->ext_width,tmpfft_d,in);
+
+        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas>
+                tmpifft_d(inf->ext_num_pix);
+        SciPAL::Vector<Mdouble, cublas>
+                tmpifft2_d(inf->ext_num_pix);
+       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2R,gpu_cuda>
+                              cuda_ifft(inf->ext_height,
+                                        inf->ext_width,
+                                        tmpifft2_d/*out*/,
+                                        tmpifft_d);
+
+        cuda_fft(tmpfft_d,in,FORWARD);
+        //Convolve, multiply in Fourier space
+        step35::Kernels<Mdouble> kernel;
+        kernel.element_norm_product(tmpfft_d.array().val(), inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        cuda_ifft(tmpifft2_d/*out*/,tmpfft_d,BACKWARD);
+
+        kernel.real(out, tmpifft_d);
     }
 
     //@sect5{Function: projection_gauss}
@@ -612,21 +652,32 @@ class CUDADriver {
     //@sect5{Function: push_data}
     //@brief Push all data from host to device
     void push_data() {
-        checkCudaErrors(cudaMemcpy(inf->im_d, &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->x_d, &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->z_d, &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(inf->e_d, &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), tmp_h, inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+        inf->im_d = inf->im_h;
+        inf->x_d = inf->x_h;
+        inf->z_d = inf->z_h;
+        inf->e_d = inf->e_h;
+        tmp_d = tmp_h;
+
+//        checkCudaErrors(cudaMemcpy(inf->im_d.array().val(), &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(inf->x_d.array().val(), &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(inf->e_d.array().val(), &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
+//        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
     }
 
     //@sect5{Function: get_data}
     //@brief Pull all data from device to host
     void get_data() {
-        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-        checkCudaErrors(cudaMemcpy(tmp_h, tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        inf->im_d.push_to(inf->im_h);
+        inf->x_d.push_to(inf->x_h);
+        inf->z_d.push_to(inf->z_h);
+        inf->e_d.push_to(inf->e_h);
+        tmp_d.push_to(tmp_h);
+//        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+//        checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
     }
 
     // FIXME: use SciPAl vectors and ETs!!!
@@ -636,33 +687,88 @@ class CUDADriver {
         step35::Kernels<Mdouble> kernel;
         //$\text{tmp}_d=I$tmp2
         kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->im_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp}_d=I-e$
-        kernel.diff(tmp_d.array().val(), inf->e_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        conv2(inf->x_d, tmp2_d);
+        kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        conv2(inf->x_d.array().val(), tmp2_d.array().val());
         //$\text{tmp}_d=I-e-A*x$
-        kernel.diff(tmp_d.array().val(), tmp2_d, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+
+
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
         kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-        kernel.sum(tmp_d.array().val(), lag1, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         conv2(tmp_d.array().val(), tmp_d.array().val());
+
         //$\text{tmp2}_d=z$
-        kernel.reset(tmp2_d, inf->ext_num_pix);
-        kernel.sum(tmp2_d, inf->z_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
+        kernel.sum(tmp2_d.array().val(), inf->z_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //$\text{tmp2}_d=z-x$ 
+
+        kernel.diff(tmp2_d.array().val(), inf->x_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //$\text{tmp2}_d=z-x$
-        kernel.diff(tmp2_d, inf->x_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        kernel.mult(tmp2_d, rho2, inf->ext_num_pix);
+        kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
+
+
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        kernel.sum(tmp2_d, tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        kernel.diff(tmp2_d, lag2, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.mult(tmp2_d, inf->gamma, inf->ext_num_pix);
+        kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
+
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.sum(inf->x_d, tmp2_d, 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(inf->x_d.array().val(), tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+
+    }
+    // FIXME: use SciPAl vectors and ETs!!!
+    //@sect5{Function: x_step}
+    //@brief Performs approximative argmin with respect to $x$
+    void x_step_ET(const Mdouble rho1,const Mdouble rho2) {
+        step35::Kernels<Mdouble> kernel;
+
+        //$\text{tmp}_d=I-e$
+        tmp_d = inf->im_d - inf->e_d;
+
+        conv2(inf->x_d.array().val(), tmp2_d.array().val());
+        //$\text{tmp}_d=I-e-A*x$
+        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        //$\text{tmp}_d=\left((I-e-A*x\right)*\rho_1+\Upsilon_1$
+        tmp_d = lag1 + (rho1*tmp_d); //but tmp_d = (rho1*tmp_d)+lag1: Does NOT work!!!
+
+        //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
+        conv2_ET(tmp_d, tmp_d);
+
+        //$\text{tmp2}_d=z-x$
+        tmp2_d = inf->z_d - inf->x_d;
+
+        //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
+        tmp2_d *= rho2;
+
+        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
+        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
+        tmp2_d -= lag2;
+
+        //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
+        tmp2_d *= inf->gamma;
+
+        //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
+        inf->x_d += tmp2_d;
+
     }
 
     //@sect5{Function: update_lagrangian}
@@ -672,21 +778,21 @@ class CUDADriver {
     void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
         step35::Kernels<Mdouble> kernel;
         kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->x_d,0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.sum(tmp_d.array().val(), inf->x_d.array().val(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
         conv2(tmp_d.array().val(), tmp_d.array().val());
         //Update the lagrangian estimates
-        kernel.update_lagrangian(lag1, lag2, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
-                                 alpha1, alpha2, inf->e_d, inf->im_d,tmp_d.array().val(), inf->x_d, inf->z_d);
+        kernel.update_lagrangian(lag1.array().val(), lag2.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
+                                 alpha1, alpha2, inf->e_d.array().val(), inf->im_d.array().val(),tmp_d.array().val(), inf->x_d.array().val(), inf->z_d.array().val());
     }
 
     //@sect5{Function: dykstra_gauss}
     //@brief Wrapper around the whole projection procedure
     //@param rho parameter for the first constraint
     void dykstra_gauss(const Mdouble rho) {
-        conv2(inf->x_d,tmp_d.array().val());
+        conv2(inf->x_d.array().val(),tmp_d.array().val());
         step35::Kernels<Mdouble> kernel;
         //the value to be projected is copied into e_d
-        kernel.prepare_e(inf->e_d, inf->im_d, tmp_d.array().val(), lag1, rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+        kernel.prepare_e(inf->e_d.array().val(), inf->im_d.array().val(), tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
         //Perform the Dykstra Algotithm
         iterate();
     }
@@ -703,31 +809,34 @@ class CUDADriver {
                 std::cerr << "Haar regularisation with 3d images is not yet implemented!" << std::endl;
                 std::abort();
             }
-            kernel.reset(tmp_haar,inf->nx2*inf->ny2);
-            kernel.reset(tmp_lagr,inf->nx2*inf->ny2);
+            //kernel.reset(tmp_haar,inf->nx2*inf->ny2);
+            tmp_haar = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
+            tmp_lagr = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
+
+            //kernel.reset(tmp_lagr,inf->nx2*inf->ny2);
 
             //Copy $x$ into the bigger temp variable while conserving its shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_height) {
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar[i*inf->ny2]), &(inf->x_d[i*inf->ext_height]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i*inf->ny2]), &(inf->x_d.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr[i*inf->ny2]), &(lag2[i*inf->ext_height]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                 }
             }
             checkCudaErrors(cudaDeviceSynchronize());
 
             //Forward 2D Haar Wavelet transform
-            kernel.haar(tmp_haar,tmp_haar2,inf->ny2);
-            kernel.haar(tmp_lagr,tmp_haar2,inf->ny2);
-            kernel.soft_threshold(tmp_haar,lag2,tmp_haar,rho2,gamma,inf->nx2*inf->ny2);
+            kernel.haar(tmp_haar.array().val(),tmp_haar2.array().val(),inf->ny2);
+            kernel.haar(tmp_lagr.array().val(),tmp_haar2.array().val(),inf->ny2);
+            kernel.soft_threshold(tmp_haar.array().val(),lag2.array().val(),tmp_haar.array().val(),rho2,gamma,inf->nx2*inf->ny2);
             //Backward 2D Haar Wavelet transform
-            kernel.inverse_haar(tmp_haar,tmp_haar2,inf->ny2);
+            kernel.inverse_haar(tmp_haar.array().val(),tmp_haar2.array().val(),inf->ny2);
 
             //Copy back, pay attention not to mess up the shape
             for (int i=0; i<inf->nx2; i++) {
                 if ( i < inf->ext_width )
-                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d[i*inf->ext_height]), &(tmp_haar[i*inf->ny2]),
+                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d.array().val()[i*inf->ext_height]), &(tmp_haar.array().val()[i*inf->ny2]),
                                                     inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
             }
             checkCudaErrors(cudaDeviceSynchronize());
@@ -736,14 +845,14 @@ class CUDADriver {
         //Regularization by direct space sparsity
         if ( inf->regType == sparse ) {
             //checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->framesize, cudaMemcpyDeviceToDevice));
-            kernel.soft_threshold(inf->z_d,lag2,inf->x_d, rho2, gamma, inf->ext_num_pix);
+            kernel.soft_threshold(inf->z_d.array().val(),lag2.array().val(),inf->x_d.array().val(), rho2, gamma, inf->ext_num_pix);
             //kernel.tv_regularization(inf->x_d,inf->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
         }
         //Regularization by Fourier Space L_2 Norm
         if ( inf->regType == quadratic ) {
-            checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
+            checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
             //the solution with smallest L_2 Norm is obtained, this corresponds to the pseudoinverse
-            kernel.pseudo_inverse(inf->z_d,lag2,rho2,gamma,inf->ext_num_pix);
+            kernel.pseudo_inverse(inf->z_d.array().val(),lag2.array().val(),rho2,gamma,inf->ext_num_pix);
         }
     }
 };

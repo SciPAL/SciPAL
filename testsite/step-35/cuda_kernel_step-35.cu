@@ -40,6 +40,9 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 //SciPAL
 #include <base/PrecisionTraits.h>
+#include <src/cuda/scipal_kernels.cu>
+#include <step-35/autoInstantiations.h>
+#include <lac/ShapeData.h>
 
 //Our stuff
 #include "cuda_helper.h"
@@ -467,6 +470,16 @@ __update_lagrangian(T* lag1, T* lag2, int offset, int nx, int ny, int nz, T alph
     }
 }
 
+template<typename T>
+__global__ void
+__real_part(
+      SciPAL::ShapeData<T> dst,
+    const SciPAL::ShapeData<SciPAL::CudaComplex<T> > src)
+{
+      int i = threadIdx.x + blockIdx.x*blockDim.x;
+      if (i < dst.n_rows)
+          dst.data_ptr[i] = src.data_ptr[i].real();
+}
 
 //@setc5{Kernel: __tv_regularization}
 //@brief kernel for tv regularization
@@ -1043,6 +1056,21 @@ void step35::Kernels<T>::soft_threshold_complex(typename PrecisionTraits<T, gpu_
     __soft_thresholding_complex<T><<<grid,blocks>>>(arr,threshold,size);
     cudaDeviceSynchronize();
     getLastCudaError("__soft_thresholding_complex<<<>>> execution failed\n");
+}
+
+template<typename T>
+void step35::Kernels<T>::real(SciPAL::ShapeData<T> &dst, const SciPAL::ShapeData<SciPAL::CudaComplex<T> > &src)
+{
+    if (dst.n_rows == src.n_rows) {
+        int grids = (src.n_rows +1023) / 1024;
+
+
+
+        __real_part<T><<< grids,1024 >>> (dst, src);
+
+    } else {
+        printf("Dimensions not the same\n");
+    }
 }
 
 

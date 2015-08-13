@@ -23,11 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/Expr.h>
 #include <base/CudaComplex.h>
 
-// Forward declarations of blas wrappers. We need them to chose the correct implementation strategy of the Unary
-// Functions. We can not include blas++.h, because this file is also seen by nvcc.
-struct blas;
-
-struct cublas;
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
 
@@ -140,7 +136,6 @@ MAKE_UNARIES(sqrt);
 // abs has to be defined by hand, since the return value type can differ from
 // the input value type. This is the case for a complex number, the modulus is real-valued.
 
-//template <typename T> struct expr_abs;
 template <typename T>
 struct expr_abs
 {
@@ -159,18 +154,6 @@ struct expr_abs
    }
 };
 
-//template <typename T>
-//struct  expr_abs
-//{
-//   typedef T value_type;
-
-//   __host__ __device__
-//   T operator()(const T val) const
-//   {
-//       return std::abs(val);
-//   }
-//};
-
 // This is the definition of the abs-operator
 template <typename T1>
 inline
@@ -184,7 +167,68 @@ gpu_cuda>::NumberType > >
            (~dst);
 }
 
+template <typename T>
+struct expr_real
+{
+   typedef T value_type;
 
+   __host__ __device__
+   T operator()(const SciPAL::CudaComplex<T> val) const
+   {
+       return SciPAL::real(val);
+   }
+
+   __host__ __device__
+   T operator()(const T val) const
+   {
+       return val;
+   }
+};
+
+// This is the definition of the abs-operator
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_real <typename PrecisionTraits<typename T1::value_type,
+gpu_cuda>::NumberType > >
+  real(const Expr<T1> &dst)
+{
+   return UnaryExpr<T1,
+           expr_real <typename PrecisionTraits<typename T1::value_type,
+                                              gpu_cuda>::NumberType > >
+           (~dst);
+}
+
+
+template <typename T>
+struct expr_imag
+{
+   typedef T value_type;
+
+   __host__ __device__
+   T operator()(const SciPAL::CudaComplex<T> val) const
+   {
+       return SciPAL::imag(val);
+   }
+
+   __host__ __device__
+   T operator()(const T val) const
+   {
+       return val;
+   }
+};
+
+// This is the definition of the abs-operator
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_imag <typename PrecisionTraits<typename T1::value_type,
+gpu_cuda>::NumberType > >
+  imag(const Expr<T1> &dst)
+{
+   return UnaryExpr<T1,
+           expr_imag <typename PrecisionTraits<typename T1::value_type,
+                                              gpu_cuda>::NumberType > >
+           (~dst);
+}
 
 
 ////add all the useful things...

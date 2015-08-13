@@ -20,19 +20,16 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef DEVICEEXPR_H
 #define DEVICEEXPR_H
 
+#include <lac/OperandInfo.h>
 #include <lac/expression_templates_host.h>
 
 #include <lac/DevLiteral.h>
 #include <base/CudaComplex.h>
+#include <cstdio>
 
-struct blas;
-
-struct cublas;
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
-
-//! aux structure to solve the missing Type problem in ShapeData
-template<typename T> struct GetMyType;
 
 template<typename T> struct GetMyType<SciPAL::ShapeData<T> >
 {
@@ -43,9 +40,6 @@ template<typename T> struct GetMyType {
 
     typedef typename T::Type Type;
 };
-
-//!definitions of operations for DevBinaryExpr
-template<typename OpTag, typename T> struct  binary;
 
 template<typename T>
 struct  binary<plus, T>
@@ -101,10 +95,6 @@ binary<pdivide, T>
 //do nothing if it is not +-*/
 template<typename OpTag, typename T> struct  binary {};
 
-
-//! This structure provides the functions for evaluating the expression tree in array arithmetic.
-//!
-template <typename T> struct ExprTree;
 
 template <typename T>
 struct ExprTree {
@@ -203,13 +193,16 @@ struct DevBinaryExpr
     {
         // Evaluate operands before the expression at this level.
         // This should simplify the analysis of errors ar compile-time.
-        // The 'E' typedef is needed, when the eval function is not static. Then @p e is an object of type @p E.
-        typedef ExprTree<value_type> /*E;
-        E*/ e;
-        value_type left  = e::eval(l, i);
-        value_type right = e::eval(r, i);
+        // We have to ask left and right operand for its value type in order to combine
+        // real and complexvalued arithmetic.
+        typename L::value_type left = ExprTree<typename L::value_type>::eval(l, i);
+        typename R::value_type right = ExprTree<typename R::value_type>::eval(r, i);
 
-        return binary<Operator, value_type>::eval(left, right);
+//        printf("before: index: %d,  l: %f, r: %f \n", i, real(left), real(right));
+        value_type returnValue = binary<Operator, value_type>::eval(left, right);
+//        printf("after : index: %d,  l: %f, r: %f \n", i, real(left), real(right));
+        return returnValue;
+
     }
 
 };

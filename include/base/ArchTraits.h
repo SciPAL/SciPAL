@@ -20,14 +20,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef ARCHTRAITS_H
 #define ARCHTRAITS_H
 
-#include <lac/blas++.h>
-#include <base/ParallelArch.h>
+#include <base/ForewardDeclarations.h>
 
 // @sect3{struct: archTraits}
-// We need the archTraits to get the correct version of blas in dependence of the template
-// parameter arch.
-template <ParallelArch T> struct archTraits;
-
 template<>
 struct archTraits<gpu_cuda>
 {

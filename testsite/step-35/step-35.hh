@@ -403,7 +403,7 @@ void step35::ADMM<T>::add_gaussian_noise (step35::CUDADriver<Mpatch, T, gpu_cuda
     boost::normal_distribution<> nd(0.0, params.gnoise);
     boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_nor(rng, nd);
 
-    driver.conv2(driver.inf->im_d, driver.inf->im_d);
+    driver.conv2(driver.inf->im_d.array().val(), driver.inf->im_d.array().val());
     //Push data from device to host
     driver.get_data();
     //Now add gaussian noise
@@ -568,7 +568,8 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
     T c1,c2=0;
     while (  ( res > params.tol && iter < params.max_it) || iter < 5 ) {
         //Argmin w.r.t. x
-        driver.x_step(params.rho1, params.rho2);
+        //driver.x_step(params.rho1, params.rho2);
+        driver.x_step_ET(params.rho1, params.rho2);
 
         //Argmin w.r.t. z
         driver.m_smoothing(params.regInt, params.rho2);
@@ -586,7 +587,7 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
             res = 0;
             c1 = 0;
             c2 = 0;
-            driver.conv2(driver.inf->x_d, driver.tmp_d.array().val());
+            driver.conv2(driver.inf->x_d.array().val(), driver.tmp_d.array().val());
             driver.get_data();
             //Calculate the change w.r.t. the last reported result
             //Calculate the violation of constraints

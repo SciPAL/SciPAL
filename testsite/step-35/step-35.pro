@@ -145,10 +145,12 @@ message("Load deal.II MPI config")
 
 
 # Enter project specific source and header files here
-SOURCES = \
-    cuda_kernel_step-35.cu step-35.cpp
+SOURCES += \
+    step-35.cpp \
+    cuda_kernel_step-35.cu \
+    $$SciPAL_DIR/include/numerics/propagation_kernels.cu
 
-HEADERS = \
+HEADERS += \
     cuda_driver_step-35.h \
     cuda_driver_step-35.hh \
     cuda_kernel_wrapper_step-35.cu.h \
@@ -158,7 +160,8 @@ HEADERS = \
     ADMMParams.h \
     preprocessor_directives.h \
     extremeValueStatisticsGenerator.h \
-    step-35.hh
+    step-35.hh \
+    *.h
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator
    # which are not subject to compilation.

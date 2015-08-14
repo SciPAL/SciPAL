@@ -260,6 +260,7 @@ class ImageInfo {
 
             checkCudaErrors(cudaDeviceSynchronize());
 
+
             //Fourier transformation of psf using cuFFT
             cufftHandle plan;
 #ifdef DOUBLE_PRECISION

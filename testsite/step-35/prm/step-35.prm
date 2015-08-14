@@ -45,7 +45,7 @@ subsection program flow control
   set approx             = true
 
   # Set maximum number of iterations
-  set maximum iterations = 1002
+  set maximum iterations = 10020
 
   # Reporting progress in intervals of ... Iterations
   set report interval    = 10

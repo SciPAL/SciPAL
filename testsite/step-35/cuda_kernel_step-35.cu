@@ -470,6 +470,7 @@ __stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_
         it++;
         delta=0;
 
+
         // Wait for every step before starting the iteration
         __syncthreads();
 

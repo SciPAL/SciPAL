@@ -38,6 +38,9 @@ struct BlasVecExp/*VectorExpressions*/
     //  typedef SparseMatrix<T, BW> SpMtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
 
+    typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
+    typedef ::SciPAL::VectorView<T, BW> SVtr;
+
     typedef Literal<T> Lit;
 
     // $ y = \alpha x$
@@ -65,6 +68,10 @@ struct BlasVecExp/*VectorExpressions*/
     // $ z =  x^t \cdot y$
     typedef typename SciPAL::BinaryExpr< SciPAL::transpose<Vtr>, mult, Vtr>
     scalar_product;
+
+    // $ z =  x^t \cdot y$
+    typedef typename SciPAL::BinaryExpr< SMtx, mult, Vtr>
+    SMV;
 };
 
 
@@ -217,6 +224,41 @@ static void apply(Vector<T, BW> &result,
              );
 }
 
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A \cdot src$
+
+template <typename T, typename BW>
+static void apply(Vector<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::SMV& expr)
+{
+
+    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    Vtr & dst = result;
+
+
+    BW::gemv('n',
+             A.n_rows, // m
+             A.n_cols, // n
+             alpha,
+             A.data_ptr,
+             A.leading_dim, // lda
+             x.data_ptr,
+             1, // incx
+             beta,
+             dst.data_ptr, // y
+             1 // incy
+             );
+}
 
 
 } // END namespace LAOOperations

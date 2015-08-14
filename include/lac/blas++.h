@@ -40,7 +40,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/Array.h>
 
 #include <lac/cublas_Vector.h>
-#include <lac/cublas_VectorView.h>
+#include <lac/cublas_SubVectorView.h>
 
 #include <lac/cublas_Matrix.h>
 #include <lac/cublas_SubMatrixView.h>

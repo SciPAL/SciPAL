@@ -17,8 +17,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 */
 
 
-#ifndef cublas_VectorView_H
-#define cublas_VectorView_H
+#ifndef cublas_SubVectorView_H
+#define cublas_SubVectorView_H
 
 #include <lac/Shape.h>
 #include <lac/Expr.h>
@@ -39,8 +39,9 @@ namespace SciPAL {
     template<typename T, typename T_src>
     class VectorView
             :
-            public SciPAL::Expr<VectorView<T, T_src> >,
-            public SciPAL::Shape<T> {
+            public SciPAL::Expr<VectorView<T, T_src> >//,
+//            public SciPAL::Shape<T>
+    {
 
    public:
         typedef typename T_src::blas_wrapper_type BW;
@@ -166,7 +167,9 @@ private:
         typedef VectorView<T, T_src> Base;
 
     ColVectorView(T_src & src,
-                  int r_begin, int c=0) : Base(src, r_begin, c) { this->_stride = 1; }
+                  int r_begin, int c=0) : Base(src, r_begin,
+                                               src.n_rows()/*r_end*/, c)
+    { this->_stride = 1; }
 
 #ifdef USE_OLD_ET
     template<typename M> //!, typename Op>

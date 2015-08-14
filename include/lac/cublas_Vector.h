@@ -21,7 +21,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define cublas_Vector_H
 
 
-#include <lac/expression_template.h>
 #include <lac/expression_templates_host.h>
 #include <complex>
 #include <float.h>
@@ -41,7 +40,7 @@ struct vmu;
 #include <base/PrecisionTraits.h>
 #include <base/Zero_One_Traits.h>
 #include <lac/cublas_SubMatrixView.h>
-#include <lac/cublas_VectorView.h>
+#include <lac/cublas_SubVectorView.h>
 
 #include <base/ForewardDeclarations.h>
 

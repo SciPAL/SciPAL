@@ -87,16 +87,25 @@ template<typename T, typename BW>
     //!
     //! Diese Klasse dient dazu, nicht interessierende Teile einer Matrix zu maskieren.
     template<typename T, typename BW>
-    class SubMatrixView {
+    class SubMatrixView
+            :
+            public SciPAL::Expr<SubMatrixView<T, BW> >,
+            public SciPAL::Shape<T>
+        {
 
     public:
 
         typedef T value_type;
 
+        typedef BW blas_wrapper_type;
+
         typedef SubMatrixView<T, BW> Type;
+
         typedef const Type& ConstHandle;
 
+        typedef  SciPAL::ShapeData<T> DevType;
 
+        typedef SciPAL::Shape<T> MyShape;
 
         SubMatrixView(Matrix<T, BW> & src, int r_begin, int c_begin);
 
@@ -280,6 +289,7 @@ template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
                                             int r_begin, int c_begin)
     :
+
     __src(&src),
     __r_begin(r_begin),
     __c_begin (c_begin),
@@ -287,7 +297,7 @@ SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
     __c_end(src.n_cols()),
     __n_el((__r_end - r_begin)*(__c_end - c_begin)),
     __view_begin(c_begin*src.n_rows() + r_begin),
-    __leading_dim(src.n_rows())
+    __leading_dim(src.leading_dim)
 {
     Assert ((r_begin >= 0) && (r_begin < src.n_rows()),
             dealii::ExcIndexRange (r_begin, 0, src.n_rows()));

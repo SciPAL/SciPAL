@@ -34,9 +34,11 @@ namespace SciPAL {
 template< typename T, typename BW> // IDEA:, MatrixStorage ms>
 struct BlasMatExp/*MatrixExpressions*/
 {
-     typedef ::SciPAL::Matrix<T, BW> // IDEA:, ms>
-    Mtx;
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
+
+    typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
+    typedef ::SciPAL::VectorView<T, BW> SVtr;
 
     typedef Literal<T> Lit;
     //scaled Matrix

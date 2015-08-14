@@ -771,9 +771,12 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
 
     BW::gemm(transpose_A,
              transpose_B,
-             transpose_A != 'n'? this->n_cols() : this->n_rows(), /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
-             dst.n_cols(), /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
-             transpose_A != 'n'? this->n_rows() : this->n_cols(), /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
+             transpose_A != 'n'? this->n_cols() : this->n_rows(),
+             /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
+             dst.n_cols(),
+             /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
+             transpose_A != 'n'? this->n_rows() : this->n_cols(),
+             /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
              alpha,
              this->data(), lda,
              src.data(), ldb,
@@ -829,8 +832,8 @@ SciPAL::Matrix<T, BW>::add_scaled_outer_product(T alpha,
     Assert(x.size() == m, dealii::ExcMessage("Dimension mismatch"));
     Assert(y.size() == n, dealii::ExcMessage("Dimension mismatch"));
 
-    int incx = x._stride;
-    int incy = y._stride;
+    int incx = x.stride;
+    int incy = y.stride;
 
     BW::ger(m, n, alpha,
             x.val(), incx,

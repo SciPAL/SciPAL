@@ -41,10 +41,10 @@ struct ShapeData {
     T * data_ptr;
 
     //! Number of rows. If this is set to 1 you get a row vector.
-    size_t n_rows;
+//    size_t n_rows;
 
     //! Nnumber of columns. If this is set to 1 you get a column vector.
-    size_t n_cols;
+//    size_t n_cols;
 
     //! If this value is, e.g., 3, then only every 3rd element of the original data array gets accessed.
     size_t stride;
@@ -54,16 +54,18 @@ struct ShapeData {
     //! We assume column-major storage in order to be compatible with CUBLAS.
     size_t leading_dim;
 
-    //! new
-    /*
-     * r_begin_active
-     * r_end_active
-     * c_begin_active
-     * c_end_active
-     *
-     * op()(i,j)
-     * op()(i)
-     */
+
+    size_t  r_begin_active;
+    size_t  r_end_active;
+    size_t  c_begin_active;
+    size_t  c_end_active;
+    size_t  n_elements_active;
+    T *  view_begin;
+
+
+//      op()(i,j)
+//     op()(i)
+
 
 
 };

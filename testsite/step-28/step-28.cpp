@@ -11,15 +11,16 @@
 #include <vector>
 
 
-// Driver class for GPU part of th program.
+// Driver class for GPU part of the program.
 #include <step-28/cuda_driver_step-28.h>
 #include <step-28/cuda_driver_step-28.hh>
 
+#ifdef USE_STEP_32
 #include <step-32/cuda_driver_step-32.h>
 #include <step-32/cuda_driver_step-32.hh>
-
+#endif
 // For choosing on which device to run
-#include "Architecture.h"
+#include  <step-27/Architecture.h>
 
 // Include the actual dielectric relaxation spectroscopy simulation,
 // courtesy of Stephan Kramer

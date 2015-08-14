@@ -19,18 +19,11 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #ifndef PRECISIONTRAITS_H
 #define PRECISIONTRAITS_H
-#include <base/ParallelArch.h>
-#include <complex>
+#include <base/ForewardDeclarations.h>
 
-typedef float2 cuComplex;
-typedef double2 cuDoubleComplex;
-
-namespace SciPAL{
-    template <typename T> struct CudaComplex;
-}
 
 // @sect3{struct: PrecisionTraits}
-template<typename T, ParallelArch arch> struct PrecisionTraits;
+//template<typename T, ParallelArch arch> struct PrecisionTraits;
 
 template <>
 struct PrecisionTraits<cuComplex, gpu_cuda> {

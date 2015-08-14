@@ -256,7 +256,7 @@ void step42::MyFancySimulation::run()
     step42::CUDADriver testcase;
 
     // ... and run the computation on the GPU (or other dedicated parallel hardware).
-    testcase.gemm_tests();
+//    testcase.gemm_tests();
 
 //    testcase.gemv_tests();
 
@@ -270,7 +270,8 @@ void step42::MyFancySimulation::run()
 
 //    testcase.views();
 
-//    testcase.stacks_of_LAOs();
+    testcase.stacks_of_LAOs();
+//    testcase.operator_precedence();
 
     std::cout << "Done." << std::endl;
 }

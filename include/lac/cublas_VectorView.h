@@ -25,10 +25,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <base/Zero_One_Traits.h>
 
-//! Vorwaertsdeklaration fuer expression templates
-struct vmu_view;
-
-
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
 

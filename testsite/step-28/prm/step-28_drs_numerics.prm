@@ -26,11 +26,11 @@ subsection Numerics
   # After parsing, the sceleton mesh is refined this many times for generating
   # the coarse mesh which is the starting point for the adaptove solutino
   # process.
-  set N init refinements                            = 1
+  set N init refinements                            = 0
 
   # During mesh refinement the coarse mesh may be refined this many times in
   # order to compute an improved solution.
-  set N mesh refinements                            = 3
+  set N mesh refinements                            = 4
 
   # Number steps to iterate the nonlinearity before moving to the next mesh.
   set N pseudo time steps                           = 5

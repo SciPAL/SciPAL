@@ -609,16 +609,22 @@ class CUDADriver {
        SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda>
                cuda_fft(inf->ext_height,inf->ext_width,tmpfft_d,in);
 
-        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas> tmpifft_d(inf->ext_num_pix);
-       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2C,gpu_cuda>
-               cuda_ifft(inf->ext_height,inf->ext_width,tmpifft_d/*out*/,tmpfft_d);
+        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas>
+                tmpifft_d(inf->ext_num_pix);
+        SciPAL::Vector<Mdouble, cublas>
+                tmpifft2_d(inf->ext_num_pix);
+       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2R,gpu_cuda>
+                              cuda_ifft(inf->ext_height,
+                                        inf->ext_width,
+                                        tmpifft2_d/*out*/,
+                                        tmpifft_d);
 
         cuda_fft(tmpfft_d,in,FORWARD);
         //Convolve, multiply in Fourier space
         step35::Kernels<Mdouble> kernel;
         kernel.element_norm_product(tmpfft_d.array().val(), inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
 
-        cuda_ifft(tmpifft_d/*out*/,tmpfft_d,BACKWARD);
+        cuda_ifft(tmpifft2_d/*out*/,tmpfft_d,BACKWARD);
 
         kernel.real(out, tmpifft_d);
     }

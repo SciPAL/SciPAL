@@ -3,7 +3,7 @@
 #define CUDA_KERNEL_STEP_28_CU_H
 
 #include <cuda.h>
-#include <lac/release/ShapeData.h>
+#include <lac/ShapeData.h>
 
 namespace step28 {
 

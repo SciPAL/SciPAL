@@ -49,7 +49,7 @@
 #include <step-27/NumericsParams.h>
 
 // For choosing the runtime architecture
-#include <step-28/Architecture.h>
+#include <step-27/Architecture.h>
 #include <step-28/coupling_type.h>
 
 #include <step-27/drs_cell.hh>

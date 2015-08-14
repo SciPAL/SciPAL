@@ -9,7 +9,8 @@
 // of 1-bits in the unsigned integer @p n. If there is only one bit set to '1'
 // (and @p n is not zero), @p n is a power of two.
 
-bool is_power_of_two (uint n)
+
+bool step28::is_power_of_two (const unsigned int n)
 {
   return (((n & (~n + 1)) == n) && (n != 0));
 }
@@ -31,7 +32,7 @@ bool is_power_of_two (uint n)
 
 __device__
 __forceinline__
-uint CStyle_index_2D(uint row, uint col, uint row_length)
+unsigned int CStyle_index_2D(unsigned int row, unsigned int col, unsigned int row_length)
 {
     return col + row*row_length;
 }
@@ -48,7 +49,7 @@ uint CStyle_index_2D(uint row, uint col, uint row_length)
 
 __device__
 __forceinline__
-uint ColMajor_index_2D(uint row, uint col, uint col_length)
+unsigned int ColMajor_index_2D(unsigned int row, unsigned int col, unsigned int col_length)
 {
     return row + col*col_length;
 }
@@ -72,13 +73,13 @@ uint ColMajor_index_2D(uint row, uint col, uint col_length)
 
 template<int dim>
 __forceinline__
-__device__ double scalardiff( const double *normal, const uint normal_size,
-                              const double *x, const uint x_size,
-                              const double *q, const uint q_size)
+__device__ double scalardiff( const double *normal, const unsigned int normal_size,
+                              const double *x, const unsigned int x_size,
+                              const double *q, const unsigned int q_size)
 {
     double val = 0;
-    for(uint i = 0; i < dim; ++i){
-        val += normal[i*normal_size]*(x[i*x_size]-q[i*q_size]);
+    for(unsigned int i = 0; i < dim; ++i){
+        val += normal[i*normal_size]*(x[i*x_size] - q[i*q_size]);
     }
     return val;
 }
@@ -95,11 +96,11 @@ __device__ double scalardiff( const double *normal, const uint normal_size,
 
 template<int dim>
 __forceinline__
-__device__ double single_layer(const double *x, const uint x_size,
-                              const double *q, const uint q_size)
+__device__ double single_layer(const double *x, const unsigned int x_size,
+                              const double *q, const unsigned int q_size)
 {
     double val = 0;
-    for(uint i = 0; i < dim; ++i){
+    for(unsigned int i = 0; i < dim; ++i){
         val += pow((x[i*x_size]-q[i*q_size]),2);
     }
     // @p rsqrt is the reverse square root provided by CUDA
@@ -137,6 +138,5 @@ __device__ double atomicAdd(double* address, double val)
     } while (assumed != old);
     return __longlong_as_double(old);
 }
-
 
 #endif

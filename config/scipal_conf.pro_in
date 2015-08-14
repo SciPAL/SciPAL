@@ -53,7 +53,6 @@ QMAKE_LDFLAGS += -fopenmp
 
 # CUDA path
 CUDA_DIR = /usr/local/cuda
-#-5.5
 CUDA_CC = $$CUDA_DIR/bin/nvcc
 
 
@@ -96,8 +95,10 @@ CUDA_INCLUDES += -I$$CUDA_DIR/sdk/shared/inc \
                  -I$$CUDA_DIR/samples/common/inc/ \
                  -I$$CUDA_DIR/sdk/CUDALibraries/common/inc/ \
                  -I$$SciPAL_DIR/include \
-                 -I$$SciPAL_DIR/
-#                 -I$$DEALHOME/include
+                 -I$$SciPAL_DIR/ \
+                 -I$$DEALHOME/include \
+                 -I/usr/include/qt4/ \
+                 -I/usr/include/qt4/QtCore
 
 #now for the host
 #these are the includes seen by the gcc
@@ -131,7 +132,8 @@ LIBS += -L$$QMAKE_LIBDIR \
         -lcublas \
         -lcufft \
         -lcurand \
--L/usr/lib
+		-lcusolver \
+		-L/usr/lib
 
 # DO NOT REMOVE the BRACES!!!
     macx {
@@ -159,10 +161,8 @@ LIBS += -lpthread  #\
 
 #some standard headers for SciPAL
 HEADERS += $$SciPAL_DIR/include/lac/*.h* \
-           $$SciPAL_DIR/include/lac/release/* \
-           $$SciPAL_DIR/include/lac/development/* \
            $$SciPAL_DIR/include/base/* \
-           $$SciPAL_DIR/include/numerics/* \
+           $$SciPAL_DIR/include/numerics/*
 
 #compiler config
 # have plain c-files compiled by g++
@@ -176,7 +176,7 @@ QMAKE_CC = $$CUDA_CC
 
 # We do not want to qmake to compile .cu files with QT-support.
 # Thus, we have to set the compilation rules by ourselves.
-QMAKE_RUN_CC = $(CC) \
+QMAKE_RUN_CC = touch $$STEP_DIR/autoInstantiations.h && $(CC) \
     -m64 -c \
     $$MY_QMAKE_CFLAGS \
     $$CUDA_CFLAGS \
@@ -192,6 +192,7 @@ QMAKE_RUN_CC_IMP = $(CC) \
     -o \
     "$@" \
     "$<"
+
 
 CONFIG(debug, debug|release) {
     QMAKE_PRE_LINK = "$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJCOMP) $(LIBS)" 2>&1 |\

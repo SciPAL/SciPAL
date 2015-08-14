@@ -62,6 +62,13 @@ double step28::CUDADriver<dim>::assemble_bem_matrices(FullMatrixAccessor &DL_mat
     this->d_n                       = n_k;
     this->d_W                       = W_k;
 
+    AssertThrow(q_k.size()%4 == 0,
+                dealii::ExcMessage("The number of quadrature points is not a power of two. "
+                                   "There exists an implementation for this case, but it "
+                                   "is generally slower and therefore disabled."));
+
+
+
     // Run the kernel wrapper function:
     bem_kernels.assemble_bem_matrices(d_DL_matrix,
                                       d_SL_matrix,

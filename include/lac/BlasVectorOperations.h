@@ -20,25 +20,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef VECTOROPERATIONS_H
 #define VECTOROPERATIONS_H
 
-
-
-namespace SciPAL {
-
-template<typename, typename> class Matrix;
-template<typename, typename> class Vector;
-
-}
+#include <base/ForewardDeclarations.h>
 
 #include <lac/expression_templates_host.h>
-
-
-// #include <release/include/lac/Matrix.h>
-// #include <release/include/lac/Vector.h>
-
-#include <lac/cublas_Matrix.h>
-#include <lac/cublas_Vector.h>
 #include <lac/VectorCustomOperations.h>
+#include <lac/scipal_kernels_wrapper.cu.h>
+
 namespace SciPAL {
+
 
 using namespace SciPAL;
 
@@ -72,6 +61,10 @@ struct BlasVecExp/*VectorExpressions*/
     // $ y = \alpha x + y$
     typedef typename SciPAL::BinaryExpr<scaledV, plus, Vtr>
     axpy;
+
+    // $ z =  x^t \cdot y$
+    typedef typename SciPAL::BinaryExpr< SciPAL::transpose<Vtr>, mult, Vtr>
+    scalar_product;
 };
 
 
@@ -87,6 +80,24 @@ struct BlasVecExp/*VectorExpressions*/
 // The corresponding apply is chosen by type.
 namespace LAOOperations
 {
+
+// @sect4{Function: apply}
+//!
+//! apply function for literals scalar product
+
+template <typename T, typename BW>
+static void apply(Literal<T> &result,
+                  const typename BlasVecExp<T, BW>::scalar_product& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    const Vtr x = expr.l.A;
+    const Vtr & y = expr.r;
+
+    result = BW::dot(x.size(), x.array().val(), 1, y.array().val(), 1);
+
+}
 
 template <typename T, typename BW>
 static void apply(Vector<T, BW> &result,
@@ -205,6 +216,8 @@ static void apply(Vector<T, BW> &result,
              1 // incy
              );
 }
+
+
 
 } // END namespace LAOOperations
 

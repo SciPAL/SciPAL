@@ -20,15 +20,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef OPERANDINFO_H
 #define OPERANDINFO_H
 
+#include <base/ForewardDeclarations.h>
+
 namespace SciPAL {
-
-//forward declaration
-template <class E> struct Expr;
-
-template<typename _L,
-         typename Operation,
-         typename _R>
-struct BinaryExpr;
 
 //! Tag for addition. The tag classes are empty structures which get passed into the binary expressions in order to retrieve the operator at a later time during compilation.
 struct plus {};

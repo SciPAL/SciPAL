@@ -44,4 +44,4 @@ set Use time tag               = true
 # cpu: do it on the CPU
 # cuda: use your GPU
 # both: use both (for speedup tests, nor for production runs).
-set Architecture = cpu
+set Architecture = both

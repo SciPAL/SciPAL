@@ -262,15 +262,16 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T, typename T2>
-    static void SetMatrix(int rows, int cols, const T2 *const &A,
-                   int lda, T *&B, int ldb)
+    static void SetMatrix(int rows, int cols, const T2 *const A,
+                   int lda, T *B, int ldb)
     {
         if(sizeof(T) != sizeof(T2))
             std::cout<<"You are trying to copy matrices with different Types: T="
                      << typeid(T).name() << ", T2=" << typeid(T2).name() ;
 
         cublasStatus_t status = cublasSetMatrix(rows, cols, sizeof(T),
-                                              A, lda, B, ldb);
+                                                A, lda,
+                                                B, ldb);
 
         check_status(status);
     }
@@ -284,8 +285,8 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T>
-    static void GetMatrix(int rows, int cols, const T * const &A,
-                   int lda, T *&B, int ldb)
+    static void GetMatrix(int rows, int cols, const T * const A,
+                   int lda, T *B, int ldb)
     {
         cublasStatus_t status = cublasGetMatrix(rows, cols, sizeof(T),
                                               A, lda, B, ldb);
@@ -318,10 +319,11 @@ public:
     //! @param B : Zielvektor B.
     //! @param inc_dst : Speicher Abstand zwischen Elemente in Vector B.
     template<typename T>
-    static void GetVector(int n_el, const T * const &A, int inc_src, T *&B, int inc_dst)
+    static void GetVector(int n_el, const T * const src, int inc_src,
+                          T *dst, int inc_dst)
     {
         cublasStatus_t status = cublasGetVector(n_el, sizeof(T),
-                                              A, inc_src, B, inc_dst);
+                                              src, inc_src, dst, inc_dst);
 
         check_status(status);
     }
@@ -626,6 +628,44 @@ public:
         cublasStatus_t status = cublasZcopy(handle, n, x, incx, y, incy);
         check_status(status);
     }
+
+    // @sect4{Funktion: swap}
+    //!
+    //! @param n : Anzahl Elemente.
+    //! @param x : Quellvektor x.
+    //! @param incx : Speicher Abstand zwischen Elemente in Vector x.
+    //! @param y : Zielvektor (y= alpha*x+y).
+    //! @param incy: Speicher Abstand zwischen Elemente in Vector y.
+
+    static void
+    swap(int n, float *x, int incx, float *y, int incy)
+    {
+        cublasStatus_t status = cublasSswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
+    static void
+    swap(int n, double *x, int incx, double *y, int incy)
+    {
+        cublasStatus_t status;
+        status = cublasDswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
+    static void
+    swap(int n, cuComplex *x, int incx, cuComplex *y, int incy)
+    {
+        cublasStatus_t status = cublasCswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
+    static void
+    swap(int n, cuDoubleComplex *x, int incx, cuDoubleComplex *y, int incy)
+    {
+        cublasStatus_t status = cublasZswap(handle, n, x, incx, y, incy);
+        check_status(status);
+    }
+
     // @sect4{Funktion:}
     //!
     //! @param n : Anzahl Elemente.

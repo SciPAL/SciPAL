@@ -77,7 +77,9 @@ public:
                             int width, int height, int size);
 
         void transpose(NumberType2* d_devPtr, int width, int height, int size );
-        void transpose2(NumberType2 *d_devPtr, int width, int height, int size );
+
+        template <typename U>
+        void transpose2(U *d_devPtr, int width, int height, int size );
 
         void separate_cplx(rShape &re, rShape &im,
                            cShape &d_devPtr,
@@ -108,7 +110,9 @@ template <typename dummy> class Impl<cpu, dummy> {
                             int width, int height, int size);
 
         void transpose(NumberType2* d_devPtr, int width, int height, int size );
-        void transpose2(NumberType2* d_devPtr, int width, int height, int size );
+
+        template <typename U>
+        void transpose2(U *d_devPtr, int width, int height, int size );
 
         void separate_cplx(rShape &re, rShape &im,
                            cShape &d_devPtr,

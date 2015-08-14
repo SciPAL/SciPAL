@@ -22,10 +22,10 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <lac/expression_templates_host.h>
 
-#include <lac/cublas_Matrix.h>
-#include <lac/cublas_Vector.h>
 #include <lac/scipal_kernels_wrapper.cu.h>
 #include <lac/UnaryFunctions.h>
+
+#include <base/ForewardDeclarations.h>
 
 
 // TODO: rename this file to CustomOperations.h. Currently, "custom" means generic array arithmetic applying both to matrices and vectors.
@@ -70,7 +70,7 @@ template <typename T, //! numbertype
 static void apply(LAO<T, BW> &result,
                   const ::SciPAL::Expr<Literal<T> > &lit)
 {
-   SciPAL::Kernels<T, BW::arch> bla(4);
+   ::SciPAL::Kernels<T, BW::arch> bla(4);
    UnaryExpr<Literal<T>, Setter<T> >parent(~lit) ;//Expr envelope for Literal
    DevUnaryExpr<Literal<T>, Setter<T> >child(parent);
 

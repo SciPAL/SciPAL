@@ -481,6 +481,7 @@ void step35::ADMM<T>::run() {
     }
     //Exact algorithm
     else {
+#define USE_EXACT
 #ifdef USE_EXACT
         typedef cset_small field_patch;
         typedef cluster<cset_small, T> driver_patch;
@@ -489,14 +490,14 @@ void step35::ADMM<T>::run() {
         //* Generates the patches and puts them in clusters if needed \n
         //* Calculates the weights $c_s$
         std::cout << "Creating field\n";
-        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(pwidth, pheight, pdepth, im, params.sigma, params.step, 1024);//only kept for statitics generation atm
+        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(pwidth, pheight, pdepth, input_image, params.sigma, params.step, 1024);//only kept for statitics generation atm
 
         std::cout << "Getting quantile\n";
         cs = field.get_quantile_gauss(params.gnoise, alpha_quant, params.step, pwidth, pheight, pdepth, qalpha_ret);
 
         //Prepare the driver
         std::cout << "Setting up driver\n";
-        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.cluster_root, im, psf, cs, pwidth, pheight, pdepth,
+        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.cluster_root, input_image, psf, cs, pwidth, pheight, pdepth,
                                                              params.step, gamma_fac, params.sigma, params.regType,
                                                              params.dim);
         //This function templates to whatever Dykstra Flavour we have chosen
@@ -566,7 +567,7 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
     int iter=1;
     //Will be used to store the constraint violations
     T c1,c2=0;
-    while (  ( res > params.tol && iter < params.max_it) || iter < 5 ) {
+    while (  ( /*res > params.tol &&*/ iter < params.max_it) || iter < 5 ) {
         //Argmin w.r.t. x
         driver.x_step(params.rho1, params.rho2);
         //driver.x_step_ET(params.rho1, params.rho2);
@@ -631,7 +632,12 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
 
             //Print the current estimate to a tiff file
             if (params.do_control)
-                write_image<T>(params.out_imagename, driver.inf->z_h, pheight0, pwidth0, pdepth0, 1.0);//params.gnoise);
+            {
+                QString img_out (QString(params.out_imagename.c_str()).replace(".", QString("-" + QString::number(iter))+"."));
+
+                write_image<T>(img_out.toStdString(), driver.inf->z_h, pheight0, pwidth0, pdepth0, 1.0);//params.gnoise);
+
+            }
         }
         iter=iter+1;
     } // End of main loop

@@ -22,6 +22,7 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 //std
 #include<iostream>
+#include <cmath>
 
 //CUDA
 #include <cuda_runtime.h>
@@ -368,7 +369,7 @@ class CUDADriver {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
             for (int so=0; so<5; so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d,inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                    kernels.dyadic_dykstra(inf->e_d.array().val(),inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
                 }
             }
         }
@@ -391,18 +392,18 @@ class CUDADriver {
     //@sect5{Function: nostream_handler2}
     //@brief Wrapper if we use the stoch_dykstra Kernel.
     void nostream_handler2() {
-        int randomPower = 5;//rand() % 11;
+        int randomPower = rand() % 11;
 
         step35::Kernels<Mdouble> kernels;
-            std::cout << "random number:" << randomPower << std::endl;
+           // std::cout << "random number:" << randomPower << std::endl;
 
         if (inf->dim == 2) {
 //            for(int i = 50000;i<1024+50000;i++)
 //                std::cout << inf->e_d(i)<< " " ;
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
-            for (int so=-1; so<5; so++) {
+            for (int so=-1; so<std::min(randomPower,10-randomPower); so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.stoch_dykstra(inf->e_d,inf->ext_height, inf->ext_width, inf->ext_depth, (so<0)? 0: (1 << so), (so<0)? 0: (1 << so), z, so, randomPower);
+                    kernels.stoch_dykstra(inf->e_d,inf->ext_height, inf->ext_width, inf->ext_depth, (so<0)? 0: (1 << so), (so<0)? 0: (1 << so), z, rand()%std::max(randomPower,10-randomPower)+1, randomPower);
                 }
             }
         }

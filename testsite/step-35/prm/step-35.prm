@@ -9,10 +9,10 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 0
+  set gaussian noise = 100
 
   # path to the .tif image
-  set image          = /Users/sck/Documents/PostDoc/Projects/FRC_tests/lena-sigma_4.tif
+  set image          = /clusterfs/cuda-2015/austausch_rw/imagetif.tif
 
   # intensity of regularisation
   set regularization = 1.0
@@ -42,10 +42,10 @@ subsection program flow control
   set MRdepth            = 15
 
   # do a small dykstra in approximation
-  set approx             = false
+  set approx             = true
 
   # Set maximum number of iterations
-  set maximum iterations = 100
+  set maximum iterations = 1002
 
   # Reporting progress in intervals of ... Iterations
   set report interval    = 10
@@ -58,11 +58,10 @@ end
 subsection simulate dataset from real image
   # If set to false the input is treated as real data, if true input will be
   # treated as test image and blurring and noise are added
-  set simulate  = false
-
+  set simulate  = true
   # If false simulated noise has a constant seed, if true the seed is taken
   # from the clock
-  set time seed = false
+  set time seed = true
 end
 
 

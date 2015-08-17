@@ -264,14 +264,14 @@ void step42::MyFancySimulation::run()
 
 //    testcase.cusolver_demonstration();
     
-    testcase.feature_demonstration();
+//    testcase.feature_demonstration();
 
 //    testcase.lin_combo();
 
 //    testcase.views();
 
-//    testcase.stacks_of_LAOs();
-    testcase.operator_precedence();
+    testcase.stacks_of_LAOs();
+//    testcase.operator_precedence();
 
     std::cout << "Done." << std::endl;
 }

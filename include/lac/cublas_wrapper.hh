@@ -319,10 +319,11 @@ public:
     //! @param B : Zielvektor B.
     //! @param inc_dst : Speicher Abstand zwischen Elemente in Vector B.
     template<typename T>
-    static void GetVector(int n_el, const T * const &A, int inc_src, T *&B, int inc_dst)
+    static void GetVector(int n_el, const T * const src, int inc_src,
+                          T *dst, int inc_dst)
     {
         cublasStatus_t status = cublasGetVector(n_el, sizeof(T),
-                                              A, inc_src, B, inc_dst);
+                                              src, inc_src, dst, inc_dst);
 
         check_status(status);
     }

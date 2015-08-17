@@ -59,17 +59,14 @@ public:
         this->reinit(data, n_rows, n_cols, leading_dim, stride);
     }
 
-    //! Copy constructor. The new object points to the same LAO as @p other.
-    //! @param other: source shape to copy.
-    Shape(const Shape& other)
-    {
-        *this = other;
-    }
 
     //! By assigning one shape to another we get two shapes looking at the same LAO.
     //! @param other: source shape to copy.
-    Shape& operator = (const Shape& other)
+    Shape& operator = (/*const*/ Shape& other)
     {
+#ifdef DEBUG
+    std::cout << "line :" << __LINE__ << ", Shape<T>  " << __FUNCTION__<< "\n"  << std::endl;
+#endif
         this->data_ptr = other.data_ptr;
 
         this->n_rows = other.n_rows;
@@ -118,6 +115,15 @@ protected:
         std::swap(this->leading_dim, other.leading_dim);
         std::swap(this->stride, other.stride);
     }
+
+private:
+    //! Copy constructor. The new object points to the same LAO as @p other.
+    //! @param other: source shape to copy.
+    Shape(const Shape& other)
+    {
+        *this = other;
+    }
+
 
 };
 

@@ -130,31 +130,39 @@ public:
     }
 
     template<typename T2>
-    Matrix<T, BW> & operator = (const FullMatrixAccessor<T2> & matrix);
+    Matrix<T, BW> & operator= (const FullMatrixAccessor<T2> & matrix);
 
-    Matrix<T, BW> & operator = (const dealii::IdentityMatrix & Id);
+    Matrix<T, BW> & operator= (const dealii::IdentityMatrix & Id);
+
+    Matrix<T, BW> & operator = (const Matrix<T, BW> & other)
+    {
+        this->reinit(other.n_rows(), other.n_cols());
+        // element-wise copy of array.
+        int inc_src  = 1;
+        int inc_this = 1;
+        BW::copy(this->n_elements(), other.array().val(), inc_src,
+                 this->array().val(), inc_this);
+        return *this;
+    }
 
     //! Generate a deep copy of @p other
     template <typename BW2>
     Matrix<T, BW> & operator = (const Matrix<T, BW2> & other)
     {
         //! check it both matrices have the same layout
-        if((this->n_rows() != other.n_rows()) || this->n_cols() != other.n_cols())
-        {
-            size_t new_size = other.size();
-            //does not respect lda
-            this->reinit(other.n_rows(), other.n_cols());
-        }
-
-
+//        if((this->n_rows() != other.n_rows()) || this->n_cols() != other.n_cols())
+//        {
+//            size_t new_size = other.size();
+//            //does not respect lda
+//            this->reinit(other.n_rows(), other.n_cols());
+//        }
+        this->reinit(other.n_rows(), other.n_cols());
+//        this->shape() = other.shape();
+//        this->MyShape::operator =(other);
         // element-wise copy of array.
         int inc_src  = 1;
         int inc_this = 1;
-        //! same blas type no problem
-        if(typeid(BW) == typeid(BW2) )
-        BW::copy(this->n_elements(), other.array().val(), inc_src,
-                 this->array().val(), inc_this);
-
+        
         //! copy from cublas matrix to blas matrix -> GetMatrix
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
@@ -176,7 +184,7 @@ public:
                               this->leading_dim);
         }
 
-
+        std::cout<<__FUNCTION__<<std::endl;
         return *this;
     }
 
@@ -244,9 +252,12 @@ public:
 
     inline const SciPAL::Array<T, BW> & array() const { return *this; }
 
+    inline MyShape & shape() { return *this; }
+
+
 private:
 
-    Matrix<T, BW> & operator = (const Array<T, BW> & src);
+    //Matrix<T, BW> & operator = (const Array<T, BW> & src);
 };
 
 }
@@ -374,7 +385,9 @@ SciPAL::Matrix<T, BW>::Matrix(const Matrix<T, BW> & other)
       dealii::Subscriptor(),
       MyShape()
 {
-    *this = other;
+//    Type& self = *this;
+//    self = other;
+    this->Type::operator=(other);
 }
 
 
@@ -400,28 +413,6 @@ void SciPAL::Matrix<T, BW>::reinit(int n_rows, int n_cols)
 }
 
 
-// @sect4{Operator: =}
-//!
-//! Element-wise copy of an Array into a matrix.
-//! The source must have at least as many elements as the target.
-//! @param src : array which is to be copied into the matrix.
-template<typename T, typename BW>
-SciPAL::Matrix<T, BW> &
-SciPAL::Matrix<T, BW>::operator = (const Array<T, BW> & src)
-{
-    Assert(this->n_elements() <= src.n_elements(),
-           dealii::ExcMessage("n_element mismatch") );
-
-    // Setting both increments to 1 means that we copy every element.
-    int inc_src  = 1;
-    int inc_this = 1;
-
-    // The actual copy operation is delegated to the underlying BLAS library.
-    BW::copy(this->n_elements(), src.data(), inc_src,
-             this->data(), inc_this);
-
-    return *this;
-}
 
 //! Initialize a matrix from an identity matrix.
 //! @param Id : identity matrix which provides the information about the size of the matrix.

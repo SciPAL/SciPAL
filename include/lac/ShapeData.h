@@ -53,6 +53,19 @@ struct ShapeData {
     //! This value can be used to optimize memory access of CUDA warps.
     //! We assume column-major storage in order to be compatible with CUBLAS.
     size_t leading_dim;
+
+    //! new
+    /*
+     * r_begin_active
+     * r_end_active
+     * c_begin_active
+     * c_end_active
+     *
+     * op()(i,j)
+     * op()(i)
+     */
+
+
 };
 
 }

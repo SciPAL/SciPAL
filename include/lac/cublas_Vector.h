@@ -130,37 +130,48 @@ public:
 
     Vector<T, BW> & operator = (const std::vector<T> & other);
 
+    Vector<T, BW> & operator = (const Vector<T, BW> & other)
+    {
+        this->reinit(other.size());
+        // element-wise copy of array.
+        int inc_src  = 1;
+        int inc_this = 1;
+        BW::copy(this->n_elements(), other.array().val(), inc_src,
+                 this->array().val(), inc_this);
+        return *this;
+    }
+
+    //! Generate a deep copy of @p other
     template<typename BW2>
     Vector<T, BW> & operator = (const Vector<T, BW2> & other)
     {
-        if(this->n_elements() != other.n_elements())
-            this->reinit(other.n_elements());
+//        if(this->n_elements() != other.n_elements())
+            this->array().reinit(other.array().n_elements());
 
         // element-wise copy of array.
         int inc_src  = 1;
         int inc_this = 1;
-        //! same blas type no problem
-        if(typeid(BW) == typeid(BW2) )
-            BW::copy(this->n_elements(), other.val(), inc_src,
-                     this->val(), inc_this);
 
         //! copy from cublas matrix to blas matrix -> GetMatrix
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
         {
-            cublas::GetMatrix(other.n_rows(), other.n_cols(), other.array().val(),
-                              other.leading_dim, this->array().val(), this->leading_dim);
+            cublas::GetVector(other.array().n_elements(),
+                              other.array().val(),
+                              other.stride,
+                              this->array().val(),
+                              this->stride);
         }
 
         //! copy from cublas matrix to blas matrix -> SetMatrix
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
         {
-            cublas::SetMatrix(other.n_rows(), other.n_cols(),
+            cublas::SetVector(other.array().n_elements(),
                               other.array().val(),
-                              other.leading_dim,
+                              other.stride,
                               this->array().val(),
-                              this->leading_dim);
+                              this->stride);
         }
 
         std::cout<<__FUNCTION__<<std::endl;

@@ -24,7 +24,7 @@
 # QT = core
 # thread-safe console application with rules for debug and release version
 
-
+QMAKE_CXXFLAGS += --std=c++11
 
 CONFIG += console \
     thread \
@@ -54,19 +54,11 @@ DEFINES += nUSE_CUDA_COMPLEX_VERSION
     HOME = $$(HOME) # your home directory
     SciPAL_DIR = $$_PRO_FILE_PWD_/../../
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/../
+    STEP_DIR = $$_PRO_FILE_PWD_/
 
 message("SciPALs home :" $$SciPAL_DIR)
 message("step home :" $$STEP_DIR)
 
-# Qt considers OSX as a unix.
-    macx {
-         DEALHOME = /usr/local #
-           }
-    else {
-        unix {
-         DEALHOME = /usr/local/deal.II-7.2.0 # path to deal II in NAM
-        }
-    }
 
 
      #put here some non standard header includes for cuda
@@ -78,14 +70,11 @@ message("step home :" $$STEP_DIR)
      #
      # build-step-2/Debug/Desktop_Qt_5_2_1_clang64/
      #
-        CUDA_INCLUDES = -I$$STEP_PARENT_DIR
-
-
-        CUDA_INCLUDES +=-I$$SciPAL_DIR/include
+        CUDA_INCLUDES += -I$$STEP_PARENT_DIR
 
 
     # and here for the gcc
-INCLUDEPATH += ..
+INCLUDEPATH += . ..
 
 #put here your non-standard libs
 LIBS +=
@@ -111,22 +100,26 @@ message("Load deal.II MPI config")
         }
     }
 
+message("g++ include paths :" $$INCLUDEPATH)
+message("g++ LD paths :" $$LD_LIBRARY_PATH)
+
 # Enter project specific source and header files here
-SOURCES = \
+SOURCES += \
     cuda_kernel_step-template.cu step-template.cpp \
     SimParams.cpp
 
-HEADERS = \
+HEADERS += \
     cuda_driver_step-template.h \
     cuda_driver_step-template.hh \
     cuda_kernel_wrapper_step-template.cu.h \
     cuda_kernel_step-template.cu.c \
     SimParams.h \
+	autoInstantiations.h \
     step-template.hh
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator
    # which are not subject to compilation.
-OTHER_FILES = doxygen_filelist \
+OTHER_FILES += doxygen_filelist \
                 doc/*.dox \
                 prm/*.prm
 

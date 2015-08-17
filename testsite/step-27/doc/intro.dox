@@ -1,7 +1,7 @@
 <h1>Introduction</h1>
 <p>
 In this project, the assembly of matrices coupling a Finite Element and a Boundary Element problem is parallelized using CUDA
-and regular CPU threads. The underlying physical problem is that of <i>dielectric relaxation spectroscopy</i>, also simplified in this case:
+and regular CPU threads. The underlying physical problem is that of <i>dielectric relaxation spectroscopy</i>, although simplified in this case:
 We consider a cylinder $\Omega_S$ with surface $\Gamma_0\cup\Gamma_C\cup\Gamma_A$
 filled with fluid with dissolved ions. The bottom and top cap of the cylinder ($\Gamma_A$ and $\Gamma_C$) are at possibly different electric potentials.
 
@@ -21,7 +21,7 @@ There are several assumptions to simplify the problem:
 The behaviour of the ion concentrations is simulated using an FEM method, if which an implementation 
 in  <i>deal.II</i> was already available, courtesy of Stephan Kramer. Including the protein via FEM is not feasible,
 because the differing dielectric constant in $\Gamma_P$ compared to the exterior $\Gamma_S$ leads to complications.
-Therefore, the protein interior is treated as a seperate problem.
+Therefore, the protein interior is treated as a separate problem.
 </p>
 <p>
 The problem in the protein interior is a Poisson equation
@@ -114,14 +114,14 @@ contributions of each cell to the global matrices can be calculated independentl
 $V_{h,ij}$ and $K_{h,ij}$ can be used from multiple threads, partitioning the cell loop onto multiple threads should lead to additional speedup.
 </p>
 
-<h2>Affiliations to other projects<h2>
+<h2>Affiliations to other projects</h2>
 
-step-27: FEM-BEM für Poisson mit Kollokation und Johnson-Nedelec-Kopplung
+step-27: FEM-BEM for Poisson with collokation and Johnson-Nedelec-coupling
 step-28: CUDA version of step-27
-step-29: FEM-BEM for Poisson mit schwacher Formulierung und hypersingulärer Kopplung
-step-30: Vorkonditionierer für BEM-Teile
-step-31: Fehlerschätzer
-step-32: eigentliches DRS-Problem
+step-29: FEM-BEM for Poisson with weak formulation and hypersingular coupling
+step-30: preconditioner for BEM part
+step-31: error estimation
+step-32: the DRS problem itself
 
 Vor step-28 ist auch noch etwas Platz. Neben der reinen Assembliererei müssen auch noch weitere Aspekte behandelt werden:
 
@@ -138,7 +138,12 @@ Was meinst Du dazu?
 
 <h2>References</h2>
 <ol>
-<li>Stephan Kramer. <i>CUDA-based Scientific Computing Tools and Selected Applications.</i>
-PhD thesis, University of G&ouml;ttingen, 2012.
+<li>Stephan Kramer.
+<a href="http://hdl.handle.net/11858/00-1735-0000-000D-FB52-0">CUDA-based Scientific Computing Tools and Selected Applications.</i>
+PhD thesis, University of G&ouml;ttingen, 2012.</a>
+<li><a href="http://link.springer.com/chapter/10.1007/978-3-319-10705-9_4">
+Finite-element-boundary element methods for accurate modeling of excluded volume effects in dielectric relaxation spectroscopy.
+Springer Lect. Notes Comput. Sci. Engrg. 103 (2015), 47-56.</a><a href="http://www.num.math.uni-goettingen.de/lube/kramer_mini_free.pdf">pdf file</a>
+
 </ol>
 

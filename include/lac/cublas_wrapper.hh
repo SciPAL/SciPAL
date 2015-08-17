@@ -186,9 +186,9 @@ struct cublas {
 
         Data() : dev_ptr(0) {}
 
-        Data(size_t n)
+        Data(size_t n_rows, size_t n_cols = 1)
         {
-            alloc(n);
+            alloc(n_rows, n_cols);
         }
 
         ~Data() {  free_dev_ptr(); }
@@ -197,10 +197,24 @@ struct cublas {
 
         const T * data() const { return dev_ptr; }
 
-        void resize(size_t n)
+        void resize(size_t n_rows, size_t n_cols = 1)
         {
             free_dev_ptr();
-            alloc(n);
+            alloc(n_rows, n_cols);
+        }
+
+        size_t leading_dim () const {
+            size_t n_bytes = sizeof(T);
+
+                if( pitch_in_bytes % n_bytes != 0 )
+                {
+                    std::cout << "somethind is woron wit the pitch pitch_in_bytes % n_bytes ="<< pitch_in_bytes % n_bytes<< std::endl;
+                return 0;
+                }
+                else
+                {
+                    return pitch_in_bytes % n_bytes;
+                }
         }
 
     protected:
@@ -221,13 +235,16 @@ struct cublas {
         }
 
 
-        void alloc(size_t n)
+        void alloc(size_t rows, size_t cols = 1)
         {
-            cudaError_t status = cudaMalloc( (void**)&dev_ptr, n*sizeof(T) );
+            cudaError_t status = cudaMallocPitch((void**)&dev_ptr, &pitch_in_bytes,
+                                             cols, rows);
+//            cudaError_t status = cudaMalloc( (void**)&dev_ptr, n*sizeof(T) );
             check_status(status);
 
             // set everything to zero
-            status = cudaMemset( dev_ptr, 0, n*sizeof(T) );
+//            status = cudaMemset2D(dev_ptr, pitch_in_bytes,
+//                                  0, cols*sizeof(T), rows*sizeof(T));
             // According to the
             // <a href="http://developer.download.nvidia.com/compute/cuda/4_2/rel/toolkit/docs/online/sync_async.html#memset_sync_async_behavior">online documentation</a>
             // cudaMemset is asynchronous.
@@ -243,6 +260,7 @@ struct cublas {
         }
 
         T * dev_ptr;
+        size_t pitch_in_bytes;
     };
 
 

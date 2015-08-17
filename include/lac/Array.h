@@ -44,11 +44,11 @@ public:
 
     //! Construct an array of length @p n.
     //! @param n: Number of elements to allocate.
-    Array(size_t n);
+    Array(size_t n_rows, size_t n_cols);
 
     //! Resize an array to length @p n.
     //! @param n: New number of elements.
-    void reinit(size_t n);
+    void reinit(size_t n_rows, size_t n_cols);
 
     //! Read-Write access to the data pointer. Use this function if you know what you are doing.
     T * val();
@@ -58,6 +58,9 @@ public:
 
     //! Return the number of elements this array currently has.
     int n_elements() const { return __n; }
+    size_t leading_dim() const {
+        return this->Base::leading_dim();
+    }
 
 protected:
     //! The number of elements this array currently has. By having it in this class
@@ -99,26 +102,26 @@ SciPAL::Array<T, BW>::Array()
 
 //! @param n : Groesse des Arrays.
 template <typename T, typename BW>
-SciPAL::Array<T, BW>::Array(size_t n)
+SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols = 1)
     :
-      Base(n),
-      __n(n)
+      Base(n_rows, n_cols),
+      __n(n_rows * n_cols)
 {}
 
 
 template <typename T, typename BW>
-inline void SciPAL::Array<T, BW>::reinit(size_t n)
+inline void SciPAL::Array<T, BW>::reinit(size_t n_rows, size_t n_cols = 1)
 {
-    if ( this->__n == n) return;
+    if ( this->__n == n_rows * n_cols) return;
 
-    AssertThrow(n > 0,
+    AssertThrow(n_rows * n_cols > 0,
                 dealii::ExcMessage("Reinitialization requires a positive number of elements.") );
 
-    if (this->__n != n)
+    if (this->__n !=n_rows * n_cols)
     {
-        this->Base::resize(n);
+        this->Base::resize(n_rows, n_cols);
         // Alocation errors are handled by the subclass. Thus we can go on.
-        __n = n;
+        __n = n_rows * n_cols;
     }
 }
 

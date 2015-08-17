@@ -39,14 +39,14 @@ namespace SciPAL {
     template<typename T, typename T_src>
     class VectorView
             :
-            public SciPAL::Expr<VectorView<T, T_src> >//,
-//            public SciPAL::Shape<T>
+            public SciPAL::Expr<VectorView<T, T_src> >,
+            public SciPAL::Shape<T, vector>
     {
 
    public:
         typedef typename T_src::blas_wrapper_type BW;
 
-        typedef SciPAL::Shape<T> MyShape;
+        typedef SciPAL::Shape<T, vector> MyShape;
 
         friend class Vector<T, BW>;
 
@@ -89,11 +89,11 @@ namespace SciPAL {
         template <typename T2>
                 VectorView<T, T_src> & operator = (const std::vector<std::complex<T2> > & other);
 
-        int r_begin() const { return __r_begin; }
+        int r_begin() const { return this->r_begin_active; }
 
-        int c_begin() const { return __col; }
+        int c_begin() const { return this->c_begin_active; }
 
-        int size() const { return __n_el; }
+        int size() const { return this->n_elements_active; }
 
         template<typename T2_src>
         VectorView & operator += (const VectorView <T, T2_src> &other);
@@ -114,17 +114,17 @@ namespace SciPAL {
 //!            this->__src = other.__src;
 //!            this->__r_begin = other.__r_begin;
 //!            this->__col     = other.__col;
-            Assert(this->__n_el    == other.__n_el,
+            Assert(this->n_elements_active    == other.__n_el,
                    dealii::ExcMessage("Cannot copy subarrays of different lengths"));
 //!            this->__view_begin = other.__view_begin;
 //!            this->_is_col   = other._is_col;
-//!            this->_stride   = other._stride;
+//!            this->stride   = other.stride;
 
             //! Elementweise Kopie des arrays.
-            int inc_src = other._stride;
-            int inc_dst = this->_stride;
+            int inc_src = other.stride;
+            int inc_dst = this->stride;
 
-            BW::copy(this->__n_el, other.val(), inc_src, this->val(), inc_dst);
+            BW::copy(this->n_elements_active, other.val(), inc_src, this->val(), inc_dst);
 
             return *this;
         }
@@ -139,20 +139,16 @@ private:
             //! das sie zeigen vorzeitig zerst&ouml;rt wird.
         dealii::SmartPointer<T_src> __src;
 
-        //! Zeilenindex
-        int __r_begin;
-        int __col;
-
     protected:
-        int __n_el;
+//        int __n_el;
 
     private:
-        int __view_begin;
+//        int __view_begin;
 
     protected:
         bool _is_col;
     //! public:
-        int _stride;
+//        int _stride;
     };
 
 
@@ -165,35 +161,21 @@ private:
 
     public:
         typedef VectorView<T, T_src> Base;
+        typedef Shape<T, vector> MyShape;
+        typedef typename T_src::blas_wrapper_type BW;
 
     ColVectorView(T_src & src,
                   int r_begin, int c=0) : Base(src, r_begin,
                                                src.n_rows()/*r_end*/, c)
-    { this->_stride = 1; }
+    { }
 
-#ifdef USE_OLD_ET
-    template<typename M> //!, typename Op>
-    ColVectorView(const //! X_read_read<M, Op, Vector<T, BW> >
-                                    X_read_read<M, vmu_view, SciPAL::ColVectorView<T, T_src> >
-                                    & Ax);
-
-
-    template<typename M> //!, typename Op>
-    ColVectorView<T, T_src> & operator = (const
-                                    X_read_read<M, vmu_view, ColVectorView<T, T_src> >
-                                    & Ax)
-    {
-        Ax.apply(*this);
-        return *this;
-    }
-#endif
 
     template<typename T2>
     SciPAL::ColVectorView<T, T_src> & operator *= (const T2 scale)
                                                     {
         int elem_dist = 1;
 
-        int n = this->__n_el;
+        int n = this->n_elements_active;
 
         Base::BW::scal(n, scale, &(this->val()[0]), elem_dist);
 
@@ -205,7 +187,7 @@ private:
 //!                                                    {
 //!        int elem_dist = 1;
 
-//!        int n = this->__n_el;
+//!        int n = this->n_elements_active;
 
 //!        Base::BW::scal(n, scale, &(this->val()[0]), elem_dist);
 
@@ -214,12 +196,12 @@ private:
 
     ColVectorView<T, T_src> & operator = (const Vector<T, typename Base::BW>& col)
     {
-        Assert(this->__n_el == col.size(),
+        Assert(this->n_elements_active == col.size(),
                dealii::ExcMessage("Dimension mismatch"));
 
         int incx = 1; //! col._stride;
-        int incy = this->_stride;
-        Base::BW::copy(this->__n_el, col.val(), incx, this->val(), incy);
+        int incy = this->stride;
+        Base::BW::copy(this->n_elements_active, col.val(), incx, this->val(), incy);
 
         return *this;
     }
@@ -247,10 +229,10 @@ private:
 
     void reset(int r_begin, int c=0)
     {
-        this->__r_begin    = r_begin;
-        this->__col        = c;
-        this->__n_el       = this->__src->n_rows() - r_begin;
-        this->__view_begin = c*this->__src->n_rows() + r_begin;
+        this->MyShape::reinit(this->data_ptr,
+                              r_begin, this->r_end_active,
+                              c, c+1,
+                              this->MyShape::leading_dim, 1);
     }
 
 
@@ -274,12 +256,15 @@ private:
 
     public:
         typedef VectorView<T, T_src> Base;
+        typedef typename T_src::blas_wrapper_type BW;
+
+        typedef SciPAL::Shape<T, vector> MyShape;
 
         RowVectorView(T_src & src,
                       int r_begin, int c) : Base(src, r_begin, c)
         {
-            this->__n_el  = src.n_cols() - c;
-            this->_stride = src.n_rows(); this->_is_col = false;
+            this->n_elements_active  = src.n_cols() - c;
+            this->stride = src.n_rows(); this->_is_col = false;
         }
 
     };
@@ -299,17 +284,12 @@ template<typename T, typename T_src>
 SciPAL::VectorView<T, T_src >::VectorView(T_src & src,
                                             int r_begin, int r_end, int c)
     :
-      MyShape(reinterpret_cast<T*>(src.data_ptr + (c*src.n_rows() + r_begin)),
-                r_end - r_begin, /*rows*/
-                1/*cols*/,
-                r_end - r_begin/*lda*/),
+      MyShape(src.array().val(),
+              r_begin, r_end, /*rows*/
+              c, c+1,/*cols*/
+              src.array().leading_dim()),
     __src(&src),
-    __r_begin(r_begin),
-    __col (c),
-    __n_el(src.n_rows() - r_begin),
-    __view_begin(c*src.n_rows() + r_begin),
-    _is_col(true),
-    _stride(1)
+    _is_col(true)
 {}
 
 
@@ -324,7 +304,7 @@ const T *
 SciPAL::VectorView<T, T_src>::val() const
 {
     //! Indizes in C-Z&auml;hlung!!!
-    return &(this->__src->val()[__view_begin]);
+    return this->view_begin;
 }
 
 
@@ -333,7 +313,7 @@ T *
 SciPAL::VectorView<T, T_src>::val()
 {
     //! Indizes in C-Z&auml;hlung!!!
-    return &(this->__src->val()[__view_begin]);
+    return this->view_begin;
 }
 
 
@@ -344,7 +324,8 @@ template<typename T, typename T_src>
 typename PrecisionTraits<T, T_src::blas_wrapper_type::arch>::NumberType
 SciPAL::VectorView<T, T_src>::l2_norm() const
 {
-    typename PrecisionTraits<T, BW::arch>::NumberType result = BW::nrm2(this->__n_el, this->val(), this->_stride);
+    typename PrecisionTraits<T, BW::arch>::NumberType result
+            = BW::nrm2(this->n_elements_active, this->val(), this->stride);
     return result;
 }
 
@@ -359,12 +340,12 @@ T
 SciPAL::VectorView<T, T_src>::dot(const VECTOR & other) const
 {
 
-    Assert(this->__n_el == other.size(),
+    Assert(this->n_elements_active == other.size(),
            dealii::ExcMessage("Dimension mismatch"));
 
-    int incx = this->_stride;
-    int incy = other._stride;
-    T result = BW::dot(this->__n_el,
+    int incx = this->stride;
+    int incy = other.stride;
+    T result = BW::dot(this->n_elements_active,
                        this->val(), incx, other.val(), incy);
 
     return result;
@@ -381,15 +362,15 @@ template<typename T2_src>
 SciPAL::VectorView<T, T_src> &
 SciPAL::VectorView<T, T_src> ::operator +=(const SciPAL::VectorView <T, T2_src> &other)
 {
-    Assert(this->__n_el == other.size(),
+    Assert(this->n_elements_active == other.size(),
            dealii::ExcMessage("Dimension mismatch"));
 
     One<T> one;
 
-    int incx = other._stride;
-    int incy = this->_stride;
+    int incx = other.stride;
+    int incy = this->stride;
 
-     BW::axpy(this->__n_el, one(), other.val(), incx,this->val(), incy);
+     BW::axpy(this->n_elements_active, one(), other.val(), incx,this->val(), incy);
 
     return *this;
 }
@@ -403,15 +384,15 @@ template<typename T, typename T_src>
 SciPAL::VectorView<T, T_src> &
 SciPAL::VectorView<T, T_src> ::operator -=(const SciPAL::VectorView <T, T_src> &other)
 {
-    Assert(this->__n_el == other.size(),
+    Assert(this->n_elements_active == other.size(),
            dealii::ExcMessage("Dimension mismatch"));
 
     One<T> one;
 
-    int incx = other._stride;
-    int incy = this->_stride;
+    int incx = other.stride;
+    int incy = this->stride;
 
-     BW::axpy(this->__n_el, one(false), other.val(), incx,this->val(), incy);
+     BW::axpy(this->n_elements_active, one(false), other.val(), incx,this->val(), incy);
 
     return *this;
 }
@@ -422,14 +403,14 @@ template<typename T, typename T_src>
 SciPAL::VectorView<T, T_src> &
 SciPAL::VectorView<T, T_src>::operator -= (const Vector<T, BW>& other)
 {
-    Assert(this->__n_el <= other.size(),
+    Assert(this->n_elements_active <= other.size(),
            dealii::ExcMessage("Dimension mismatch"));
 
     int incx = 1; //! col._stride;
-    int incy = this->_stride;
+    int incy = this->stride;
     T alpha = -1.;
-    //!BW::copy(this->__n_el, col.val(), incx,  this->val(), incy);
-    BW::axpy(this->__n_el, alpha, other.val()+ this->__view_begin, incx,this->val(), incy);
+    //!BW::copy(this->n_elements_active, col.val(), incx,  this->val(), incy);
+    BW::axpy(this->n_elements_active, alpha, other.val()+ this->__view_begin, incx,this->val(), incy);
 
     return *this;
 }
@@ -443,9 +424,9 @@ template<typename T, typename T_src>
 SciPAL::VectorView<T, T_src> &
 SciPAL::VectorView<T, T_src> ::operator *=(const T alpha)
 {
-     int incx = this->_stride;
+     int incx = this->stride;
 
-     BW::scal(this->__n_el, alpha, this->val(), incx);
+     BW::scal(this->n_elements_active, alpha, this->val(), incx);
 
     return *this;
 }
@@ -466,9 +447,9 @@ SciPAL::VectorView<T, T_src> ::operator /=(const T alpha)
            dealii::ExcMessage("Div/0"));
 #endif
 
-     int incx = this->_stride;
+     int incx = this->stride;
 
-     BW::scal(this->__n_el, (1/alpha), this->val(), incx);
+     BW::scal(this->n_elements_active, (1/alpha), this->val(), incx);
 
     return *this;
 }
@@ -485,9 +466,9 @@ SciPAL::VectorView<T, T_src> &
            dealii::ExcMessage("Div/0"));
 #endif
 
-     int incx = this->_stride;
+     int incx = this->stride;
 
-     BW::scal(this->__n_el, (1./alpha), this->val(), incx);
+     BW::scal(this->n_elements_active, (1./alpha), this->val(), incx);
 
     return *this;
 }
@@ -500,12 +481,12 @@ template<typename T, typename T_src>
 SciPAL::VectorView<T, T_src> &
 SciPAL::VectorView<T, T_src>::operator = (const Vector<T, BW>& col)
 {
-    Assert(this->__n_el == col.size(),
+    Assert(this->n_elements_active == col.size(),
            dealii::ExcMessage("Dimension mismatch"));
 
     int incx = 1; //! col._stride;
-    int incy = this->_stride;
-    BW::copy(this->__n_el, col.val(), incx,  this->val(), incy);
+    int incy = this->stride;
+    BW::copy(this->n_elements_active, col.val(), incx,  this->val(), incy);
 
     return *this;
 }
@@ -537,18 +518,18 @@ template<typename T, typename T_src>
 void
 SciPAL::VectorView<T, T_src>::print() const
 {
-    std::vector<T> tmp(this->__n_el);
-    int inc_src = this->_stride;
+    std::vector<T> tmp(this->n_elements_active);
+    int inc_src = this->stride;
     int inc_dst = 1;
 
     T * tmp_ptr = &tmp[0];
-    BW::GetVector(this->__n_el, this->val(), inc_src, tmp_ptr, inc_dst);
+    BW::GetVector(this->n_elements_active, this->val(), inc_src, tmp_ptr, inc_dst);
 
     if (this->_is_col)
-        for (int i = 0; i < this->__n_el; ++i)
+        for (int i = 0; i < this->n_elements_active; ++i)
             std::cout << tmp[i] << std::endl;
     else
-        for (int i = 0; i < this->__n_el; ++i)
+        for (int i = 0; i < this->n_elements_active; ++i)
             std::cout << tmp[i] << " ";
     std::cout << std::endl;
 

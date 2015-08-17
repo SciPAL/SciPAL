@@ -62,6 +62,29 @@ struct ShapeData {
     size_t  n_elements_active;
     T *  view_begin;
 
+    //! Returns the number of elements, this is the same nuber the function n_elements of the
+    //! array class returns. But note that we can have the situation where only the Shape
+    //! iformation but the Array information is available.
+
+    //! Returns active rows
+    __host__ __device__
+    size_t n_rows_active() const {
+        return this->r_end_active - this->r_begin_active;
+    }
+
+    //! Returns active columns
+    __host__ __device__
+    size_t n_cols_active() const {
+        return this->c_end_active - this->c_begin_active;
+    }
+
+    __host__ __device__
+    size_t size() const {
+        return n_rows_active() * n_cols_active();
+    }
+
+
+
 
 //      op()(i,j)
 //     op()(i)

@@ -34,7 +34,7 @@ enum sub_Layout{general, symm, banded, rowvector, columnvector};
 //! The <i>shape</i> of a linear algebra object (LAO) determines whether the LAO can be considered
 //! as matrix or vector. By separating the shape from the data of a LAO it is easy to <i>reshape</i>
 //! a LAO if necessary. The attributes are public for easy use in CUDA kernels.
-template <typename T, LAOType L>
+template <typename T, LAOType LT>
 class Shape : public /*protected*/ ShapeData<T>
 {
 public:
@@ -43,18 +43,24 @@ public:
     typedef T value_type;
 
     //! is it a matrix or vector
-    static const Layout layout = L;
+    static const LAOType layout = LT;
 
-    typedef Shape<T, L> Type;
+    typedef Shape<T, LT> Type;
+    //FIX ME unnecessary ? but needed for compiling
+    typedef Type MyShape;
 
     typedef  SciPAL::ShapeData<T> DevType;
+
+    typedef blas blas_wrapper_type;
 
     //! The default constructor generates an empty shape.
     Shape()
     {
         this->data_ptr = 0;
-        this->n_rows = 0;
-        this->n_cols = 0;
+        this->r_begin_active = 0;
+        this->r_end_active = 0;
+        this->c_begin_active = 0;
+        this->c_end_active = 0;
         this->leading_dim = 0;
         this-> stride = 0;
     }
@@ -65,24 +71,34 @@ public:
     //! @param stride : If this value is, e.g., 3, then only every 3rd element of the original data array gets accessed.
     //! @param leading_dim : the length of a column in memory. This value can be used to optimize memory access of CUDA warps. We assume column-major storage in order to be compatible with CUBLAS.
     Shape(T * data,
-          size_t n_rows, size_t n_cols, size_t leading_dim,
-          size_t stride = 1)
+          size_t  r_begin_active,
+          size_t  r_end_active,
+          size_t  c_begin_active,
+          size_t  c_end_active,
+          size_t leading_dim, size_t stride = 1)
     {
-        this->reinit(data, n_rows, n_cols, leading_dim, stride);
+        this->reinit(data,
+                     r_begin_active, r_end_active,
+                     c_begin_active, c_end_active,
+                     leading_dim, stride = 1);
     }
 
 
     //! By assigning one shape to another we get two shapes looking at the same LAO.
     //! @param other: source shape to copy.
-    Shape& operator = (/*const*/ Shape& other)
+    Shape& operator = (const Shape& other)
     {
 #ifdef DEBUG
-    std::cout << "line :" << __LINE__ << ", Shape<T>  " << __FUNCTION__<< "\n"  << std::endl;
+        std::cout << "line :" << __LINE__ << ", Shape<T>  " << __FUNCTION__<< "\n"  << std::endl;
 #endif
         this->data_ptr = other.data_ptr;
+        this->view_begin = other.view_begin;
 
-        this->n_rows = other.n_rows;
-        this->n_cols = other.n_cols;
+        this->r_begin_active = other.r_begin_active;
+        this->r_end_active = other.r_end_active;
+        this->c_begin_active = other.c_begin_active;
+        this->c_end_active = other.c_end_active;
+        this->n_elements_active = this->size();
 
         this->leading_dim = other.leading_dim;
         this->stride = other.stride;
@@ -106,28 +122,22 @@ public:
         this->r_end_active = r_end_active;
         this->c_begin_active = c_begin_active;
         this->c_end_active = c_end_active;
+        this->n_elements_active = this->size();
+
 
         this->leading_dim = leading_dim;
         this->stride = stride;
     }
 
-    //! Returns active rows
-    size_t n_rows_active() const {
-        return r_end_active - r_begin_active;
-    }
 
-    //! Returns active columns
-    size_t n_cols_active() const {
-        return c_end_active - c_begin_active;
-    }
 
-    //! Returns the number of elements, this is the same nuber the function n_elements of the
-    //! array class returns. But note that we can have the situation where only the Shape
-    //! iformation but the Array information is available.
-    size_t size() const {
-        return n_rows_active() * n_cols_active();
-    }
 
+    //! Copy constructor. The new object points to the same LAO as @p other.
+    //! @param other: source shape to copy.
+    Shape(const Shape& other)
+    {
+        *this = other;
+    }
 
 protected:
     //! Swap the attributes of two shapes.
@@ -144,14 +154,8 @@ protected:
         std::swap(this->stride, other.stride);
     }
 
-private:
-    //! Copy constructor. The new object points to the same LAO as @p other.
-    //! @param other: source shape to copy.
-    Shape(const Shape& other)
-    {
-        *this = other;
-    }
 
+private:
 
 };
 

@@ -29,14 +29,13 @@ struct vmu;
 
 //SciPAL implementation for expression templates
 
-//#include <lac/SciPAL_kernels_wrapper.cu.h>
 #include <deal.II/lac/vector.h>
 
 #include <lac/Array.h>
 #include <lac/Shape.h>
 
 #include <lac/BlasVectorOperations.h>
-
+#include <lac/VectorCustomOperations.h>
 #include <base/PrecisionTraits.h>
 #include <base/Zero_One_Traits.h>
 #include <lac/cublas_SubMatrixView.h>
@@ -58,7 +57,7 @@ class Vector
         public SciPAL::Expr<Vector<T, BW> >,
         public  dealii::Subscriptor,
         protected Array<T, BW>,
-        public SciPAL::Shape<T> {
+        public SciPAL::Shape<T, vector> {
 
 
     friend class SciPAL::Matrix<T, BW>;
@@ -70,7 +69,6 @@ class Vector
 
     template<typename, typename> friend class ColVectorView;
 
-    typedef SciPAL::Shape<T> MyShape;
 
 public:
 
@@ -86,6 +84,7 @@ public:
 
     typedef  SciPAL::ShapeData<T> DevType;
 
+    typedef SciPAL::Shape<T, vector> MyShape;
         //! Fuer Optimierungen der Matrix-Vektor-Operationen zwischen
         //! (Teil-)Matrizen und (Teil-)Vektoren muss bekannt sein, was fuer ein
         //! Typ die jeweiligen Objekte sind. Da statische Konstanten zur Compile-Zeit ausgewertet werden
@@ -282,7 +281,10 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector()
     :
       Array<T, BW>(),
-      MyShape(this->data(), 0, 0, 0 /*TO DO: leading dim*/)
+      MyShape(this->data(),
+              0, 0,
+              0, 0,
+              this->array().leading_dim()/*TO DO: leading dim*/)
 {}
 
 // @sect4{Konstruktor: Vector(n)}
@@ -295,9 +297,9 @@ SciPAL::Vector<T, BW>::Vector(size_t n_elements)
     :
     Array<T, BW>(n_elements),
     MyShape(this->array().val(),
-              n_elements, /*n_rows*/
-              1, /*n_cols*/
-              n_elements, /*leading dim*/
+              0, n_elements, /*n_rows*/
+              0, 1, /*n_cols*/
+              this->array().leading_dim(), /*leading dim*/
               1) /*stride*/
 {}
 
@@ -391,8 +393,11 @@ void SciPAL::Vector<T, BW>::reinit(size_t new_size)
 
     size_t n_cols = 1;
 
-    this->MyShape::reinit(this->array().val(), new_size, n_cols,
-                          new_size /*leading_dim*/, 1/*stride*/);
+    this->MyShape::reinit(this->array().val(),
+                          0, new_size,
+                          0, 1,
+                          this->array().leading_dim() /*leading_dim*/,
+                          1/*stride*/);
 }
 
 
@@ -630,7 +635,7 @@ SciPAL::Vector<T, BW>::operator = (const VectorView<T, T_src > & other)
     Assert(this->size() >= other.size(),
            dealii::ExcDimensionMismatch(this->size(), other.size()) );
 
-    int incx = other._stride;
+    int incx = other.stride;
     int incy = 1;
     BW::copy(other.size(), other.val(), incx,
              &(this->val()[(other._is_col ?
@@ -842,7 +847,7 @@ SciPAL::Vector<T, BW>::dot(const VECTOR & other) const
      dealii::ExcMessage("Dimension mismatch"));
 
     int incx = 1; //! this->_stride;
-    int incy = 1; //!other._stride;
+    int incy = 1; //!other.stride;
     T result = BW::dot(this->__n,
                        this->val(), incx, other.val(), incy);
 

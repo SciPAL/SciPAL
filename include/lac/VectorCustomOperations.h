@@ -93,18 +93,18 @@ static void apply(LAO<T, BW> &result,
 //!
 //! @param result: linear algebra object which will contain the result of the expression.
 //! @param parent: expresion object built on the host-side of the program.
-template <typename T, //! numbertype
-          typename BW, //! blas type
-          template <typename, typename> class LAO, //! template for result type
-          typename E/*short for Expression*/ >
-static void apply(LAO<T, BW> &result,
-                  const ::SciPAL::Expr<E> &parent)
-{
-   SciPAL::Kernels<T, BW::arch> bla(4);
-//   result.reinit((~parent).get_l());
-    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
-   bla.apply(result, child);
-}
+//template <typename T, //! numbertype
+//          typename BW, //! blas type
+//          template <typename, typename> class LAO, //! template for result type
+//          typename E/*short for Expression*/ >
+//static void apply(LAO<T, BW> &result,
+//                  const ::SciPAL::Expr<E> &parent)
+//{
+//   SciPAL::Kernels<T, BW::arch> bla(4);
+////   result.reinit((~parent).get_l());
+//    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
+//   bla.apply(result, child);
+//}
 
 
 } // END namespace LAOOperations

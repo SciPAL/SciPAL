@@ -47,21 +47,29 @@ namespace SciPAL {
 // @sect4{Struct: transpose}
 // Interpret Matrices and Vectors in transposed manner.
 template<typename M>
-struct transpose : public SciPAL::Expr<transpose<M> > {
-
+struct transpose
+        :
+        public SciPAL::Expr<transpose<M> >
+{
     const M & A;
 
+    typedef typename M::value_type value_type;
     typedef transpose<M> Type;
-    typedef transpose<M> DevType;
+    typedef ShapeData<value_type> DevType;
 
     typedef const Type& ConstHandle;
 
-    typedef typename M::value_type value_type;
+
 
     typedef typename M::blas_wrapper_type blas_wrapper_type;
 
     transpose(const M & m) : A(m) {}
-};
+
+    operator typename M::MyShape() const
+    {
+        return A;
+    }
+    };
 
 // @sect4{Struct: adjoint}
 // Interpret Matrices and Vectors in adjoint manner.
@@ -70,12 +78,12 @@ struct adjoint : public SciPAL::Expr<adjoint<M> > {
 
     const M & A;
 
-    typedef adjoint<M> Type;
-    typedef adjoint<M> DevType;
-
-    typedef const Type& ConstHandle;
 
     typedef typename M::value_type value_type;
+    typedef adjoint<M> Type;
+    typedef ShapeData<value_type> DevType;
+
+    typedef const Type& ConstHandle;
 
     typedef typename M::blas_wrapper_type blas_wrapper_type;
 
@@ -89,12 +97,11 @@ struct diag : public SciPAL::Expr<diag<M> > {
 
     const M & A;
 
+    typedef typename M::value_type value_type;
     typedef diag<M> Type;
-    typedef diag<M> DevType;
+    typedef ShapeData<value_type> DevType;
 
     typedef const Type& ConstHandle;
-
-    typedef typename M::value_type value_type;
 
     typedef typename M::blas_wrapper_type blas_wrapper_type;
 
@@ -233,6 +240,15 @@ operator *(const T e1, const  LAO<T, BW>& e2)
 {
     return BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >(~Literal<T>(e1), ~e2);
 }
+
+template <typename T, LAOType LT1, LAOType LT2>
+inline
+const BinaryExpr<Shape<T, LT1>, SciPAL::mult, Shape<T, LT2> >
+operator * (const Shape<T, LT1>& e1, const Shape<T, LT2>& e2)
+{
+    return BinaryExpr<Shape<T, LT1>, SciPAL::mult, Shape<T, LT2> >(~e1, ~e2);
+}
+
 
 template <typename T1, typename T2 >
 inline

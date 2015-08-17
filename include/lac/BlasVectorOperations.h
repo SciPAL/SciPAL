@@ -23,7 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <base/ForewardDeclarations.h>
 
 #include <lac/expression_templates_host.h>
-#include <lac/VectorCustomOperations.h>
+//#include <lac/VectorCustomOperations.h>
 #include <lac/scipal_kernels_wrapper.cu.h>
 
 namespace SciPAL {
@@ -34,12 +34,11 @@ using namespace SciPAL;
 template< typename T, typename BW>
 struct BlasVecExp/*VectorExpressions*/
 {
-    typedef ::SciPAL::Matrix<T, BW> Mtx;
-    //  typedef SparseMatrix<T, BW> SpMtx;
-    typedef ::SciPAL::Vector<T, BW> Vtr;
+        typedef typename ::SciPAL::Matrix<T, BW>::MyShape Mtx;
+        typedef typename ::SciPAL::Vector<T, BW>::MyShape Vtr;
+//        typedef ::SciPAL::Shape<T, matrix> Mtx;
+//        typedef ::SciPAL::Shape<T, vector> Vtr;
 
-    typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
-    typedef ::SciPAL::VectorView<T, BW> SVtr;
 
     typedef Literal<T> Lit;
 
@@ -50,6 +49,10 @@ struct BlasVecExp/*VectorExpressions*/
     // $ y = A \cdot x$
     typedef typename ::SciPAL::BinaryExpr<Mtx, mult, Vtr> // ::SciPAL::Mul<Mtx, Vtr >
     MV;
+
+    // $ y = A \cdot x$
+    typedef typename ::SciPAL::BinaryExpr<transpose<Mtx>, mult, Vtr> // ::SciPAL::Mul<Mtx, Vtr >
+    MtV;
 
     // $ y = \alpha A \cdot x$, just a crutch
     typedef typename ::SciPAL::BinaryExpr<Lit, mult, Mtx> scaledM;
@@ -69,9 +72,9 @@ struct BlasVecExp/*VectorExpressions*/
     typedef typename SciPAL::BinaryExpr< SciPAL::transpose<Vtr>, mult, Vtr>
     scalar_product;
 
-    // $ z =  x^t \cdot y$
-    typedef typename SciPAL::BinaryExpr< SMtx, mult, Vtr>
-    SMV;
+    typedef typename SciPAL::BinaryExpr<SciPAL::transpose<SciPAL::SubMatrixView<T, BW> >, SciPAL::mult, SciPAL::Vector<T, BW> > SMtmV;
+
+
 };
 
 
@@ -188,6 +191,43 @@ static void apply(Vector<T, BW> &result,
              );
 }
 
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A^t \cdot src$
+
+template <typename T, typename BW>
+static void apply(Vector<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::MtV& expr)
+{
+
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    Vtr & dst = result;
+
+
+    BW::gemv('t',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data_ptr,
+             A.n_rows(), // lda
+             x.data_ptr,
+             1, // incx
+             beta,
+             dst.data_ptr, // y
+             1 // incy
+             );
+}
+
+
 // @sect4{Function: scaled_vmult}
 //!
 //! Generic matrix-vector multiplication.
@@ -224,41 +264,42 @@ static void apply(Vector<T, BW> &result,
              );
 }
 
+
 // @sect4{Function: apply}
 //!
 //! Matrix-vector multiplication.
-//! $dst = A \cdot src$
+//! $dst = A^t \cdot src$
 
-template <typename T, typename BW>
-static void apply(Vector<T, BW> &result,
-                  const typename BlasVecExp<T, BW>::SMV& expr)
-{
+//template <typename T, typename BW>
+//static void apply(Vector<T, BW> &result,
+//                  const typename BlasVecExp<T, BW>::SMtmV& expr)
+//{
 
-    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
-    typedef Vector<T, BW> Vtr;
+//    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
+//    typedef Vector<T, BW> Vtr;
 
-    T alpha = T(1);
-    const Mtx & A = expr.l;
-    const Vtr & x = expr.r;
+//    T alpha = T(1);
+//    const Mtx & A = expr.l.A;
+//    const Vtr & x = expr.r;
 
-    T beta = T(0);
+//    T beta = T(0);
 
-    Vtr & dst = result;
+//    Vtr & dst = result;
 
 
-    BW::gemv('n',
-             A.n_rows, // m
-             A.n_cols, // n
-             alpha,
-             A.data_ptr,
-             A.leading_dim, // lda
-             x.data_ptr,
-             1, // incx
-             beta,
-             dst.data_ptr, // y
-             1 // incy
-             );
-}
+//    BW::gemv('t',
+//             A.n_rows(), // m
+//             A.n_cols(), // n
+//             alpha,
+//             A.data_ptr,
+//             A.leading_dim(), // lda
+//             x.data_ptr,
+//             1, // incx
+//             beta,
+//             dst.data_ptr, // y
+//             1 // incy
+//             );
+//}
 
 
 } // END namespace LAOOperations

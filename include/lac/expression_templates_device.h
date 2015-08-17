@@ -36,6 +36,12 @@ template<typename T> struct GetMyType<SciPAL::ShapeData<T> >
 typedef SciPAL::ShapeData<T> Type;
 };
 
+template<typename T> struct GetMyType<SciPAL::transpose<T> > {
+
+    typedef SciPAL::ShapeData<T> Type;
+};
+
+
 template<typename T> struct GetMyType {
 
     typedef typename T::Type Type;

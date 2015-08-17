@@ -213,7 +213,7 @@ struct expr_imag
    __host__ __device__
    T operator()(const T val) const
    {
-       return val;
+       return T(0);
    }
 };
 

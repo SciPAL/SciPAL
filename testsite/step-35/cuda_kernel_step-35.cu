@@ -409,6 +409,12 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
     }
 }
 
+template<typename T>
+__device__ __forceinline__ T mymin(T a,T b) {
+     return (a<b)? a : b;
+}
+
+
 //@sect5{Kernel: __stoch_dykstra}
 //@brief CUDA adapted approximate Dykstra
 //@param A pointer to the image
@@ -419,9 +425,10 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
 //@param smin minimum frame size is $2^{smin}$
 template<typename T>
 __global__ void
-__stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int smin, const int powerx) {
+__stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int smin, const int powerx,const bool both_halving) {
 
     int resolution_depth;
+
     if (powerx > 10-powerx)
         resolution_depth = powerx;
     else
@@ -433,7 +440,7 @@ __stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_
 
     //Shared memory
     __shared__ T e[1024];
-    //sum of errors in chunk,1024 values is max, not always needed completely
+    //sum of errors in chunk,1024 values is max, never needed completely
     __shared__ T c_err[1024];
 
     //temp storage for dykstra's algorithm
@@ -445,17 +452,12 @@ __stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_
         q[s]=0.;
     }
 
-    // Pixel index this thread is processing
-    int idx = (threadIdx.y+offsety+blockIdx.y*blockDim.y)%im_height+((blockIdx.x*blockDim.x+offsetx+threadIdx.x)%im_width)*im_height; //ks*ni*nj + is*nj + js;;
-    //current error index
-    int e_idx = threadIdx.y + threadIdx.x*blockDim.y;
+    //The rectangle is decomposed into chunks with the following egde lengths each
+    int chunkWidth =xdim;
+    int chunkHeight = ydim;
 
     // Iteration counter
     int it=0;
-
-    //The given part of image is decomposed into non-overlapping chunks
-    int chunkHeight;
-    int chunkWidth;
 
     // FIXME: make adjustable from outside
     // Maximum iteration count
@@ -470,76 +472,191 @@ __stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_
         it++;
         delta=0;
 
-
         // Wait for every step before starting the iteration
-        __syncthreads();
+        __syncthreads();       
 
-        //random resolution, just one! is set in nostream_handler2 in the driver.h
-        int s = smin;
+        //multi-resolution loop (at least 5, if smin==0), else s=smin
+        for (int s=(smin) ? smin : resolution_depth; (smin)? (s==smin) : (s>0); s--) {
 
-        //multi-resolution loop (at least 5)
-//        for (int s=resolution_depth; s>0; s--) {
+            // rule of decomposing rectangles into chunks
+            if (both_halving) {// halving both edges simultaneously
+                if (xdim<ydim) {
+                    chunkHeight = 1<<s;
+                    if (10- resolution_depth -( resolution_depth - s) >=0)
+                        chunkWidth = 1<<(10- resolution_depth -( resolution_depth - s));
+                    else
+                        chunkWidth = 1;
+                }
+                if (xdim>ydim) {
+                    chunkWidth = 1<<s;
+                    if (10- resolution_depth -( resolution_depth - s) >=0)
+                        chunkHeight = 1<<(10- resolution_depth -( resolution_depth - s));
+                    else
+                        chunkHeight = 1;
+                }
+            } else {//halving only the longest edge
+                if (xdim>ydim&&s>10-resolution_depth) //still chunkHeight = ydim
+                    chunkWidth=1<<s;
+                if (xdim < ydim&&s>10-resolution_depth) //still chunkWidth = xdim
+                    chunkHeight=1<<s ;
+                if (s <= 10-resolution_depth){
+                    chunkHeight=1<<s;
+                    chunkWidth=1<<s;
+                }
+            }
+            int chunkSize = chunkHeight * chunkWidth;
+            int numChunksx = xdim/chunkWidth;
+            int numChunksy = ydim/chunkHeight;
+            // Map the threads to pixels by following scheme (depending on chunk decomposition because of easy sum reducing later for e[]):
+            // Fill first chunk (in the left top of the rectangle) columnwise with the threads beginning with threadIdx.x=0,
+            // Continue with the next chunk below the current, if there is left any, else continue with chunk to the right top (again fill chunk columnwise left to right)
+            // Then the pixel belonging to the current thread is given by:
+            //int idx = (threadIdx.y+offsety+blockIdx.y*blockDim.y)%im_height+((blockIdx.x*blockDim.x+offsetx+threadIdx.x)%im_width)*im_height; //ks*ni*nj + is*nj + js;;
+            int chunkIdx = threadIdx.x/chunkSize;
 
-        //errors are shared
-        f = src_dst.data_ptr[idx] - q[s];
-        e[e_idx] = f*f;
+            int colInChunk = (threadIdx.x%chunkSize)/chunkHeight;
+            int rowInChunk = (threadIdx.x%chunkSize)%chunkHeight;
 
-        __syncthreads(); //every thread needs to know the values from the others in the following
+            int xPos = offsetx+blockIdx.x*xdim + /*num of pixels from the left of rectangle to current chunk*/(chunkIdx/numChunksy)*chunkWidth + /*column in chunk*/colInChunk;
+            int yPos = offsety+blockIdx.y*ydim + /*num of pixels from the top of rectangle to current chunk*/(chunkIdx%numChunksy)*chunkHeight + /*row in chunk*/rowInChunk;
+            int idx = yPos%im_height + im_height*(xPos%im_width);
 
-        //chunk index, chunk that corresponds to threadIdx
-        int c_idx;
-        //check case: 1. when xdim>ydim divide only in x-direction by 2^s
-        if (xdim>ydim && s>10-resolution_depth) {
-            chunkHeight = ydim;
-            chunkWidth = 1<<s;
-            c_idx = (int)(threadIdx.x/chunkWidth);
-            c_err[c_idx] = 0;
-            for (int i = c_idx*chunkWidth; i<(c_idx+1)*chunkWidth;i++)
-                for (int j = 0; j < ydim; j++)
-                    c_err[c_idx]+= e[i*ydim+j];
+//            // check if image borders are crossed, split chunks on boundary (no periodic boundary)
+
+//            int bdry_id = 0; // 8 different cases need to be considered on bdry, identifier 1 to 8
+
+//            if (xPos < im_width && xPos + chunkWidth -colInChunk > im_width)
+//                bdry_id = 1;
+//            if (xPos >= im_width && xPos - colInChunk < im_width)
+//                bdry_id = 2;
+//            if (yPos < im_height && yPos + chunkHeight - rowInChunk > im_height) {
+//                if (bdry_id == 1)
+//                    bdry_id = 5;
+//                else if (bdry_id == 2)
+//                    bdry_id = 6;
+//                else
+//                    bdry_id = 3;
+//            }
+//            if (yPos >= im_height && yPos - rowInChunk < im_height) {
+//                if (bdry_id == 1)
+//                    bdry_id = 7;
+//                else if (bdry_id == 2)
+//                    bdry_id = 8;
+//                else
+//                    bdry_id = 4;
+//            }
+            // set chunk index for bdry elements (parts of chunks in image are normally counted, parts of chunks that lay off image
+            // are counted with index > numer of chunks, chunks completely off image are counted normally)
+            int c_idx = chunkIdx;
+//            switch (bdry_id) {
+//            case 2: case 6:
+//                c_idx = numChunksx*numChunksy+chunkIdx%numChunksy;
+//                break;
+//            case 4: case 7:
+//                c_idx = numChunksx*numChunksy+numChunksy+chunkIdx/numChunksy;
+//                break;
+//            case 8:
+//                c_idx = numChunksx*numChunksy+numChunksy+chunkIdx/numChunksy+1;
+//                break;
+//            }
+
+            //errors are shared
+            f = src_dst.data_ptr[idx] - q[s];
+            e[threadIdx.x] = f*f;
+
+            int m=1;
+            __syncthreads(); //every thread needs to know the values from the others in the following
+//            c_err[c_idx] = 0;
+
+//            //sum errors, take care of image borders first (slow summation, improve by reducing?)
+//            if (idx_x_out_of_bounds&&idx_y_out_of_bounds)
+//                for (int i = 0; i < offsetx; i++)
+//                    for (int j = 0; j < offsety; j++) {
+//                        c_err[c_idx] += e[j+i*im_height];
+//                        e[j+i*im_height] = 0;
+//                    }
+//            else {
+//                if (idx_x_out_of_bounds)
+//                    for (int i = 0; i < offsetx; i++)
+//                        for (int j = yPos-(threadIdx.x/chunkSize)%chunkHeight; j < yPos-(threadIdx.x/chunkSize)%chunkHeight+chunkHeight; j++) {
+//                            c_err[c_idx] += e[j+i*im_height];
+//                            e[j+i*im_height] = 0;
+//                        }
+//                if (idx_y_out_of_bounds)
+//                    for (int i = xPos - (threadIdx.x/chunkSize)/chunkHeight; i < xPos - (threadIdx.x/chunkSize)/chunkHeight + chunkWidth; i++)
+//                        for (int j = 0; j < offsety; j++) {
+//                            c_err[c_idx] += e[j+i*im_height];
+//                            e[j+i*im_height] = 0;
+//                        }
+//            }
+            //fast summation
+//            if (!idx_x_out_of_bounds&&!idx_y_out_of_bounds)  {
+                while(m < chunkSize) {
+                    if (threadIdx.x%chunkSize+m<chunkSize) //indices out of bounds were set to 0 previously
+                            e[threadIdx.x]+= e[threadIdx.x+m];
+                    m = m << 1;
+                }
+                __syncthreads();
+                c_err[c_idx] = e[(threadIdx.x/chunkSize)*chunkSize];
+//            }
+//            printf("Indix is: %d",c_idx);
+//            __syncthreads();
+//        //check case: 1. when xdim>ydim divide only in x-direction by 2^s
+//        if (xdim>ydim && s>10-resolution_depth) {
+//            chunkHeight = ydim;
+//            chunkWidth = 1<<s;
+//            c_idx = (int)(threadIdx.x/chunkWidth);
+//            c_err[c_idx] = 0;
+//            for (int i = c_idx*chunkWidth; i<(c_idx+1)*chunkWidth;i++)
+//                for (int j = 0; j < ydim; j++)
+//                    c_err[c_idx]+= e[i*ydim+j];
+//            __syncthreads();
+//        }
+//        //check case: 2. when xdim<ydim divide only in y-direction by 2^s
+//        if (xdim<ydim && s>10-resolution_depth){
+//            chunkHeight = 1<<s;
+//            chunkWidth = xdim;
+//            c_idx = (int)(threadIdx.y/chunkHeight);
+//            c_err[c_idx] = 0;
+//            for (int i = 0; i<xdim;i++)
+//                for (int j = c_idx*chunkHeight; j < (c_idx+1)*chunkHeight; j++)
+//                    c_err[c_idx]+= e[i*ydim+j];
+//            __syncthreads();
+//        }
+//        //check case: 3. squares divide in x- and y-direction by 2^s
+//        if (s<=10-resolution_depth) {
+//            chunkHeight = 1 << s;
+//            chunkWidth = chunkHeight;
+//            c_idx = (int)(threadIdx.y/chunkHeight)+(int)(threadIdx.x/chunkWidth)*(int)(ydim/chunkHeight);
+//            c_err[c_idx] = 0;
+//            for (int i = (int)(threadIdx.x/chunkWidth)*chunkWidth; i<(int)(threadIdx.x/chunkWidth+1)*chunkWidth;i++)
+//                for (int j = (int)(threadIdx.y/chunkHeight)*chunkHeight; j < (int)(threadIdx.y/chunkHeight+1)*chunkHeight; j++)
+//                    c_err[c_idx]+= e[i*ydim+j];
+//            __syncthreads();
+//        }
+
+            //$q = x_{r+1} - x_r$
+            q[s] = -f;
+//#ifdef BALBLABLA
+//T cs = 1/((T)3/(T)8/sqrt((T)chunkSize)+sqrt(sqrt(chunkSize-0.5)));
+//cs*=cs*cs*cs;
+//#endif
+            if (cs[s]*c_err[c_idx] > 1.0)
+                f = f/(sqrt(cs[s]*c_err[c_idx]));
+
+            // Update $q$
+            q[s] += f;
+
+            // Templatized abs function
+            __abs<T> mabs;
+            // Calculate increment
+            delta+=mabs(src_dst.data_ptr[idx]-f);
+            // Update image
+            src_dst.data_ptr[idx] = f;
+
             __syncthreads();
-        }
-        //check case: 2. when xdim<ydim divide only in y-direction by 2^s
-        if (xdim<ydim && s>10-resolution_depth){
-            chunkHeight = 1<<s;
-            chunkWidth = xdim;
-            c_idx = (int)(threadIdx.y/chunkHeight);
-            c_err[c_idx] = 0;
-            for (int i = 0; i<xdim;i++)
-                for (int j = c_idx*chunkHeight; j < (c_idx+1)*chunkHeight; j++)
-                    c_err[c_idx]+= e[i*ydim+j];
-            __syncthreads();
-        }
-        //check case: 3. squares divide in x- and y-direction by 2^s
-        if (s<=10-resolution_depth) {
-            chunkHeight = 1 << s;
-            chunkWidth = chunkHeight;
-            c_idx = (int)(threadIdx.y/chunkHeight)+(int)(threadIdx.x/chunkWidth)*(int)(ydim/chunkHeight);
-            c_err[c_idx] = 0;
-            for (int i = (int)(threadIdx.x/chunkWidth)*chunkWidth; i<(int)(threadIdx.x/chunkWidth+1)*chunkWidth;i++)
-                for (int j = (int)(threadIdx.y/chunkHeight)*chunkHeight; j < (int)(threadIdx.y/chunkHeight+1)*chunkHeight; j++)
-                    c_err[c_idx]+= e[i*ydim+j];
-            __syncthreads();
-        }
 
-        //$q = x_{r+1} - x_r$
-        q[s] = -f;
-
-        if (cs[s]*c_err[c_idx] > 1.0)
-            f = f/(sqrt(cs[s]*c_err[c_idx]));
-
-        // Update $q$
-        q[s] += f;
-
-        // Templatized abs function
-        __abs<T> mabs;
-        // Calculate increment
-        delta+=mabs(src_dst.data_ptr[idx]-f);
-        // Update image
-        src_dst.data_ptr[idx] = f;
-        __syncthreads();
-
-//    } // end of multi-resolution loop
+        } // end of multi-resolution loop
     }
 }
 
@@ -987,12 +1104,14 @@ void step35::Kernels<T>::dykstra(T *qg, T *A,  int **cinfo, const int * q_offset
 //@param offsetj offset in horizontal direction
 //@param smin minimum frame size is $2^{smin}$
 template<typename T>
-void step35::Kernels<T>::stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int so, const int powerx) {
+void step35::Kernels<T>::stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int so, const int powerx,const bool both_halving) {
     int gridsx=im_width/(1<<powerx);
     int gridsy=im_height/(1<<(10-powerx));
+//    dim3 grid(gridsx,gridsy);
+//    dim3 blocks(1<<powerx,1<<(10-powerx));
     dim3 grid(gridsx,gridsy);
-    dim3 blocks(1<<powerx,1<<(10-powerx));
-    __stoch_dykstra<T><<<grid,blocks>>> (src_dst, im_height, im_width, nk, offsetx, offsety, offsetk, so,powerx);
+    dim3 blocks(1024,1);
+    __stoch_dykstra<T><<<grid,blocks>>> (src_dst, im_height, im_width, nk, offsetx, offsety, offsetk, so,powerx,both_halving);
     getLastCudaError("__incomplete_dykstra<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 }

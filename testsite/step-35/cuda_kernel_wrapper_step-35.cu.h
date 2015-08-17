@@ -35,7 +35,7 @@ struct Kernels {
     void set_cs(T* cs_h, int maxnum);
     void dykstra(T *qg, T *A, int **cinfo, const int * q_offset_d, const int num_of_cluster, const int ni, const int nj, const int numpx, cudaStream_t *mystream);
     void dyadic_dykstra(T *A, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int so);
-    void stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int so, const int length1);
+    void stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int so, const int length1,const bool both_halving);
     void element_norm_product(typename PrecisionTraits<T, gpu_cuda>::ComplexType *arr1, typename PrecisionTraits<T, gpu_cuda>::ComplexType *arr2, int width, int height, int depth);
     void reset(T* arr, int size);
     void mult(T* arr, T factor, int size);

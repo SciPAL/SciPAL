@@ -9,7 +9,7 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 100
+  set gaussian noise = 10
 
   # path to the .tif image
   set image          = /clusterfs/cuda-2015/austausch_rw/imagetif.tif
@@ -24,9 +24,29 @@ subsection input data
   set rho2           = 1.8
 
   # PSF spread
-  set sigma          = 4
+  set sigma          = 4 
 end
 
+subsection stoch dykstra
+
+    # stochastic dykstra on, else old incomplete dykstra is executed
+    set stoch dyk      = true
+
+    # decomposition of image into rectangles with width 2^power_x
+    # power_x = -1 means stochastically chosen decompositions
+    set power x = -1
+
+    # random resolution, if resol = -1, all resolutions if resol = 0,
+    # else consider only certain resoution depth (between 1 and power_x)
+    set resol = -1
+
+    # for rectangles choose way of decomposing into chunks for higher resolution
+    # both_halving = true means for next resolution to consider in algorithm the chunks are
+    # created by halving both sides of the rectangle until one side is 1 pixel, then only the other is
+    # divided by 2, else first the longest side is divided by 2 until a square is achieved, then both sides are halved
+    # until their length is 1
+    set both halving = false
+end
 
 subsection output
   # save preliminary results of the output image
@@ -34,6 +54,13 @@ subsection output
 
   # where should we put the ouput image? Will be a tiff image
   set output image = control.tif
+
+  # Specify a directory where the results of the test are to be stored. This
+  # can be either an absolute path or path relative to the directory where the
+  # program has been started. The default is subdir called results-<date>
+  # where <date> will be replaced by the date at which the program has been
+  # started. this simplifies keeping the projects directory clean
+  set Run directory = /clusterfs/cuda-2015/step-35/results
 end
 
 
@@ -45,10 +72,10 @@ subsection program flow control
   set approx             = true
 
   # Set maximum number of iterations
-  set maximum iterations = 10020
+  set maximum iterations = 10002
 
   # Reporting progress in intervals of ... Iterations
-  set report interval    = 10
+  set report interval    = 100
 
   # Finish when |x_r - x_{r-1}| < tolerance
   set tolerance          = 1e-3

@@ -91,6 +91,14 @@ class ADMMParams {
     bool anscombe;
     //Type of regularisation used in SMRE
     regularisationType regType;
+    //Stochastic or incomplete Dykstra
+    bool stoch_dyk;
+    //Width of rectangle
+    int power_x;
+    //Resolution
+    int resol;
+    //Decoposition rule for higher resolution
+    bool both_halving;
 
     ADMMParams() {}
 
@@ -105,6 +113,9 @@ class ADMMParams {
     // physical problem gets investigated.
     QDir run_dir;
 
+    // Secondly, we need a directory where the parameter settings of a run should be logged.
+    // This will always be @p run_dir + "/log".
+    QDir prm_log_dir;
   private:
     ADMMParams (const ADMMParams & /*other*/) {}
 
@@ -163,6 +174,29 @@ void ADMMParams<T>::declare(dealii::ParameterHandler &prm) {
     }
     prm.leave_subsection ();
 
+    prm.enter_subsection ("stoch dykstra");
+    {
+        prm.declare_entry ("stoch dyk","true",
+                            dealii::Patterns::Bool(),
+                            "stochastic dykstra on, else old incomplete dykstra is executed");
+        prm.declare_entry ("power x","-1",
+                           dealii::Patterns::Integer(),
+                           "decomposition of image into rectangles with width 2^power_x "
+                           "power_x = -1 means stochastically chosen decompositions");
+        prm.declare_entry ("resol","-1",
+                           dealii::Patterns::Integer(),
+                           "random resolution, if resol = -1, all resolutions if resol = 0, "
+                           "else consider only certain resoution depth (between 1 and power_x)");
+        prm.declare_entry ("both halving","false",
+                           dealii::Patterns::Bool(),
+                           "for rectangles choose way of decomposing into chunks for higher resolution "
+                           "both_halving = true means for next resolution to consider in algorithm the chunks are "
+                           "created by halving both sides of the rectangle until one side is 1 pixel, then only the other is "
+                           "divided by 2, else first the longest side is divided by 2 until a square is achieved, then both sides are halved "
+                           "until their length is 1");
+    }
+    prm.leave_subsection ();
+
     prm.enter_subsection ("simulate dataset from real image");
     {
         prm.declare_entry ("simulate",
@@ -210,6 +244,25 @@ void ADMMParams<T>::declare(dealii::ParameterHandler &prm) {
                            "control.tif",
                            dealii::Patterns::FileName(),
                            "where should we put the ouput image? Will be a tiff image");
+        // The most generic parameter for a simulation is a string which indicates
+        // where the simulation should store its results. By default, it contains
+        // the current date and uses the time as subdirectory.
+        prm.declare_entry("Run directory",
+                          QString(
+                              QString("./")
+                              +
+                              QString("results-"
+                                      +
+                                      QDateTime::currentDateTime().toString("ddd-yyyy-MM-dd/hh_mm_ss")
+                                      ).remove(".")).toStdString(),
+                          dealii::Patterns::Anything(),
+                          "Specify a directory where the results of "
+                          "the test are to be stored. This can be either "
+                          "an absolute path or path relative to the directory "
+                          "where the program has been started. The default is "
+                          "subdir called results-<date> where <date> will be replaced "
+                          "by the date at which the program has been started. "
+                          "this simplifies keeping the projects directory clean");
     }
     prm.leave_subsection ();
 }
@@ -234,7 +287,6 @@ void ADMMParams<T>::get(dealii::ParameterHandler &prm) {
         this->sigmaf = 2.0*this->sigmaf; //the gaussian is calculated with the input sigma, its support has edge length 4 sigma
         this->sigma=std::ceil(this->sigmaf);
 
-
         this->imagename = prm.get("image");
         this->regInt = prm.get_double("regularization");
 
@@ -255,6 +307,15 @@ void ADMMParams<T>::get(dealii::ParameterHandler &prm) {
         }
     }
     prm.leave_subsection ();
+
+    prm.enter_subsection("stoch dykstra");
+    {
+        this->stoch_dyk = prm.get_bool("stoch dyk");
+        this->power_x = prm.get_integer("power x");
+        this->resol = prm.get_integer("resol");
+        this->both_halving = prm.get_bool("both halving");
+    }
+prm.leave_subsection ();
 
     prm.enter_subsection("simulate dataset from real image");
     {
@@ -277,6 +338,11 @@ void ADMMParams<T>::get(dealii::ParameterHandler &prm) {
     {
         this->do_control = prm.get_bool("control");
         this->out_imagename = prm.get("output image");
+        this->run_dir.setPath(prm.get("Run directory").c_str() );
+        this->run_dir.makeAbsolute();
+
+        if(!this->run_dir.exists())
+            this->run_dir.mkpath(".");
     }
     prm.leave_subsection ();
 }

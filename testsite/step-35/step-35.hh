@@ -199,12 +199,58 @@ step35::ADMM<T>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
 
     this->params.get(prm_handler);
 
+    // Create toplevel run directory
+
+    this->params.run_dir.setPath( this->params.run_dir.absolutePath() +  QDir::separator() +
+    QString(QDateTime::currentDateTime().toString("ddd-yyyy-MM-dd/hh_mm_ss")
+            ).remove("."));
+
+    cwd.setPath(this->params.run_dir.absolutePath());
+
+    std::cout << "path to run directory : " << this->params.run_dir.absolutePath().toStdString().c_str() << std::endl;
+
+
+    // The following lets a directory make its own path.
+    if (!cwd.exists())
+        cwd.mkpath( "." );
+
+
+    // After the run directory we create the log directory.
+    this->params.prm_log_dir = this->params.run_dir.absolutePath() + QDir::separator() + "log";
+    if (!this->params.prm_log_dir.exists())
+        this->params.prm_log_dir.mkpath(".");
+
+    std::cout << "log path : " << this->params.prm_log_dir.absolutePath().toStdString().c_str() << std::endl;
+
+    // Now, change to the run directory
+    QDir::setCurrent(cwd.absolutePath());
+
+    // ... and write what has been actually read
+    // into log file. Basically, this is just another parameter file
+    // and thus could be used again as input to another run after stripping the .log suffix.
+    std::string master_log_file = (this->params.prm_log_dir.absolutePath() + QDir::separator()
+                                   +
+                                  (QFileInfo(prm_filename.c_str()).fileName()
+                                   + ".log") ).toStdString();
+
+    std::cout << "log file : " << master_log_file.c_str()
+                                   << std::endl;
+
+    std::ofstream log_master_prm( master_log_file.c_str() );
+    prm_handler.print_parameters (log_master_prm,
+                                  dealii::ParameterHandler::Text);
+
+    // At this point the toplevel run dir must exist.
+    // Thus, we can change to it without any further sanity test.
+    QDir::setCurrent(this->params.run_dir.absolutePath());
+
+
     //Create log file
 
-    prm_filename += ".log";
-    std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
-    prm_handler.print_parameters (log_out_text,
-                                  dealii::ParameterHandler::Text);
+//    prm_filename += ".log";
+//    std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
+//    prm_handler.print_parameters (log_out_text,
+//                                  dealii::ParameterHandler::Text);
 }
 
 //@sect5{Function: create_psf}
@@ -474,7 +520,7 @@ void step35::ADMM<T>::run() {
         std::cout << "Setting up driver\n";
         step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.croot, input_image, psf, cs, pwidth, pheight, pdepth,
                                                              params.step, gamma_fac, params.sigma, params.regType,
-                                                             params.dim);
+                                                             params.dim,&params);
         //This function templates to whatever Dykstra Flavour we have chosen
         std::cout << "Starting run\n";
         __run<field_patch, driver_patch>(field, driver);
@@ -499,7 +545,7 @@ void step35::ADMM<T>::run() {
         std::cout << "Setting up driver\n";
         step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.cluster_root, input_image, psf, cs, pwidth, pheight, pdepth,
                                                              params.step, gamma_fac, params.sigma, params.regType,
-                                                             params.dim);
+                                                             params.dim,&params);
         //This function templates to whatever Dykstra Flavour we have chosen
         __run<field_patch, driver_patch>(field, driver);
 #else

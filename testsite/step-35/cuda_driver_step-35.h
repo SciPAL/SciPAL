@@ -41,7 +41,6 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <deal.II/lac/vector.h>
 
 //Our stuff
-//#include "ImageDecomposition.h"
 #include "cuda_driver_step-35.hh"
 #include "cuda_kernel_wrapper_step-35.cu.h"
 #include "patch.h"
@@ -170,7 +169,10 @@ struct runStruct<cset_dyadic,T,c > {
     //@brief Run function of CUDADriver for cset_dyadic, only calls nostream_handler()
     //@param pt pointer to the friended CUDADriver instance
     void run_func(CUDADriver<cset_dyadic,T, c> *pt) {
-        pt->nostream_handler2();
+        if (pt->params->stoch_dyk)
+            pt->nostream_handler2();
+        else
+            pt->nostream_handler();
     }
 };
 
@@ -207,6 +209,8 @@ class CUDADriver {
     // FIXME: For the device side arrays use this:
     SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr,tmp_haar;
 
+    //simpler parameter handling
+    ADMMParams<Mdouble> *params;
 
     cufftHandle *plan_fft,*iplan_fft;
 
@@ -214,9 +218,6 @@ class CUDADriver {
     int stream_count;
     //Worker thread handles
     std::thread* thread_handles;
-
-    //Contains dimensions of rectangles
-    std::vector<int> dimRect;
 
 #ifdef TIME_KERNELS
     // Total GPU time for dykstra kernels in ms
@@ -241,7 +242,7 @@ class CUDADriver {
     CUDADriver(Mpatch* mcroot, std::vector<Mdouble> &input_image, std::vector<Mdouble> &fpsf, Mdouble* cs_h,
                // FIXME: use ImageStack class developed for SOFI and ask that for nx, ny, nz, if needed
                const int nx, const int ny, const int nz, const int n, Mdouble gamma, int sigma,
-               regularisationType regType, const int dim)
+               regularisationType regType, const int dim,ADMMParams<Mdouble> * param)
         :
           // FIXED: use RAII
           inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
@@ -249,8 +250,7 @@ class CUDADriver {
     // FIXME: more vector instantiations go here
           tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix),
           tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix),
-          tmp_h(inf->ext_num_pix),
-          dimRect(11)
+          tmp_h(inf->ext_num_pix),params(param)
     {
         getLastCudaError("CUDA in error state while driver init\n");
         //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
@@ -268,12 +268,6 @@ class CUDADriver {
         unsigned int queue_len=(unsigned int) (ny/(n))*(nx/(n));
         //Set up queue
         queue=new wqueue<Mpatch,Mdouble, c>(queue_len);
-
-        //The info class holds all real variables
-
-        //Assign dimensions of rectangles for decomposition
-        for (int i = 0; i < 11; i++)
-            dimRect[i] = 1 << i;
 
         //Cufft setup
         int fm1_size=inf->ext_depth*inf->ext_width*(inf->ext_height/2+1)*sizeof(complex);
@@ -393,10 +387,19 @@ class CUDADriver {
     //@sect5{Function: nostream_handler2}
     //@brief Wrapper if we use the stoch_dykstra Kernel.
     void nostream_handler2() {
-        int randomPower = rand() % 11;
+        int randomPower;
+        if (params->power_x < 0)
+            randomPower = rand() % 11;
+        else
+            randomPower = params->power_x;
+        int resol;
+        if (params->resol < 0)
+            resol = rand()%std::max(randomPower,10-randomPower)+1;
+        else
+            resol = params->resol;
 
         step35::Kernels<Mdouble> kernels;
-           // std::cout << "random number:" << randomPower << std::endl;
+            std::cout << "random number:" << randomPower << std::endl;
 
         if (inf->dim == 2) {
 //            for(int i = 50000;i<1024+50000;i++)
@@ -404,7 +407,7 @@ class CUDADriver {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
             for (int so=-1; so<std::min(randomPower,10-randomPower); so++) {
                 for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.stoch_dykstra(inf->e_d,inf->ext_height, inf->ext_width, inf->ext_depth, (so<0)? 0: (1 << so), (so<0)? 0: (1 << so), z, rand()%std::max(randomPower,10-randomPower)+1, randomPower);
+                    kernels.stoch_dykstra(inf->e_d,inf->ext_height, inf->ext_width, inf->ext_depth, (so<0)? 0: (1 << so), (so<0)? 0: (1 << so), z,resol, randomPower,params->both_halving);
                 }
             }
         }

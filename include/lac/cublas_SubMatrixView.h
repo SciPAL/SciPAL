@@ -26,71 +26,14 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 namespace SciPAL {
 
-template<typename T, typename BW>
-struct SMSMmult : SciPAL::Expr<SMSMmult<T, BW> >  {
-
-    const SubMatrixView<T, BW> &  l;
-    const SubMatrixView<T, BW> &  r;
-
-    SMSMmult (const SubMatrixView<T, BW> & A, const SubMatrixView<T, BW> & B): l(A), r(B){}
-
-};
-
-template<typename T, typename BW> struct SMSMTmult {
-    const SubMatrixView<T, BW> &  l;
-    const transpose<SubMatrixView<T, BW> > &  r;
-    SMSMTmult (const SubMatrixView<T, BW> & A, const transpose<SubMatrixView<T, BW> > & B): l(A), r(B){}
-};
-
-
-template<typename T, typename BW> struct SMTSMmult {
-    const transpose<SubMatrixView<T, BW> > &  l;
-    const SubMatrixView<T, BW> &  r;
-    SMTSMmult (const SciPAL::transpose<SubMatrixView<T, BW> > & A, const SubMatrixView<T, BW> & B): l(A), r(B){}
-};
-
-// @sect4{Operator: *}
-//! Multiplizieren von zwei SubMatrixView
-//! @param A:        ein SubMatrixView
-//! @param B:        ein SubMatrixView
-//!
-template<typename T, typename BW>
-inline SMSMmult<T, BW> operator * (const SubMatrixView<T, BW> & A, const SubMatrixView<T, BW> & B) {
-    return SMSMmult<T, BW>(A, B);
-}
-
-// @sect4{Operator: *}
-//! Multiplizieren von zwei SubMatrixView
-//! @param A:        ein SubMatrixView
-//! @param B:        ein SubMatrixView
-//!
-template<typename T, typename BW>
-inline SMSMTmult<T, BW> operator * (const SubMatrixView<T, BW> & A,
-                                    const transpose<SubMatrixView<T, BW> > & B) {
-    return SMSMTmult<T, BW>(A, B);
-}
-
-
-
-// @sect4{Operator: *}
-//! Multiplizieren von zwei SubMatrixView
-//! @param A:        ein SubMatrixView
-//! @param B:        ein SubMatrixView
-//!
-template<typename T, typename BW>
-inline SMTSMmult<T, BW> operator * (const transpose<SubMatrixView<T, BW> > & A,
-                                    const SubMatrixView<T, BW> & B) {
-    return SMTSMmult<T, BW>(A, B);
-}
-
 // @sect3{Klasse: SubMatrixView}
 //!
 //! Diese Klasse dient dazu, nicht interessierende Teile einer Matrix zu maskieren.
 template<typename T, typename BW>
 class SubMatrixView
         :
-        public SciPAL::Shape<T, matrix>,
-        public SciPAL::Expr<SubMatrixView<T, BW> >
+        public SciPAL::Expr<SubMatrixView<T, BW> >,
+        public SciPAL::Shape<T, matrix>
 {
 
 public:
@@ -107,6 +50,8 @@ public:
 
     typedef SciPAL::Shape<T, matrix> MyShape;
 
+    static const EType I_am = leafE;
+
     SubMatrixView(Matrix<T, BW> & src, int r_begin, int c_begin);
 
     SubMatrixView(Matrix<T, BW> & src, int r_begin, int r_end,
@@ -120,13 +65,13 @@ public:
     template <typename X>
     SubMatrixView<T, BW> & operator = (const SciPAL::Expr<X> & expr);
 
-    SubMatrixView<T, BW> & operator += (const SMSMmult<T, BW> & AB);
+//    SubMatrixView<T, BW> & operator += (const SMSMmult<T, BW> & AB);
 
-    SubMatrixView<T, BW> & operator += (const SMSMTmult<T, BW> & AB);
+//    SubMatrixView<T, BW> & operator += (const SMSMTmult<T, BW> & AB);
 
-    SubMatrixView<T, BW> & operator += (const SMTSMmult<T, BW> & AB);
+//    SubMatrixView<T, BW> & operator += (const SMTSMmult<T, BW> & AB);
 
-    SubMatrixView<T, BW> & operator -= (const SMSMmult<T, BW> & AB);
+//    SubMatrixView<T, BW> & operator -= (const SMSMmult<T, BW> & AB);
 
     const T * val() const { return this->MyShape::view_begin; }
 
@@ -367,44 +312,44 @@ SciPAL::SubMatrixView<T, BW>::operator = (const Matrix<T, BW>& col)
 }
 
 
-namespace SciPAL {
+//namespace SciPAL {
 
-namespace MatrixOperations {
+//namespace MatrixOperations {
 
-template <typename T, typename BW>
-static void apply(::SciPAL::SubMatrixView<T, BW> &result,
-                  const ::SciPAL::SMSMmult<T, BW> & // typename BlasMatExp<T, BW>::scaledM&
-                  AB)
-{
-#ifdef DEBUG
-    std::cout << " MY new and shiny SMV prod" << std::endl;
-#endif
-    const T * A = AB.l.val(); // SubMatrixView::val() automatically computes the begin of the view in memory  //matrix().array().val()[AB.l.__view_begin]) ;
-    const T * B = AB.r.val(); // &(AB.r.__src->val()[AB.r.__view_begin]) ;
-    T * C = result.val(); // &( result./*this->*/__src->val()[ result./*this->*/__view_begin]) ;
+//template <typename T, typename BW>
+//static void apply(::SciPAL::SubMatrixView<T, BW> &result,
+//                  const ::SciPAL::SMSMmult<T, BW> & // typename BlasMatExp<T, BW>::scaledM&
+//                  AB)
+//{
+//#ifdef DEBUG
+//    std::cout << " MY new and shiny SMV prod" << std::endl;
+//#endif
+//    const T * A = AB.l.val(); // SubMatrixView::val() automatically computes the begin of the view in memory  //matrix().array().val()[AB.l.__view_begin]) ;
+//    const T * B = AB.r.val(); // &(AB.r.__src->val()[AB.r.__view_begin]) ;
+//    T * C = result.val(); // &( result./*this->*/__src->val()[ result./*this->*/__view_begin]) ;
 
-    T alpha = +1;
-    T beta  = 0.;
+//    T alpha = +1;
+//    T beta  = 0.;
 
-    int lda = AB.l.leading_dim();
-    int ldb = AB.r.leading_dim();
-    int ldc =  result./*this->*/leading_dim();
+//    int lda = AB.l.leading_dim();
+//    int ldb = AB.r.leading_dim();
+//    int ldc =  result./*this->*/leading_dim();
 
-    int m = AB.l.r_end() - AB.l.r_begin() ;
-    int n = AB.r.c_end() - AB.r.c_begin ();
-    int k = AB.l.c_end() - AB.l.c_begin ();
+//    int m = AB.l.r_end() - AB.l.r_begin() ;
+//    int n = AB.r.c_end() - AB.r.c_begin ();
+//    int k = AB.l.c_end() - AB.l.c_begin ();
 
-    BW::gemm('n', 'n',
-             m, n, k,
-             alpha,
-             A, lda,
-             B, ldb,
-             beta,
-             C, ldc);
+//    BW::gemm('n', 'n',
+//             m, n, k,
+//             alpha,
+//             A, lda,
+//             B, ldb,
+//             beta,
+//             C, ldc);
 
-}
-}
-}
+//}
+//}
+//}
 
 
 // @sect4{Operator: =}
@@ -416,7 +361,7 @@ SciPAL::SubMatrixView<T, BW> &
 SciPAL::SubMatrixView<T, BW>::operator = (const SciPAL::Expr<X> &expr)
 {
 
-    SciPAL::MatrixOperations::apply(*this,  ~expr);
+    SciPAL::LAOOperations::apply(*this,  ~expr);
 
     // OLD IMPL:
     //    const T * A = &(AB.l.__src->val()[AB.l.__view_begin]) ;
@@ -455,7 +400,7 @@ SciPAL::SubMatrixView<T, BW>::operator = (const SciPAL::Expr<X> &expr)
 // @sect4{Operator: +=}
 //! @param AB:        SMSMmult Objekt
 //!
-template<typename T, typename BW>
+/*template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW> &
 SciPAL::SubMatrixView<T, BW>::operator += (const SMSMmult<T, BW> & AB)
 {
@@ -483,14 +428,14 @@ SciPAL::SubMatrixView<T, BW>::operator += (const SMSMmult<T, BW> & AB)
              C, ldc);
 
     return *this;
-}
+}*/
 
 
 
 // @sect4{Operator: +=}
 //! @param AB:        SMSMTmult Objekt
 //!
-template<typename T, typename BW>
+/*template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW> &
 SciPAL::SubMatrixView<T, BW>::operator += (const SMSMTmult<T, BW> & AB)
 {
@@ -521,12 +466,12 @@ SciPAL::SubMatrixView<T, BW>::operator += (const SMSMTmult<T, BW> & AB)
 
     return *this;
 }
-
+*/
 
 // @sect4{Operator: +=}
 //! @param AB:        SMTSMmult Objekt
 //!
-template<typename T, typename BW>
+/*template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW> &
 SciPAL::SubMatrixView<T, BW>::operator += (const SMTSMmult<T, BW> & AB)
 {
@@ -545,7 +490,7 @@ SciPAL::SubMatrixView<T, BW>::operator += (const SMTSMmult<T, BW> & AB)
     int m = AB.l.A.n_cols_active();
     int n = AB.r.n_cols_active() ;
     int k = AB.l.A.n_cols_active();
-    /*
+
     std::cout<<"m "<< m
             <<" n "<< n
             <<" k "<<k
@@ -553,7 +498,7 @@ SciPAL::SubMatrixView<T, BW>::operator += (const SMTSMmult<T, BW> & AB)
             <<" ldb "<<ldb
             <<" ldc "<<ldc
             << std::endl;
-*/
+
 
 
     BW::gemm('t', 'n',
@@ -566,14 +511,14 @@ SciPAL::SubMatrixView<T, BW>::operator += (const SMTSMmult<T, BW> & AB)
 
     return *this;
 }
-
+*/
 
 
 
 // @sect4{Operator: -=}
 //! @param AB:        SMSMult Objekt
 //!
-template<typename T, typename BW>
+/*template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW> &
 SciPAL::SubMatrixView<T, BW>::operator -= (const SMSMmult<T, BW> & AB)
 {
@@ -602,7 +547,7 @@ SciPAL::SubMatrixView<T, BW>::operator -= (const SMSMmult<T, BW> & AB)
 
     return *this;
 }
-
+*/
 
 // @sect4{Funktion: SubMatrixView::vmult}
 //! @param src:        source Vektor

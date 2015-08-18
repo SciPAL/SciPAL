@@ -27,6 +27,35 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 namespace SciPAL {
 
+
+//template <typename T> struct expr_transpose<T>{};
+//struct expr_transpose{};
+
+
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_transpose >
+transpose(const Expr<T1> &dst)
+{
+    return UnaryExpr<T1, expr_transpose >(~dst);
+}
+
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_adjoint >
+adjoint(const Expr<T1> &dst)
+{
+    return UnaryExpr<T1, expr_adjoint >(~dst);
+}
+
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_diag >
+diag(const Expr<T1> &dst)
+{
+    return UnaryExpr<T1, expr_diag >(~dst);
+}
+
 // @sect3{Struct: expr_sin}
 //
 // This structure wrapps the built-in sin

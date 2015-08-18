@@ -92,7 +92,7 @@ public:
     //! Siehe beispielsweise SubMatrixView::vmult().
     static const bool is_vector_view = false;
 
-
+    static const EType I_am = leafE;
 
     Vector();
 
@@ -875,134 +875,7 @@ SciPAL::Vector<T, BW>::sadd (T alpha, const Vector<T, BW> & other)
 
 
 
-// @sect4{struct: vmu}
-//!
-//! Struktur zum Ausfuehren einer Matrix Vector Multiplikation
-//! @param b : Zielvector
-//! @param A : Matrix
-//! @param x : Vector
-struct vmu
-{
-    template<typename T, typename BW>
-    static void apply(      SciPAL::Vector<T, BW> & b,
-                      const SciPAL::Matrix<T, BW> & A,
-                      const SciPAL::Vector<T, BW> & x)
-    {
-        b.reinit(A.n_rows());   A.vmult(b,x);
-    }
 
-    template<typename T, typename BW>
-    static void apply(      SciPAL::Vector<T, BW> & b,
-                      const SciPAL::SubMatrixView<T, BW> & A,
-                      const SciPAL::Vector<T, BW> & x)
-    {
-        b.reinit(A.r_end() - A.r_begin());   A.vmult(b,x);
-    }
-
-
-    template<typename T, typename BW>
-    static void apply(      SciPAL::Vector<T, BW> & b,
-                            const SciPAL::transpose<SciPAL::Matrix<T, BW> > & A_t,
-                      const SciPAL::Vector<T, BW> & x)
-    {
-        b.reinit(A_t.A.n_cols());    A_t.A.Tvmult(b,x);
-    }
-
-
-
-    template<typename T, typename BW>
-    static void apply(      SciPAL::Vector<T, BW> & b,
-                      const SciPAL::transpose<SciPAL::SubMatrixView<T, BW> > & A_t,
-                      const SciPAL::Vector<T, BW> & x)
-    {
-        b.reinit(A_t.A.matrix().n_rows());   A_t.A.Tvmult(b,x);
-    }
-
-
-    template<typename T, typename BW, typename T_src>
-    static void apply(      SciPAL::Vector<T, BW> & b,
-                      const SciPAL::Matrix<T, BW> & A,
-                      const SciPAL::ColVectorView<T, T_src>  & x)
-    {
-        b.reinit(A.n_rows());   A.vmult(b,x);
-    }
-};
-
-#ifdef USE_OLD_ET
-// @sect4{Operator *}
-//!
-//! Operator fuer Expression Template vmu
-//! @param _l : Referenz auf rechte Seite (Matrix)
-//! @param _r : Referenz auf linke Seite (Vector)
-template<typename L, typename T, typename BW>
-inline
-X_read_read<L, vmu, SciPAL::Vector<T, BW> >
-operator * (const L & _l, const SciPAL::Vector<T, BW> & _r)
-{
-    return X_read_read<L, vmu, SciPAL::Vector<T, BW> > (_l,_r);
-}
-
-template<typename L, typename T, //!typename R> //!
-typename BW, typename T_src>
-inline
-X_read_read<L, vmu, SciPAL::ColVectorView<T, T_src> >
-operator * (const L & _l, const //! R
-             SciPAL::ColVectorView<T, T_src>
-            & _r)
-{
-    return X_read_read<L, vmu, //! R
-            SciPAL::ColVectorView<T, T_src>
-            > (_l,_r);
-}
-#endif
-
-#ifdef USE_OLD_ET
-template<typename T, typename BW>
-template<typename M, typename Op>
-SciPAL::Vector<T, BW>::Vector(const X_read_read<M, Op, Vector<T, BW> > & Ax)
-{
-    Ax.apply(*this);
-}
-
-
-template<typename T, typename BW>
-template<typename M, typename Op
-          , typename T_src
->
-SciPAL::Vector<T, BW>::Vector(const //! X_read_read<M, Op, Vector<T, BW> >
-                                X_read_read<M, Op, SciPAL::ColVectorView<T, T_src> >
-                                & Ax)
-{
-    Ax.apply(*this);
-}
-
-
-
-
-template<typename T, typename BW>
-template<typename M, typename Op>
-SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const X_read_read<M, Op, Vector<T, BW> > & Ax)
-{
-    Ax.apply(*this);
-
-    return *this;
-}
-
-
-template<typename T, typename BW>
-template<typename M, //! typename Op,
-typename T_src>
-SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator=(const
-                                X_read_read<M, vmu, SciPAL::ColVectorView<T, T_src> >
-                                & Ax)
-{
-    Ax.apply(*this);
-
-     return *this;
-}
-#endif
 
 
 // additional functions

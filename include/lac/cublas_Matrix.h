@@ -94,7 +94,9 @@ public:
 
    // IDEA: MatrixStorage my_storage_scheme = ms;
 
-    static const bool is_leaf = true;
+    //static const bool is_leaf = true;
+
+    static const EType I_am = leafE;
 
     Matrix();
 
@@ -790,9 +792,9 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
 {
     // T alpha = 1; T beta = 0;
 
-    int lda = this->n_rows(); //! this == A
-    int ldb = src.n_rows(); /* == this->n_cols() !!! */ //! src == B
-    int ldc = dst.n_rows(); //! dst == C
+    int lda = this->array().leading_dim(); //! this == A
+    int ldb = src.array().leading_dim(); /* == this->n_cols() !!! */ //! src == B
+    int ldc = dst.array().leading_dim(); //! dst == C
 
     BW::gemm(transpose_A,
              transpose_B,
@@ -877,8 +879,8 @@ T
 SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c) const
 {
-    int lead_dim = this->n_rows();
-    const T * tmp_d =  & this->data()[c*this->n_rows()+r];
+    int lead_dim = this->array().leading_dim();
+    const T * tmp_d =  & this->data()[c*lead_dim+r];
     T entry;
     T * p_e = &entry;
     BW::GetMatrix(1, 1,
@@ -899,8 +901,8 @@ void
 SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c, T data)
 {
-    int lead_dim = this->n_rows();
-    T * tmp_d =  & this->data()[c*this->n_rows()+r];
+    int lead_dim = this->array().leading_dim();
+    T * tmp_d =  & this->data()[c*lead_dim+r];
     T * p_e = &data;
     BW::SetMatrix(1, 1,
                   p_e, lead_dim, tmp_d, 1);

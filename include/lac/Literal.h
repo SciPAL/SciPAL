@@ -31,12 +31,12 @@ namespace SciPAL {
 // This class encapsulates simple numbers so that they can be used in expression tree leafs.
 // We put into the same file as @p Expr because the only reason to introduce a class for literals
 // is that tempalte magic in the ET business does nto understand primitive built-n types as they are not classes.
-template <typename T>
-class Literal : public Expr<Literal<T> > {
+template <typename T, typename BW>
+class Literal : public Expr<Literal<T, BW> > {
 public:
     typedef T value_type;
-
-    typedef Literal<T> Type;
+    typedef BW blas_wrapper_type;
+    typedef Literal<T, BW> Type;
     typedef DevLiteral<T> DevType;
     typedef const Type ConstHandle;
 
@@ -54,33 +54,33 @@ public:
      __host__ __device__ __forceinline__
      T get_val() const { return val; }
 
-     Literal<T> operator =(T new_val) {
+     Literal<T, BW> operator =(T new_val) {
          val = new_val;
          return *this;
      }
 
-     Literal<T> operator =(Literal<T> new_val) {
+     Literal<T, BW> operator =(Literal<T, BW> new_val) {
          val = new_val.get_val();
          return *this;
      }
 
      template <typename X>
-     SciPAL::Literal<T> & operator = (const SciPAL::Expr<X> & e);
+     SciPAL::Literal<T, BW> & operator = (const SciPAL::Expr<X> & e);
 
 
 private:
      T val;
 };
-template <typename T>
+template <typename T, typename BW>
 template <typename X>
-Literal<T> & Literal<T>::operator =
+Literal<T, BW> & Literal<T, BW>::operator =
 (const SciPAL::Expr<X> & e)
 {
 #ifdef DEBUG
     std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
 #endif
 
-    SciPAL::LAOOperations::apply<T, cublas>(*this, ~e);
+    SciPAL::LAOOperations::apply<T, BW>(*this, ~e);
     return *this;
 }
 

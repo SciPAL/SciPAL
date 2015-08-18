@@ -24,7 +24,7 @@ namespace SciPAL {
 
 //differentiating a BinaryExpr and a UnaryExpr can be hard because of the different number of template parameters.
 //this enum allows to distinguish them, in an easy manner.
-enum EType {binE, unE};
+enum EType {binE, unE, leafE};
 
 // @sect3{Struct: Expr}
 //

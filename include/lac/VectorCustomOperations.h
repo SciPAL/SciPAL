@@ -68,11 +68,11 @@ template <typename T, //! numbertype
           template <typename, typename> class LAO //! template for result type
           >
 static void apply(LAO<T, BW> &result,
-                  const ::SciPAL::Expr<Literal<T> > &lit)
+                  const ::SciPAL::Expr<Literal<T, BW> > &lit)
 {
    ::SciPAL::Kernels<T, BW::arch> bla(4);
-   UnaryExpr<Literal<T>, Setter<T> >parent(~lit) ;//Expr envelope for Literal
-   DevUnaryExpr<Literal<T>, Setter<T> >child(parent);
+   UnaryExpr<Literal<T, BW>, Setter<T> >parent(~lit) ;//Expr envelope for Literal
+   DevUnaryExpr<Literal<T, BW>, Setter<T> >child(parent);
 
    bla.apply(result, child);
 }

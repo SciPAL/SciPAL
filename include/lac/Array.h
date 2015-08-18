@@ -59,7 +59,9 @@ public:
     //! Return the number of elements this array currently has.
     int n_elements() const { return __n; }
     size_t leading_dim() const {
-        return this->Base::leading_dim();
+//        return this->Base::leading_dim();
+         return this->n_rows;
+//        return this->Base::pitch;
     }
 
 protected:
@@ -86,6 +88,8 @@ private:
 
     //! @param other: Array to copy.
     Array<T, BW> & operator = (const Array<T, BW>& other);
+    size_t n_rows;
+    size_t n_cols;
 
 
 };
@@ -105,13 +109,15 @@ template <typename T, typename BW>
 SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols = 1)
     :
       Base(n_rows, n_cols),
-      __n(n_rows * n_cols)
+      __n(n_rows * n_cols), n_rows(n_rows), n_cols(n_cols)
 {}
 
 
 template <typename T, typename BW>
 inline void SciPAL::Array<T, BW>::reinit(size_t n_rows, size_t n_cols = 1)
 {
+    this->n_rows = n_rows;
+    this->n_cols = n_cols;
     if ( this->__n == n_rows * n_cols) return;
 
     AssertThrow(n_rows * n_cols > 0,

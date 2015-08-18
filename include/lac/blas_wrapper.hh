@@ -206,8 +206,8 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T,  typename T2>
-    static void SetMatrix(int rows, int cols, const T2 *const &A,
-                   int lda, T *&B, int ldb)
+    static void SetMatrix(int rows, int cols, const T2 *const A,
+                   int lda, T *B, int ldb)
     {
         //! cublasStatus status = cublasSetMatrix(rows, cols, sizeof(T),
         //!                                      A, lda, B, ldb);
@@ -226,8 +226,8 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T>
-    static void GetMatrix(int rows, int cols, const T * const &A,
-                   int lda, T *&B, int ldb)
+    static void GetMatrix(int rows, int cols, const T * const A,
+                   int lda, T *B, int ldb)
     {
         //! cublasStatus status = cublasGetMatrix(rows, cols, sizeof(T),
         //!                                      A, lda, B, ldb);
@@ -271,7 +271,7 @@ public:
     //! @param B : Zielvektor B.
     //! @param inc_dst : Speicher Abstand zwischen Elemente in Vector B.
     template<typename T>
-    static void GetVector(int n_el, const T * const &A, int inc_src, T *&B, int inc_dst)
+    static void GetVector(int n_el, const T * const A, int inc_src, T *B, int inc_dst)
     {
         //! cublasStatus status = cublasGetVector(n_el, sizeof(T),
         //!                                      A, inc_src, B, inc_dst);

@@ -20,6 +20,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef EXPRESSION_TEMPLATES_H
 #define EXPRESSION_TEMPLATES_H
 
+#include <iostream>
+
 #include <base/PrecisionTraits.h>
 #include <base/ArchTraits.h>
 
@@ -46,60 +48,71 @@ namespace SciPAL {
 
 // @sect4{Struct: transpose}
 // Interpret Matrices and Vectors in transposed manner.
-template<typename M>
-struct transpose : public SciPAL::Expr<transpose<M> > {
+//template<typename M>
+//struct transpose
+//        :
+//        public SciPAL::Expr<transpose<M> >
+//{
+//    const M & A;
 
-    const M & A;
+//    typedef typename M::value_type value_type;
+//    typedef transpose<M> Type;
+//    typedef ShapeData<value_type> DevType;
 
-    typedef transpose<M> Type;
-    typedef transpose<M> DevType;
+//    typedef const Type& ConstHandle;
 
-    typedef const Type& ConstHandle;
 
-    typedef typename M::value_type value_type;
 
-    typedef typename M::blas_wrapper_type blas_wrapper_type;
+//    typedef typename M::blas_wrapper_type blas_wrapper_type;
 
-    transpose(const M & m) : A(m) {}
-};
+//    static const EType I_am = M::I_am;
+
+//    transpose(const M & m) : A(m) {}
+
+//    operator typename M::MyShape() const
+//    {
+//        return A;
+//    }
+//    };
 
 // @sect4{Struct: adjoint}
 // Interpret Matrices and Vectors in adjoint manner.
-template<typename M>
-struct adjoint : public SciPAL::Expr<adjoint<M> > {
+//template<typename M>
+//struct adjoint : public SciPAL::Expr<adjoint<M> > {
 
-    const M & A;
+//    const M & A;
 
-    typedef adjoint<M> Type;
-    typedef adjoint<M> DevType;
 
-    typedef const Type& ConstHandle;
+//    typedef typename M::value_type value_type;
+//    typedef adjoint<M> Type;
+//    typedef ShapeData<value_type> DevType;
 
-    typedef typename M::value_type value_type;
+//    typedef const Type& ConstHandle;
 
-    typedef typename M::blas_wrapper_type blas_wrapper_type;
+//    typedef typename M::blas_wrapper_type blas_wrapper_type;
 
-    adjoint(const M & m) : A(m) {}
-};
+//    static const EType I_am = M::I_am;
+
+//    adjoint(const M & m) : A(m) {}
+//};
 
 // @sect4{Struct: diag}
 // Interpret a vector as diagonal matrix.
-template<typename M>
-struct diag : public SciPAL::Expr<diag<M> > {
+//template<typename M>
+//struct diag : public SciPAL::Expr<diag<M> > {
 
-    const M & A;
+//    const M & A;
 
-    typedef diag<M> Type;
-    typedef diag<M> DevType;
+//    typedef typename M::value_type value_type;
+//    typedef diag<M> Type;
+//    typedef ShapeData<value_type> DevType;
 
-    typedef const Type& ConstHandle;
+//    typedef const Type& ConstHandle;
 
-    typedef typename M::value_type value_type;
+//    typedef typename M::blas_wrapper_type blas_wrapper_type;
 
-    typedef typename M::blas_wrapper_type blas_wrapper_type;
-
-    diag(const M & m) : A(m) {}
-};
+//    diag(const M & m) : A(m) {}
+//};
 
 // @sect3{Structs: binary and expressions}
 //
@@ -127,7 +140,7 @@ struct BinaryExpr
     typedef typename _L::Type::value_type value_type;
 
     //we get the wrapper type from the _R because L can be a Literal, Literals do not have a blaswrapper.
-    typedef typename _R::Type::blas_wrapper_type blas_wrapper_type;
+    typedef typename _L::Type::blas_wrapper_type blas_wrapper_type;
 
     // For Literals the handle is a value and for matrices or vectors it is a reference.
     // these are the actual attributes of the binary expression
@@ -138,7 +151,7 @@ struct BinaryExpr
 
     //The ~ operator is uesed here again on _l and _r to remove the outer Expr<>
     //envelope. This shortens the types of the generated expressions.
-    BinaryExpr(const _L& _l, const _R& _r) : l(~_l), r(~_r) {}
+    BinaryExpr(const _L& _l, const _R& _r) : l(_l), r(_r) {}
 //public:
 //    typename _L::ConstHandle get_l()
 //    {
@@ -172,6 +185,7 @@ struct UnaryExpr
     typedef typename L::value_type value_type;
 
     typename L::ConstHandle l;
+    typedef typename _L::Type::blas_wrapper_type blas_wrapper_type;
 
     //I had to comment this in order for the Setter function to work.
     //Where does it break down? -jh
@@ -219,20 +233,52 @@ operator - (const Expr<T1> &e1, const Expr<T2> &e2)
 //for the case that we want to multiply a real-valued literal with a complex LAO
 template <typename T, typename BW, template <typename, typename> class LAO >
 inline
-const BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >
+const BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >
 operator *(const typename PrecisionTraits<T, BW::arch>::NumberType e1,
            const  LAO<T, BW>& e2)
 {
-    return BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >(~Literal<T>(e1), ~e2);
+    return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
 }
 
 template <typename T, typename BW, template <typename, typename> class LAO >
 inline
-const BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >
+const BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >
 operator *(const T e1, const  LAO<T, BW>& e2)
 {
-    return BinaryExpr<Literal<T>, SciPAL::mult, LAO<T, BW> >(~Literal<T>(e1), ~e2);
+    return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
 }
+
+//template <typename T, LAOType LT1, LAOType LT2>
+//inline
+//const BinaryExpr<Shape<T, LT1>, SciPAL::mult, Shape<T, LT2> >
+//operator * (const Shape<T, LT1>& e1, const Shape<T, LT2>& e2)
+//{
+//    return BinaryExpr<Shape<T, LT1>, SciPAL::mult, Shape<T, LT2> >(~e1, ~e2);
+//}
+
+//template <typename T1, typename T2 >
+//inline
+//const BinaryExpr<T1, SciPAL::mult, T2 >
+//operator * (const Expr<T1>& e1, const Expr<T2>& e2)
+//{
+//    if ((T1::I_am == unE || T1::I_am == binE) &&
+//            (T2::I_am == unE || T2::I_am == binE))
+//        return BinaryExpr<T1, SciPAL::mult, T2 >(~e1, ~e2);
+
+//    else if ((T1::I_am == unE || T1::I_am == binE) &&
+//            !(T2::I_am == unE || T2::I_am == binE))
+//        return BinaryExpr<T1, SciPAL::mult, typename T2::MyShape >(~e1, e2);
+
+//    else if (!(T1::I_am == unE || T1::I_am == binE) &&
+//            (T2::I_am == unE || T2::I_am == binE))
+//        return BinaryExpr<typename T1::MyShape, SciPAL::mult, T2>(e1, ~e2);
+
+//    else if (!(T1::I_am == unE || T1::I_am == binE) &&
+//            !(T2::I_am == unE || T2::I_am == binE))
+//    return BinaryExpr<typename T1::MyShape, SciPAL::mult, typename T2::MyShape>(e1, e2);
+//    else
+//        std::cerr << "SOMETHING WENT TERRIBLY WRONG BUILDING EXPRESSIONS!!1!" << std::endl;
+//}
 
 template <typename T1, typename T2 >
 inline
@@ -259,6 +305,64 @@ operator || (const Expr<T1>& e1, const Expr<T2>& e2)
 {
     return BinaryExpr<T1, SciPAL::pdivide, T2 >(~e1, ~e2);
 }
+
+//template<typename T, typename BW>
+//struct SMSMmult : SciPAL::Expr<SMSMmult<T, BW> >  {
+
+//    const SubMatrixView<T, BW> &  l;
+//    const SubMatrixView<T, BW> &  r;
+
+//    SMSMmult (const SubMatrixView<T, BW> & A, const SubMatrixView<T, BW> & B): l(A), r(B){}
+
+//};
+
+//template<typename T, typename BW> struct SMSMTmult {
+//    const SubMatrixView<T, BW> &  l;
+//    const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > &  r;
+//    SMSMTmult (const SubMatrixView<T, BW> & A, const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & B): l(A), r(B){}
+//};
+
+
+//template<typename T, typename BW> struct SMTSMmult {
+//    const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > &  l;
+//    const SubMatrixView<T, BW> &  r;
+//    SMTSMmult (const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & A, const SubMatrixView<T, BW> & B): l(A), r(B){}
+//};
+
+//// @sect4{Operator: *}
+////! Multiplizieren von zwei SubMatrixView
+////! @param A:        ein SubMatrixView
+////! @param B:        ein SubMatrixView
+////!
+//template<typename T, typename BW>
+//inline SMSMmult<T, BW> operator * (const SubMatrixView<T, BW> & A, const SubMatrixView<T, BW> & B) {
+//    return SMSMmult<T, BW>(A, B);
+//}
+
+//// @sect4{Operator: *}
+////! Multiplizieren von zwei SubMatrixView
+////! @param A:        ein SubMatrixView
+////! @param B:        ein SubMatrixView
+////!
+//template<typename T, typename BW>
+//inline SMSMTmult<T, BW> operator * (const SubMatrixView<T, BW> & A,
+//                                    const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & B) {
+//    return SMSMTmult<T, BW>(A, B);
+//}
+
+
+
+//// @sect4{Operator: *}
+////! Multiplizieren von zwei SubMatrixView
+////! @param A:        ein SubMatrixView
+////! @param B:        ein SubMatrixView
+////!
+//template<typename T, typename BW>
+//inline SMTSMmult<T, BW> operator * (const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & A,
+//                                    const SubMatrixView<T, BW> & B) {
+//    return SMTSMmult<T, BW>(A, B);
+//}
+
 
 
 } // END namespace SciPAL

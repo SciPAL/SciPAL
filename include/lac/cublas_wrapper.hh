@@ -31,6 +31,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 //SciPAL includes
 #include<base/ParallelArch.h>
+#include<base/CUDA_error_check.h>
 
 //CUDA includes
 #include <cuda_runtime_api.h>
@@ -186,9 +187,9 @@ struct cublas {
 
         Data() : dev_ptr(0) {}
 
-        Data(size_t n)
+        Data(size_t n_rows, size_t n_cols = 1)
         {
-            alloc(n);
+            alloc(n_rows, n_cols);
         }
 
         ~Data() {  free_dev_ptr(); }
@@ -197,10 +198,25 @@ struct cublas {
 
         const T * data() const { return dev_ptr; }
 
-        void resize(size_t n)
+        void resize(size_t n_rows, size_t n_cols = 1)
         {
             free_dev_ptr();
-            alloc(n);
+            alloc(n_rows, n_cols);
+        }
+
+        size_t leading_dim () const {
+            size_t n_bytes = sizeof(T);
+
+                if( pitch_in_bytes % n_bytes != 0 )
+                {
+                    std::cout << "something is wrong with the pitch pitch_in_bytes % n_bytes ="<< pitch_in_bytes % n_bytes<< std::endl;
+                return 0;
+                }
+                else
+                {
+                    size_t result = pitch_in_bytes;//  / n_bytes;
+                    return result;
+                }
         }
 
     protected:
@@ -221,13 +237,19 @@ struct cublas {
         }
 
 
-        void alloc(size_t n)
+        void alloc(size_t rows, size_t cols = 1)
         {
-            cudaError_t status = cudaMalloc( (void**)&dev_ptr, n*sizeof(T) );
+            //cols and rows switched on purpose to meet cublas alignment requirements!!!!!!!1
+//            cudaError_t status = cudaMallocPitch((void**)&dev_ptr, &pitch_in_bytes,
+//                                             rows, cols);
+            //cols and rows switched on purpose to meet cublas alignment requirements!!!!!!!1
+
+            cudaError_t status = cudaMalloc( (void**)&dev_ptr, rows*cols*sizeof(T) );
             check_status(status);
 
             // set everything to zero
-            status = cudaMemset( dev_ptr, 0, n*sizeof(T) );
+//            status = cudaMemset2D(dev_ptr, pitch_in_bytes,
+//                                  0, cols*sizeof(T), rows*sizeof(T));
             // According to the
             // <a href="http://developer.download.nvidia.com/compute/cuda/4_2/rel/toolkit/docs/online/sync_async.html#memset_sync_async_behavior">online documentation</a>
             // cudaMemset is asynchronous.
@@ -243,6 +265,7 @@ struct cublas {
         }
 
         T * dev_ptr;
+        size_t pitch_in_bytes;
     };
 
 
@@ -272,7 +295,12 @@ public:
         cublasStatus_t status = cublasSetMatrix(rows, cols, sizeof(T),
                                                 A, lda,
                                                 B, ldb);
+//        cudaError_t status = cudaMemcpy2D( B, ldb,
+//                               A, lda,
+//                               cols, rows, cudaMemcpyHostToDevice);
 
+//        gpuErrchk( cudaPeekAtLastError() );
+//        gpuErrchk( cudaDeviceSynchronize() );
         check_status(status);
     }
 
@@ -302,7 +330,8 @@ public:
     //! @param dst : Zielvektor dst.
     //! @param inc_dst : Speicher Abstand zwischen Elemente in Vector dst.
     template<typename T>
-    static void SetVector(int n_el, const T * const src, int inc_src, T *dst, int inc_dst)
+    static void SetVector(int n_el, const T * const src, int inc_src,
+                          T *dst, int inc_dst)
     {
         cublasStatus_t status = cublasSetVector(n_el, sizeof(T),
                                               src, inc_src, dst, inc_dst);
@@ -1000,8 +1029,10 @@ public:
     //! @param beta : Skalar fuer Matrix C.
     //! @param C : Matrix C.
     //! @param ldc : leading dimension von C.
-    static void gemm(char transa, char transb, int m, int n, int k, float alpha,
-                     const float * const A, int lda, const float * const B, int ldb,
+    static void gemm(char transa, char transb,
+                     int m, int n, int k, float alpha,
+                     const float * const A, int lda,
+                     const float * const B, int ldb,
                      float beta, float * C, int ldc)
     {
 

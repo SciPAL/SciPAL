@@ -31,10 +31,21 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 namespace SciPAL {
 
+//template<typename T> struct GetMyType<SciPAL::Literal<T, blas> >
+//{
+//typedef DevLiteral<T> Type;
+//};
+
+//template<typename T> struct GetMyType<SciPAL::Literal<T, cublas> >
+//{
+//typedef DevLiteral<T>  Type;
+//};
+
 template<typename T> struct GetMyType<SciPAL::ShapeData<T> >
 {
 typedef SciPAL::ShapeData<T> Type;
 };
+
 
 template<typename T> struct GetMyType {
 
@@ -120,11 +131,21 @@ struct ExprTree {
     }
 
     //! Specialization for literals. Retrieve the value.
-    template<template <typename> class Lit>
+    template<typename BW>
     __host__
     __device__
     __forceinline__
-    static T eval(const Lit<T> & Ax, int i)
+    static T eval(const Literal<T, BW> & Ax, int i)
+    {
+       // printf("%s ", __PRETTY_FUNCTION__); printf("literal : Ex[%d] : %g\n", i, Ax.get_val() );
+        return Ax.get_val();
+    }
+
+    //! Specialization for literals. Retrieve the value.
+    __host__
+    __device__
+    __forceinline__
+    static T eval(const DevLiteral<T> & Ax, int i)
     {
        // printf("%s ", __PRETTY_FUNCTION__); printf("literal : Ex[%d] : %g\n", i, Ax.get_val() );
         return Ax.get_val();
@@ -138,7 +159,7 @@ struct ExprTree {
     __host__
     __device__
     __forceinline__
-    static T eval(const DevBinaryExpr<L/*e.g.: DevLiteral<T>*/, Op, R> & Ax, int i)
+    static T eval(const DevBinaryExpr<L/*e.g.: DevLiteral<T, BW>*/, Op, R> & Ax, int i)
     {
         return Ax[i];
     }

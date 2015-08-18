@@ -51,7 +51,7 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
 #else
     int threads_per_block = 1024;
 #endif
-    int size = d_dst.n_rows * d_dst.n_cols;
+    int size = d_dst.size();
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
     __apply<T, X><<<blocks, threads_per_block>>>(d_dst.data_ptr, Ax, size);
@@ -70,7 +70,7 @@ ImplOpenMP<T>::apply(SciPAL::ShapeData<T> &d_dst,
                   const SciPAL::DevUnaryExpr<X, op> &Ax)
 {
     #pragma omp parallel for
-    for(int i = 0; i < d_dst.n_rows * d_dst.n_cols; i++)
+    for(int i = 0; i < d_dst.size() ; i++)
      __apply_element<T, X, op>(d_dst.data_ptr, Ax, i);
 }
 /////////////////////////////////////////
@@ -113,7 +113,7 @@ __apply(T *d_dst,
 template< typename T>
 template <typename L, typename op, typename R>
 void
-ImplCUDA<T>::apply(SciPAL::ShapeData<T> & d_dst,
+ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
                   const SciPAL::DevBinaryExpr<L, op, R> & Ax)
 {
 #if __CUDA_ARCH__ < 200
@@ -122,7 +122,7 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> & d_dst,
     int threads_per_block = 1024;
 #endif
 
-    int size = d_dst.n_rows * d_dst.n_cols;
+    int size = d_dst.size();
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
     __apply<T, L, op, R><<<blocks, threads_per_block>>>
@@ -141,7 +141,7 @@ ImplOpenMP<T>::apply(SciPAL::ShapeData<T> & d_dst,
                   const SciPAL::DevBinaryExpr<L, op, R> &Ax)
 {
     #pragma omp parallel for
-    for(int i = 0; i < d_dst.n_rows * d_dst.n_cols; i++)
+    for(int i = 0; i < d_dst.n_elements_active; i++)
      __apply_element<T, L, op, R>(d_dst.data_ptr, Ax, i);
 
 }

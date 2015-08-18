@@ -38,8 +38,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 // We have to include
 #include <cuda_runtime_api.h>
 
-#include <lac/stack.h>
-
 // @sect4{Constructor: CUDADriver}
 //
 // The constructor of the driver class allocates memory
@@ -102,7 +100,7 @@ void step42::CUDADriver::gemm_tests()
     C.print();
 
     std::cout << " ============ C = A * B ======" << std::endl;
-    C = A * B;   std::cout << "C : " << std::endl; C.print();
+    C = (A) * (B);   std::cout << "C : " << std::endl; C.print();
 
     std::cout << " ============ C = B * A ======" << std::endl;
     C = B * A;   std::cout << "C : " << std::endl; C.print();
@@ -171,7 +169,7 @@ void step42::CUDADriver::gemv_tests()
     SciPAL::Vector<Number, BW> vA, vB(n_elements), vC;
     vA = a;
     // This sets all elements of vB to 2.3, note: vector needs to be initialized.
-    vB = SciPAL::Literal<Number>(2.3);
+    vB = SciPAL::Literal<Number, BW>(2.3);
     vC = a;
 
 
@@ -287,12 +285,12 @@ void step42::CUDADriver::gemv_tests()
         C.print();
 
         //test pointwise * on same matrix
-        //       C = C && C;
+        C = C && C;
         std::cout << "C = C .* C" << std::endl;
         C.print();
 
         //test pointwise *
-        //       C = A && B;
+        C = A && B;
         std::cout << "C = A .* B" << std::endl;
         C.print();
 
@@ -738,7 +736,7 @@ void step42::CUDADriver::operator_precedence(){
     SciPAL::Vector<Number, BW> vA, vB(n_elements), vC, vD(n_elements);
     vA = a;
     // This sets all elements of vB to 2.3, note: vector needs to be initialized.
-    vB = SciPAL::Literal<Number>(2.3);
+    vB = SciPAL::Literal<Number, BW>(2.3);
     vC = a;
 
 
@@ -769,7 +767,7 @@ void step42::CUDADriver::operator_precedence(){
     vD = vC + vA * vB;
     vD.print();
 
-    SciPAL::Literal<Number> test(0);
+    SciPAL::Literal<Number, BW> test(0);
     test = (SciPAL::transpose<SciPAL::Vector<Number, BW> >(vA)) * vB;
     std::cout<< test << std::endl;
 }
@@ -824,7 +822,7 @@ void step42::CUDADriver::stacks_of_LAOs(){
 
     //        std::cout<<"initialization \n";
     //        d_test[0].print();
-    //        d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+    //        d_test[2] = SciPAL::Literal<test_nmbr, BW>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr, BW>(3.0)*d_test[1];
     //        std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
     //        d_test[2].print();
     //    }
@@ -858,7 +856,7 @@ void step42::CUDADriver::stacks_of_LAOs(){
 
             std::cout<<"initialization \n";
             d_test[0].print();
-            d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+            d_test[2] = SciPAL::Literal<test_nmbr, BW>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr, BW>(3.0)*d_test[1];
             std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
             d_test[2].print();
         }
@@ -892,7 +890,7 @@ void step42::CUDADriver::stacks_of_LAOs(){
 
                 std::cout<<"initialization \n";
                 d_test[0].print();
-                d_test[2] = SciPAL::Literal<test_nmbr>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr>(3.0)*d_test[1];
+                d_test[2] = SciPAL::Literal<test_nmbr, BW>(2.0) * d_test[0] + SciPAL::Literal<test_nmbr, BW>(3.0)*d_test[1];
                 std::cout<<"result of d_test[2] = 2.0 * d_test[0] + 3.0*d_test[1] \n";
                 d_test[2].print();
             }

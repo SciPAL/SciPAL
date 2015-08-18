@@ -34,13 +34,21 @@ namespace SciPAL {
 template< typename T, typename BW> // IDEA:, MatrixStorage ms>
 struct BlasMatExp/*MatrixExpressions*/
 {
-     typedef ::SciPAL::Matrix<T, BW> // IDEA:, ms>
-    Mtx;
-    typedef ::SciPAL::Vector<T, BW> Vtr;
+//    typedef typename ::SciPAL::Matrix<T, BW>::MyShape Mtx;
+//    typedef typename ::SciPAL::Vector<T, BW>::MyShape Vtr;
 
-    typedef Literal<T> Lit;
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+    typedef ::SciPAL::Vector<T, BW> Vtr;
+//    typedef ::SciPAL::Shape<T, matrix> Mtx;
+//    typedef ::SciPAL::Shape<T, vector> Vtr;
+
+    typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
+    typedef ::SciPAL::VectorView<T, BW> SVtr;
+
+    typedef Literal<T, BW> Lit;
     //scaled Matrix
     typedef typename SciPAL::BinaryExpr<Lit,  mult, Mtx> scaledM;
+
 
     //scaled matrix multiplied matrix
     typedef typename SciPAL::BinaryExpr<scaledM,  mult, Mtx> sMM;
@@ -48,18 +56,24 @@ struct BlasMatExp/*MatrixExpressions*/
     //matrix multiplied matrix
     typedef typename SciPAL::BinaryExpr<Mtx,  mult, Mtx> MM;
 
+    //submatrix multiplied submatrix
+    typedef typename SciPAL::BinaryExpr<SMtx,  mult, SMtx> SMmSM;
+
+
     // diagonal matrix multiplied matrix
-    typedef typename SciPAL::BinaryExpr<SciPAL::diag<Vtr>,  mult, Mtx> dMM;
+    typedef typename SciPAL::BinaryExpr<UnaryExpr<Vtr, expr_diag>,  mult, Mtx> dMM;
 
     // matrix multiplied diagonal matrix
-    typedef typename SciPAL::BinaryExpr<Mtx,  mult, SciPAL::diag<Vtr> > MdM;
+    typedef typename SciPAL::BinaryExpr<Mtx,  mult, UnaryExpr<Vtr, expr_diag> > MdM;
 
 
-    typedef typename SciPAL::BinaryExpr< SciPAL::transpose<Mtx>, mult, Mtx> MtM;
-    typedef typename SciPAL::BinaryExpr< SciPAL::adjoint<Mtx>, mult, Mtx> MaM;
+    typedef typename SciPAL::BinaryExpr< UnaryExpr<Mtx, expr_transpose >, mult, Mtx> MtM;
 
-    typedef typename SciPAL::BinaryExpr<Mtx, mult, SciPAL::transpose<Mtx> > MMt;
-    typedef typename SciPAL::BinaryExpr<Mtx, mult, SciPAL::adjoint<Mtx> > MMa;
+    typedef typename SciPAL::BinaryExpr<Mtx, mult, UnaryExpr<Mtx, expr_transpose > > MMt;
+
+    typedef typename SciPAL::BinaryExpr< UnaryExpr<Mtx, expr_adjoint>, mult, Mtx> MaM;
+
+    typedef typename SciPAL::BinaryExpr<Mtx, mult, UnaryExpr<Mtx, expr_adjoint> > MMa;
 
     //matrix times matrix plus matrix
     typedef typename SciPAL::BinaryExpr<MM, plus, Mtx>  MMaM;
@@ -70,7 +84,7 @@ struct BlasMatExp/*MatrixExpressions*/
     //generalized matrix matrix product
     typedef typename SciPAL::BinaryExpr<sMM, plus, scaledM> sMMasM;
 
-    typedef typename SciPAL::adjoint<Mtx> adM;
+    typedef typename SciPAL::UnaryExpr<Mtx, expr_adjoint> adM;
 };
 
 // @sect3{namespace: LAOOperations}
@@ -136,14 +150,46 @@ static void apply(::SciPAL::Matrix<T, BW> // IDEA:, ms>
 }
 
 
+template <typename T, typename BW> // IDEA:, MatrixStorage ms>
+static void apply(::SciPAL::SubMatrixView<T, BW> // IDEA:, ms>
+                  &result,
+                  const typename BlasMatExp<T, BW> // IDEA:, ms>
+                  ::SMmSM& expr)
+{
+    typedef typename BlasMatExp<T, BW>::SMtx SMtx;
+    const SMtx& A = expr.l;
+    const SMtx& B = expr.r;
+
+    int lda = A.leading_dim();
+    int ldb = B.leading_dim(); /* == this->n_cols() !!! */ //! src == B
+    int ldc = result.leading_dim(); //! dst == C
+
+    BW::gemm('n',
+             'n',
+             A.n_cols(),
+             /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
+             B.n_cols(),
+             /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
+             A.n_cols(),
+             /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
+             0,
+             A.data_ptr, lda,
+             B.data_ptr, ldb,
+             0,
+             result.data_ptr, ldc);
+}
+
+
 template <typename T, typename BW>
 static void apply(::SciPAL::Matrix<T, BW> &result,
                   const typename BlasMatExp<T, BW>::MtM& expr)
+                  //SciPAL::BinaryExpr<SciPAL::transpose<SciPAL::Matrix<T, BW> >, SciPAL::mult, SciPAL::Matrix<T, BW> > & expr)
+
 {
     typedef ::SciPAL::Matrix<T, BW> Mtx;
 
     T alpha = 1.0;
-    const Mtx & A = expr.l.A;
+    const Mtx & A = expr.l.l;
     const Mtx & B = expr.r;
 
     T beta = 0.0;
@@ -162,7 +208,7 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
     typedef ::SciPAL::Matrix<T, BW> Mtx;
 
     T alpha = 1.0;
-    const Mtx & A = expr.l.A;
+    const Mtx & A = expr.l.l;
     const Mtx & B = expr.r;
 
     T beta = 0.0;
@@ -195,6 +241,7 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 }
 
 
+
 template <typename T, typename BW>
 static void apply(::SciPAL::Matrix<T, BW> &result,
                   const typename BlasMatExp<T, BW>::MMa& expr)
@@ -203,7 +250,7 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     T alpha = 1.0;
     const Mtx & A = expr.l;
-    const Mtx & B = expr.r.A;
+    const Mtx & B = expr.r.l;
 
     T beta = 0.0;
 
@@ -222,7 +269,7 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
 
-    const Vtr & diag = expr.l.A;
+    const Vtr & diag = expr.l.l;
     const Mtx & A = expr.r;
 
 
@@ -245,7 +292,7 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
 
-    const Vtr & diag = expr.r.A;
+    const Vtr & diag = expr.r.l;
     const Mtx & A = expr.l;
 
 
@@ -324,7 +371,7 @@ static void apply(::SciPAL::Matrix<T, BW> & result,
     typedef ::SciPAL::Matrix<T, BW> Mtx;
 
     T alpha = 1.0;
-    const Mtx & A = expr.A;
+    const Mtx & A = expr.l;
 
     Mtx B(A.n_rows(), A.n_rows());
     for (unsigned int i = 0; i < B.n_rows(); i++)

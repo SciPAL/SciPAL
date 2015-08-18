@@ -120,6 +120,8 @@ struct blas {
          //! Number of elements in the array.
         size_t __n_el;
 
+        size_t leading_dim_elements;
+
     public:
         //! This attribute can be used to determine an optimal
         //! value for the leading dimension by (re)allocating memory
@@ -135,16 +137,18 @@ struct blas {
 
         //! Construct an array of length @p n.
         //! @param n : Number of elements to allocate.
-        Data(size_t n)
+        Data(size_t n_rows, size_t n_cols = 1)
             : __data(0), __n_el(0)
         {
-            resize(n);
+            resize(n_rows, n_cols);
         }
 
         //! Resize the array to length @p n. All previous data is erased.
         //! @param n : New number of elements.
-        void resize(size_t n)
+        void resize(size_t n_rows, size_t n_cols = 1)
         {
+            size_t n = n_rows * n_cols;
+            this->leading_dim_elements = n_rows;
 #ifdef QT_NO_DEBUG
             AssertThrow(n > 0,
                         dealii::ExcMessage("allocation of 0 elements not allowed"));
@@ -170,6 +174,10 @@ struct blas {
                     __data[ii] = T();
 
         };
+
+        size_t leading_dim() const {
+            return this->leading_dim_elements;
+        }
 
         ~Data()
         {
@@ -198,8 +206,8 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T,  typename T2>
-    static void SetMatrix(int rows, int cols, const T2 *const &A,
-                   int lda, T *&B, int ldb)
+    static void SetMatrix(int rows, int cols, const T2 *const A,
+                   int lda, T *B, int ldb)
     {
         //! cublasStatus status = cublasSetMatrix(rows, cols, sizeof(T),
         //!                                      A, lda, B, ldb);
@@ -218,8 +226,8 @@ public:
     //! @param B : Zielmatrix B.
     //! @param ldb : leading dimension von B.
     template<typename T>
-    static void GetMatrix(int rows, int cols, const T * const &A,
-                   int lda, T *&B, int ldb)
+    static void GetMatrix(int rows, int cols, const T * const A,
+                   int lda, T *B, int ldb)
     {
         //! cublasStatus status = cublasGetMatrix(rows, cols, sizeof(T),
         //!                                      A, lda, B, ldb);
@@ -263,7 +271,7 @@ public:
     //! @param B : Zielvektor B.
     //! @param inc_dst : Speicher Abstand zwischen Elemente in Vector B.
     template<typename T>
-    static void GetVector(int n_el, const T * const &A, int inc_src, T *&B, int inc_dst)
+    static void GetVector(int n_el, const T * const A, int inc_src, T *B, int inc_dst)
     {
         //! cublasStatus status = cublasGetVector(n_el, sizeof(T),
         //!                                      A, inc_src, B, inc_dst);

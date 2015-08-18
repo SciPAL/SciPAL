@@ -16,13 +16,14 @@ namespace SciPAL
     template<typename, typename> class Vector;
     template<typename, typename> class VectorView;
     template<typename, typename> class ColVectorView;
-    template<typename T> struct Literal;
+    template<typename T, typename BW> struct Literal;
     template<typename T> struct DevLiteral;
     template<typename T> struct Setter;
     template<typename T, ParallelArch arch> struct Kernels;
-    template<typename M> struct transpose;
-    template<typename M> struct adjoint;
-    template<typename M> struct diag;
+
+    struct expr_transpose{};
+    struct expr_adjoint{};
+    struct expr_diag{};
 
     template <class E> struct Expr;
 

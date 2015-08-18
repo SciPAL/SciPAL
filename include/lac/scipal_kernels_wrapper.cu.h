@@ -24,7 +24,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #endif
 //SciPAL includes
 #include <base/PrecisionTraits.h>
-#include <lac/ShapeData.h>
+#include <lac/Shape.h>
 #include <base/CudaComplex.h>
 #include <lac/expression_templates_device.h>
 #include <lac/UnaryFunctions.h>
@@ -33,6 +33,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <iostream>
 
 #include <base/ForewardDeclarations.h>
+using namespace SciPAL;
 
 template <typename T> class ImplCUDA {
 public:
@@ -41,7 +42,7 @@ public:
     typedef typename PrecisionTraits<T, gpu_cuda>::NumberType NumberType;
 
     template <typename L, typename op, typename R>
-    static void apply(SciPAL::ShapeData<T> & d_dst,
+    static void apply(SciPAL::ShapeData<T>& d_dst,
                       const typename ::SciPAL::DevBinaryExpr<L, op, R> & Ax);
 
     template <typename X, typename op>
@@ -63,6 +64,8 @@ public:
     template <typename X, typename op>
     static void apply(SciPAL::ShapeData<T> & d_dst,
                       const SciPAL::DevUnaryExpr<X, op> & Ax);
+
+
 
 private:
 };

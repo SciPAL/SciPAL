@@ -8,14 +8,17 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <cuda_runtime.h>
 #ifndef Q_OS_OSX
 #include <sys/prctl.h>
 #endif
 //! code from
 //! http://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__, __FUNCTION__); }
+
 inline void gpuAssert(cudaError_t code, const char *file, int line, const char *func,bool abort=true)
 {
+    #ifndef DEBUG
    if (code != cudaSuccess)
    {
       fprintf(stderr,"GPUassert: %s %s line: %d\n function:%s\n", cudaGetErrorString(code), file, line, func);
@@ -39,5 +42,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, const char *
 
       if (abort) exit(code);
    }
+#endif//DEBUG
 }
+
 #endif // CUDA_ERROR_CHECK_H

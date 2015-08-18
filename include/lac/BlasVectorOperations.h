@@ -23,7 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <base/ForewardDeclarations.h>
 
 #include <lac/expression_templates_host.h>
-#include <lac/VectorCustomOperations.h>
+//#include <lac/VectorCustomOperations.h>
 #include <lac/scipal_kernels_wrapper.cu.h>
 
 namespace SciPAL {
@@ -34,11 +34,15 @@ using namespace SciPAL;
 template< typename T, typename BW>
 struct BlasVecExp/*VectorExpressions*/
 {
+//        typedef typename ::SciPAL::Matrix<T, BW>::MyShape Mtx;
+//        typedef typename ::SciPAL::Vector<T, BW>::MyShape Vtr;
+//        typedef ::SciPAL::Shape<T, matrix> Mtx;
+//        typedef ::SciPAL::Shape<T, vector> Vtr;
+
     typedef ::SciPAL::Matrix<T, BW> Mtx;
-    //  typedef SparseMatrix<T, BW> SpMtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
 
-    typedef Literal<T> Lit;
+    typedef Literal<T, BW> Lit;
 
     // $ y = \alpha x$
   //  typedef typename ::SciPAL::Mul<T, Vtr > scaledV;
@@ -47,6 +51,10 @@ struct BlasVecExp/*VectorExpressions*/
     // $ y = A \cdot x$
     typedef typename ::SciPAL::BinaryExpr<Mtx, mult, Vtr> // ::SciPAL::Mul<Mtx, Vtr >
     MV;
+
+    // $ y = A \cdot x$
+    typedef typename ::SciPAL::BinaryExpr<UnaryExpr<Mtx, expr_transpose >, mult, Vtr> // ::SciPAL::Mul<Mtx, Vtr >
+    MtV;
 
     // $ y = \alpha A \cdot x$, just a crutch
     typedef typename ::SciPAL::BinaryExpr<Lit, mult, Mtx> scaledM;
@@ -63,8 +71,18 @@ struct BlasVecExp/*VectorExpressions*/
     axpy;
 
     // $ z =  x^t \cdot y$
-    typedef typename SciPAL::BinaryExpr< SciPAL::transpose<Vtr>, mult, Vtr>
+    typedef typename SciPAL::BinaryExpr< UnaryExpr<Vtr, expr_transpose>, mult, Vtr>
     scalar_product;
+
+    // vector = transpose(A) * vector
+    typedef typename SciPAL::BinaryExpr<
+    UnaryExpr<SciPAL::SubMatrixView<T, BW>, expr_transpose > , SciPAL::mult, SciPAL::Vector<T, BW> > SMtmV;
+
+    // vector = (A) * vector
+    typedef typename SciPAL::BinaryExpr<
+    SciPAL::SubMatrixView<T, BW> , SciPAL::mult, SciPAL::Vector<T, BW> > SMmV;
+
+
 };
 
 
@@ -86,13 +104,13 @@ namespace LAOOperations
 //! apply function for literals scalar product
 
 template <typename T, typename BW>
-static void apply(Literal<T> &result,
+static void apply(Literal<T, BW> &result,
                   const typename BlasVecExp<T, BW>::scalar_product& expr)
 {
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef Vector<T, BW> Vtr;
 
-    const Vtr x = expr.l.A;
+    const Vtr x = expr.l.l;
     const Vtr & y = expr.r;
 
     result = BW::dot(x.size(), x.array().val(), 1, y.array().val(), 1);
@@ -181,6 +199,43 @@ static void apply(Vector<T, BW> &result,
              );
 }
 
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A^t \cdot src$
+
+template <typename T, typename BW>
+static void apply(Vector<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::MtV& expr)
+{
+
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    Vtr & dst = result;
+
+
+    BW::gemv('t',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data_ptr,
+             A.n_rows(), // lda
+             x.data_ptr,
+             1, // incx
+             beta,
+             dst.data_ptr, // y
+             1 // incy
+             );
+}
+
+
 // @sect4{Function: scaled_vmult}
 //!
 //! Generic matrix-vector multiplication.
@@ -217,6 +272,78 @@ static void apply(Vector<T, BW> &result,
              );
 }
 
+
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A^t \cdot src$
+
+template <typename T, typename BW>
+static void apply(Vector<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::SMtmV& expr)
+{
+
+    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    Vtr & dst = result;
+
+
+    BW::gemv('t',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data_ptr,
+             A.leading_dim(), // lda
+             x.data_ptr,
+             1, // incx
+             beta,
+             dst.data_ptr, // y
+             1 // incy
+             );
+}
+
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A \cdot src$
+
+template <typename T, typename BW>
+static void apply(Vector<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::SMmV& expr)
+{
+
+    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    Vtr & dst = result;
+
+
+    BW::gemv('n',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data_ptr,
+             A.leading_dim(), // lda
+             x.data_ptr,
+             1, // incx
+             beta,
+             dst.data_ptr, // y
+             1 // incy
+             );
+}
 
 
 } // END namespace LAOOperations

@@ -44,11 +44,11 @@ public:
 
     //! Construct an array of length @p n.
     //! @param n: Number of elements to allocate.
-    Array(size_t n_rows, size_t n_cols);
+    Array(size_t n_rows, size_t n_cols = 1);
 
     //! Resize an array to length @p n.
     //! @param n: New number of elements.
-    void reinit(size_t n_rows, size_t n_cols);
+    void reinit(size_t n_rows, size_t n_cols = 1);
 
     //! Read-Write access to the data pointer. Use this function if you know what you are doing.
     T * val();
@@ -106,7 +106,7 @@ SciPAL::Array<T, BW>::Array()
 
 //! @param n : Groesse des Arrays.
 template <typename T, typename BW>
-SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols = 1)
+SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols)
     :
       Base(n_rows, n_cols),
       __n(n_rows * n_cols), n_rows(n_rows), n_cols(n_cols)
@@ -114,7 +114,7 @@ SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols = 1)
 
 
 template <typename T, typename BW>
-inline void SciPAL::Array<T, BW>::reinit(size_t n_rows, size_t n_cols = 1)
+inline void SciPAL::Array<T, BW>::reinit(size_t n_rows, size_t n_cols)
 {
     this->n_rows = n_rows;
     this->n_cols = n_cols;

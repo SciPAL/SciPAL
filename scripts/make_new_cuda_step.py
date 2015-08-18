@@ -51,7 +51,7 @@ def copy_template():
     print "step range : %d - %d " % (step_min, step_max) 
     
     print "cwd : " + os.getcwd() 	
-    while str(os.path.split(os.getcwd())[1]) != "Praktikum_2014":
+    while str(os.path.split(os.getcwd())[1]) != "SciPAL":
         os.chdir("..")
         print "cwd : " + os.getcwd()
     os.chdir("testsite")

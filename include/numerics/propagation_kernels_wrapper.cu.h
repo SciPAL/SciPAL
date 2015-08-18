@@ -2,7 +2,10 @@
 #define PROPAGATION_KERNELS_CU_H
 //CUDA specific include
 //! \file
+//!
+#ifdef HAVE_OPENMP
 #include <omp.h>
+#endif
 #include <base/CudaComplex.h>
 #include <base/PrecisionTraits.h>
 #include <lac/Shape.h>
@@ -148,7 +151,9 @@ struct PropagationKernels<T,cpu>
 {
     PropagationKernels(int num_omp_threads)
     {
+#ifdef HAVE_OPENMP
         omp_set_num_threads(num_omp_threads);
+#endif
     }
 };
 

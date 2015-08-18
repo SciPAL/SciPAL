@@ -1,32 +1,43 @@
 # Listing of Parameters
 # ---------------------
+# Where to run the assembly of the BEM part.
+# cpu: do it on the CPU
+# cuda: use your GPU
+# both: use both (for speedup tests, nor for production runs).
+set Architecture               = both
 
+# These test cases can be used for convergence tests. Currently available are:
+# sum: f(x,y,z) = 2*x+y+z
+# prod: f(x,y,z) = 0.01*x*y*z
+# sum_prod: f(x,y,z) = sum + prod
+# dipole: f(x,y,z) = a/|r-r0| - a/|r-r1|, where a is the strength of the
+# dipole and r0,r1 are points on the z axis, symmetric w.r.t. to the origin. a
+# and the lengths of r0, r1 can be tuned in protein_dipole_data.prm
+# sum_prod_dipole: f(x,y,z) = sum + prod + dipole
+# drs: do not use a test case, but actually run the drs simulation. Not
+# available in step-27..
+set FEM-BEM reference solution = sum_prod_dipole                         # default: sum_prod
 
-  # Specify a directory where the results of the simulation should be stored.
-  # This can be either an absolute path or path relative to the directory
-  # where the program has been started. The default is asubdir called
-  # test_me-<date> where <date> will be replaced by the date at which the
-  # program has been started. this simplifies keeping the projects directory
-  # clean
-  set Run directory         = /Users/sck/cuda-workspace/step-27-runs/
+# Specify a directory where the results of the simulation should be stored.
+# This can be either an absolute path or path relative to the directory where
+# the program has been started. The default is asubdir called test_me-<date>
+# where <date> will be replaced by the date at which the program has been
+# started. This simplifies keeping the projects directory clean.
+set Run directory              = /Users/sck/cuda-workspace/step-27-runs/ # default: ./test_me-
 
+# To validate that the full DRS simulation (choose full_DRS) works it is
+# useful to reduce the DRS problem to the Poisson equation for the potential
+# which either has to fulfill the FEM-BEM problem at the cavity interface and
+# Dirichlet boundary conditions elsewhere (FEM_BEM_unit_test)  or a Poisson
+# equation which is only subject to von Neumann boundary data
+# (pure_von_Neumann). In the latter case the solution is not unique anymore.
+# To fix that, the problem is made pseudo time-dependent by adding a time
+# derivative which makes the global constant visible again. This parameter
+# allows to test the different aspects of the overall simulation
+# independently.
+set Sub model                  = FEM_BEM_unit_test
 
-  # If set to true, the results of the run will be stored in a subdirectory
-  # of a given run directory which named after the date and time at the
-  # start of the program. This allows to group runs without
-  # overwriting previous results.
-  set Use time tag = true
-
-                      # These test cases can be used for convergence tests. Currently available are:
-                      # sum: f(x,y,z) = 2*x+y+z
-                      # prod: f(x,y,z) = 0.01*x*y*z
-                      # sum_prod: f(x,y,z) = sum + prod
-                      # dipole: f(x,y,z) = a/|r-r0| - a/|r-r1|,
-                      # where a is the strength of the dipole and r0,r1 are points on the z axis,
-                      # symmetric w.r.t. to the origin.
-                      # a and the lengths of r0, r1 can be tuned in protein_dipole_data.prm
-                      # sum_prod_dipole: f(x,y,z) = sum + prod + dipole
-                      # drs: do not use a test case, but actually run the drs simulation.
-  set FEM-BEM reference solution = sum_prod_dipole
-
-
+# If set to true, the results of the run will be stored in a subdirectory of a
+# given run directory which named after the date and time at the start of the
+# program. This allows to group runs without overwriting previous results
+set Use time tag               = true

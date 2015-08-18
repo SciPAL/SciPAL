@@ -309,7 +309,7 @@ class extremeValueStatisticsGenerator {
             return NULL;
         }
         //First check if the needed value is already written down in the bibfile in the working directory
-        std::ifstream bibfile("bibfile_gauss.txt");
+        std::ifstream bibfile("/home/neal.hermer/Desktop/cuda_prakt_2015/SciPAL/testsite/build-step-35-Desktop-Release/bibfile_gauss.txt");
         if ( bibfile ) {
             int tmr,tnx,tny;
             Q talpha,tres,tsi;

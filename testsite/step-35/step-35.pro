@@ -59,6 +59,7 @@ DEFINES += USE_CPP11
     PRAK = $$_PRO_FILE_PWD_/../../ #$$HOME/cuda-2014/Praktikum_2013 # path to your copy of the lab course folder. Typically, this 2 levels above the source folder of your step-
     SciPAL_DIR = $$PRAK/
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/..
+    STEP_DIR = $$_PRO_FILE_PWD_/
 
 message("SciPALs home :" $$SciPAL_DIR)
 message("step home :" $$STEP_DIR)
@@ -143,7 +144,6 @@ message("Load deal.II MPI config")
 
 
 
-
 # Enter project specific source and header files here
 SOURCES += \
     step-35.cpp \
@@ -161,7 +161,8 @@ HEADERS += \
     preprocessor_directives.h \
     extremeValueStatisticsGenerator.h \
     step-35.hh \
-    *.h
+    *.h #\
+    #ImageDecomposition.h
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator
    # which are not subject to compilation.

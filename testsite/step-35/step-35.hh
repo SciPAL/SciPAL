@@ -199,12 +199,58 @@ step35::ADMM<T>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
 
     this->params.get(prm_handler);
 
+    // Create toplevel run directory
+
+    this->params.run_dir.setPath( this->params.run_dir.absolutePath() +  QDir::separator() +
+    QString(QDateTime::currentDateTime().toString("ddd-yyyy-MM-dd/hh_mm_ss")
+            ).remove("."));
+
+    cwd.setPath(this->params.run_dir.absolutePath());
+
+    std::cout << "path to run directory : " << this->params.run_dir.absolutePath().toStdString().c_str() << std::endl;
+
+
+    // The following lets a directory make its own path.
+    if (!cwd.exists())
+        cwd.mkpath( "." );
+
+
+    // After the run directory we create the log directory.
+    this->params.prm_log_dir = this->params.run_dir.absolutePath() + QDir::separator() + "log";
+    if (!this->params.prm_log_dir.exists())
+        this->params.prm_log_dir.mkpath(".");
+
+    std::cout << "log path : " << this->params.prm_log_dir.absolutePath().toStdString().c_str() << std::endl;
+
+    // Now, change to the run directory
+    QDir::setCurrent(cwd.absolutePath());
+
+    // ... and write what has been actually read
+    // into log file. Basically, this is just another parameter file
+    // and thus could be used again as input to another run after stripping the .log suffix.
+    std::string master_log_file = (this->params.prm_log_dir.absolutePath() + QDir::separator()
+                                   +
+                                  (QFileInfo(prm_filename.c_str()).fileName()
+                                   + ".log") ).toStdString();
+
+    std::cout << "log file : " << master_log_file.c_str()
+                                   << std::endl;
+
+    std::ofstream log_master_prm( master_log_file.c_str() );
+    prm_handler.print_parameters (log_master_prm,
+                                  dealii::ParameterHandler::Text);
+
+    // At this point the toplevel run dir must exist.
+    // Thus, we can change to it without any further sanity test.
+    QDir::setCurrent(this->params.run_dir.absolutePath());
+
+
     //Create log file
 
-    prm_filename += ".log";
-    std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
-    prm_handler.print_parameters (log_out_text,
-                                  dealii::ParameterHandler::Text);
+//    prm_filename += ".log";
+//    std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
+//    prm_handler.print_parameters (log_out_text,
+//                                  dealii::ParameterHandler::Text);
 }
 
 //@sect5{Function: create_psf}
@@ -474,13 +520,14 @@ void step35::ADMM<T>::run() {
         std::cout << "Setting up driver\n";
         step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.croot, input_image, psf, cs, pwidth, pheight, pdepth,
                                                              params.step, gamma_fac, params.sigma, params.regType,
-                                                             params.dim);
+                                                             params.dim,&params);
         //This function templates to whatever Dykstra Flavour we have chosen
         std::cout << "Starting run\n";
         __run<field_patch, driver_patch>(field, driver);
     }
     //Exact algorithm
     else {
+#define USE_EXACT
 #ifdef USE_EXACT
         typedef cset_small field_patch;
         typedef cluster<cset_small, T> driver_patch;
@@ -489,16 +536,16 @@ void step35::ADMM<T>::run() {
         //* Generates the patches and puts them in clusters if needed \n
         //* Calculates the weights $c_s$
         std::cout << "Creating field\n";
-        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(pwidth, pheight, pdepth, im, params.sigma, params.step, 1024);//only kept for statitics generation atm
+        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(pwidth, pheight, pdepth, input_image, params.sigma, params.step, 1024);//only kept for statitics generation atm
 
         std::cout << "Getting quantile\n";
         cs = field.get_quantile_gauss(params.gnoise, alpha_quant, params.step, pwidth, pheight, pdepth, qalpha_ret);
 
         //Prepare the driver
         std::cout << "Setting up driver\n";
-        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.cluster_root, im, psf, cs, pwidth, pheight, pdepth,
+        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.cluster_root, input_image, psf, cs, pwidth, pheight, pdepth,
                                                              params.step, gamma_fac, params.sigma, params.regType,
-                                                             params.dim);
+                                                             params.dim,&params);
         //This function templates to whatever Dykstra Flavour we have chosen
         __run<field_patch, driver_patch>(field, driver);
 #else
@@ -566,10 +613,10 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
     int iter=1;
     //Will be used to store the constraint violations
     T c1,c2=0;
-    while (  ( res > params.tol && iter < params.max_it) || iter < 5 ) {
+    while (  ( /*res > params.tol &&*/ iter < params.max_it) || iter < 5 ) {
         //Argmin w.r.t. x
-        //driver.x_step(params.rho1, params.rho2);
-        driver.x_step_ET(params.rho1, params.rho2);
+        driver.x_step(params.rho1, params.rho2);
+        //driver.x_step_ET(params.rho1, params.rho2);
 
         //Argmin w.r.t. z
         driver.m_smoothing(params.regInt, params.rho2);
@@ -631,7 +678,12 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
 
             //Print the current estimate to a tiff file
             if (params.do_control)
-                write_image<T>(params.out_imagename, driver.inf->z_h, pheight0, pwidth0, pdepth0, 1.0);//params.gnoise);
+            {
+                QString img_out (QString(params.out_imagename.c_str()).replace(".", QString("-" + QString::number(iter))+"."));
+
+                write_image<T>(img_out.toStdString(), driver.inf->z_h, pheight0, pwidth0, pdepth0, 1.0);//params.gnoise);
+
+            }
         }
         iter=iter+1;
     } // End of main loop

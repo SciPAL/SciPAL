@@ -21,6 +21,8 @@ Copyright Stephan Kramer, Johannes Hagemann, Lutz Künneke, Jan Lebert 2014
 
 //CUDA
 #include <cuda_runtime.h>
+#include <cstdio>
+#include <ctime>
 
 //Our stuff
 #include <step-35/step-35.hh>
@@ -33,7 +35,12 @@ Copyright Stephan Kramer, Johannes Hagemann, Lutz Künneke, Jan Lebert 2014
 //argv[2] Device ID of the GPU (optional, default: 0)
 int main(int argc, char **argv) {
     cublas::Init();
+    srand(time(NULL));
     using namespace step35;
+
+//    ImageDecomposition_1024px iDecomp;
+//    std::cout << iDecomp.print();
+
 
     // At the beginning we figure out
     // how many CUDA devices are available.

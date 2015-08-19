@@ -26,6 +26,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <QtGlobal>
 
 #include <deal.II/base/subscriptor.h>
+#include <deal.II/lac/identity_matrix.h>
 
 #include <lac/Array.h>
 #include <lac/Expr.h>
@@ -63,7 +64,7 @@ class Matrix
         public SciPAL::Expr<Matrix<T, BW> >,
 //        protected SciPAL::Array<T, BW>,
         public dealii::Subscriptor,
-        public SciPAL::Shape<T, matrix>
+        public SciPAL::Shape<T, BW, matrix>
 {
 
     friend class Vector<T, BW>;
@@ -73,8 +74,6 @@ class Matrix
     friend class SubMatrixView<T, BW>;
 
     friend class FullMatrixAccessor<T>;
-
-    friend class Array<T, BW>;
 
 public:
 
@@ -90,17 +89,13 @@ public:
 
     typedef SciPAL::ShapeData<T> DevType;
 
-    typedef SciPAL::Shape<T, matrix> MyShape;
+    typedef SciPAL::Shape<T, BW, matrix> MyShape;
 
     static const ParallelArch arch = BW::arch;
 
    // IDEA: MatrixStorage my_storage_scheme = ms;
 
-    //static const bool is_leaf = true;
-
     static const EType I_am = leafE;
-
-    Array<T, BW> storage;
 
     Matrix();
 
@@ -258,10 +253,6 @@ public:
 
     T sum() const;
 
-    inline SciPAL::Array<T, BW> & array() { return storage; }
-
-    inline const SciPAL::Array<T, BW> & array() const { return storage; }
-
     inline MyShape & shape() { return *this; }
 
 
@@ -280,11 +271,8 @@ private:
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix()
     :
-      storage(),
-      MyShape(this->storage.data(),
-              0, 0,
-              0, 0,
-              this->storage.leading_dim())
+      MyShape(0, 0,
+              0, 0)
 {}
 
 //! Allocate a matrix of @p n_rows and @p n_cols.
@@ -294,26 +282,9 @@ SciPAL::Matrix<T, BW>::Matrix()
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(int n_rows, int n_cols)
     :
-      storage(n_rows, n_cols),
-      MyShape(this->data(),
-              0, n_rows, /*active rows*/
-              0, n_cols, /*active cols*/
-              this->leading_dim/*leading_dim*/)
-{
-    // TODO: The following should be handled in the Data class
-    // from the blas wrapper
-#ifdef USE_ZERO_INIT
-    Zero<T> zero;
-    const std::vector<T> tmp(n_rows*n_cols, zero());
-
-    const T * const tmp_ptr = &tmp[0];
-
-    T * this_data = this->data();
-
-    BW::SetMatrix(n_rows, n_cols, tmp_ptr, n_rows,
-                  this_data, n_rows);
-#endif
-}
+      MyShape(0, n_rows, /*active rows*/
+              0, n_cols/*active cols*/)
+{}
 
 
 //! Allocate a matrix of @p n_rows and @p n_cols and fill it with given values @p src.
@@ -326,11 +297,8 @@ SciPAL::Matrix<T, BW>::Matrix(const unsigned int n_rows,
                                 const unsigned int n_cols,
                                 const std::vector<T2> & src)
     :
-      storage(n_rows, n_cols),
-      MyShape(this->data(),
-              0, n_rows,
-              0, n_cols,
-              this->leading_dim /*leading_dim*/ )
+      MyShape(0, n_rows,
+              0, n_cols)
 {
     const T2 * const tmp_ptr = &src[0];
 
@@ -394,8 +362,8 @@ SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator =
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
     :
-      storage(),
-      MyShape(this->data(), 0, 0, 0 /*TODO: leading_dim*/)
+      MyShape(0, 0,
+              0, 0)
 {
     *this = Id;
 }
@@ -407,7 +375,6 @@ SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const Matrix<T, BW> & other)
     :
-      storage(),
       dealii::Subscriptor(),
       MyShape()
 {
@@ -432,14 +399,9 @@ SciPAL::Matrix<T, BW>::Matrix(const FullMatrixAccessor<T2> & other)
 template<typename T, typename BW>
 void SciPAL::Matrix<T, BW>::reinit(int n_rows, int n_cols)
 {
- /*TODO: leading_dim*/
-    this->storage.reinit(n_rows, n_cols);
-
-    this->MyShape::reinit(this->storage.val(),
-                          0, n_rows,
-                          0, n_cols,
-                          this->array().leading_dim()/*leading_dim*/,
-                          1 /*unit stride*/);
+   this->MyShape::reinit(0, n_rows,
+                         0, n_cols,
+                         1 /*unit stride*/);
 }
 
 

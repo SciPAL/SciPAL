@@ -33,7 +33,7 @@ template<typename T, typename BW>
 class SubMatrixView
         :
         public SciPAL::Expr<SubMatrixView<T, BW> >,
-        public SciPAL::Shape<T, matrix>
+        public SciPAL::Shape<T, BW, matrix>
 {
 
 public:
@@ -48,7 +48,7 @@ public:
 
     typedef  SciPAL::ShapeData<T> DevType;
 
-    typedef SciPAL::Shape<T, matrix> MyShape;
+    typedef SciPAL::Shape<T, BW, matrix> MyShape;
 
     static const EType I_am = leafE;
 
@@ -261,12 +261,10 @@ SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
                                             int r_begin, int r_end,
                                             int c_begin, int c_end)
     :
-      MyShape(src.data(),
-              r_begin, r_end, /*active rows*/
-              c_begin, c_end, /*active cols*/
-              src.leading_dim/*leading_dim*/),
+      MyShape(),
       __src(&src)
 {
+    *this = src;
     //! Pruefe im DEBUG-Modus Zulaessigkeit der Indexgrenzen.
     Assert ((r_begin >= 0) && (r_begin < src.n_rows()),
             dealii::ExcIndexRange (r_begin, 0, src.n_rows()));
@@ -289,7 +287,7 @@ template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW> &
 SciPAL::SubMatrixView<T, BW>::operator = (const Matrix<T, BW>& col)
 {
-    Assert(this->__n_el <= col.n_elements(),
+    Assert(this->size() <= col.size(),
            dealii::ExcMessage("Dimension mismatch"));
 
     int incx = 1;
@@ -302,10 +300,10 @@ SciPAL::SubMatrixView<T, BW>::operator = (const Matrix<T, BW>& col)
 
     //! Kopiere spaltenweise.
     for (int c = this->c_begin_active; c < this->c_end_active; ++c)
-        BW::copy(n_rows_2_copy, (col.val() + c*(col.n_rows()) + this->r_begin),
-                 incx,
-                 this->__src->val() + this->r_begin + c*this->leading_dim,
-                 incy);
+        BW::copy(n_rows_2_copy, (col.data() + c*(col.n_rows()) + this->r_begin()),
+                 col.stride,
+                 this->__src->data() + this->r_begin() + c*this->leading_dim(),
+                 this->stride);
 
     return *this;
 

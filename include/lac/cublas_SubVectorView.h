@@ -40,13 +40,13 @@ namespace SciPAL {
     class VectorView
             :
             public SciPAL::Expr<VectorView<T, T_src> >,
-            public SciPAL::Shape<T, vector>
+            public SciPAL::Shape<T, typename T_src::blas_wrapper_type, vector>
     {
 
    public:
         typedef typename T_src::blas_wrapper_type BW;
 
-        typedef SciPAL::Shape<T, vector> MyShape;
+        typedef SciPAL::Shape<T, BW, vector> MyShape;
 
         friend class Vector<T, BW>;
 
@@ -160,9 +160,9 @@ private:
     class ColVectorView : public VectorView<T, T_src> {
 
     public:
-        typedef VectorView<T, T_src> Base;
-        typedef Shape<T, vector> MyShape;
         typedef typename T_src::blas_wrapper_type BW;
+        typedef VectorView<T, T_src> Base;
+        typedef Shape<T, BW, vector> MyShape;
 
     ColVectorView(T_src & src,
                   int r_begin, int c=0) : Base(src, r_begin,
@@ -258,7 +258,7 @@ private:
         typedef VectorView<T, T_src> Base;
         typedef typename T_src::blas_wrapper_type BW;
 
-        typedef SciPAL::Shape<T, vector> MyShape;
+        typedef SciPAL::Shape<T, BW, vector> MyShape;
 
         RowVectorView(T_src & src,
                       int r_begin, int c) : Base(src, r_begin, c)

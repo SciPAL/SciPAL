@@ -107,7 +107,9 @@ struct UnaryExpr
         public Expr<UnaryExpr<_L,  Operation>
         >
 {
-    typedef typename GetMyType<_L>::Type L; //<- needed in apply function template
+//    typedef typename GetMyType<_L>::Type L; //<- needed in apply function template
+    typedef _L L;
+
     typedef Operation OpTag;
     static const EType I_am = unE;
     typedef UnaryExpr<_L, Operation> Type;

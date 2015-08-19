@@ -22,6 +22,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 //! #include <lac/FullMatrixAccessor.h>
 
+#include <lac/Shape.h>
 #include <lac/cublas_wrapper.hh>
 
 #include <lac/blas_wrapper.hh>
@@ -36,8 +37,9 @@ namespace SciPAL {
 template <typename T, typename BW>
 class Array : protected BW::template Data<T> {
 
-    friend class Matrix<T, BW>;
-    friend class Vector<T, BW>;
+    //FIX ME can we do that nicer
+    friend class Shape<T, BW, matrix>;
+    friend class Shape<T, BW, vector>;
 
     typedef typename BW::template Data<T> Base;
 

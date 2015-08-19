@@ -110,10 +110,10 @@ static void apply(Literal<T, BW> &result,
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef Vector<T, BW> Vtr;
 
-    const Vtr x = expr.l.l;
-    const Vtr & y = expr.r;
+    const Vtr& x = expr.l.l;
+    const Vtr& y = expr.r;
 
-    result = BW::dot(x.size(), x.array().val(), 1, y.array().val(), 1);
+    result = BW::dot(x.size(), x.data(), 1, y.data(), 1);
 
 }
 
@@ -134,7 +134,7 @@ static void apply(Vector<T, BW> &result,
 
     //int n = A.n_elements(); this is not accessiable
     int n = A.size();
-    // BW::scal(n, alpha, &(C.array().val()[0]), incx);
+    // BW::scal(n, alpha, &(C.data()[0]), incx);
 
     typedef SciPAL::ShapeData<T> LAOShape;
 
@@ -159,8 +159,8 @@ static void apply(Vector<T, BW> &result,
 
     int n = A.size();
 
-    BW::axpy(n, alpha, &(A.array().val()[0]), incx,
-            &(result.array().val()[0]), incy);
+    BW::axpy(n, alpha, &(A.data()[0]), incx,
+            &(result.data()[0]), incy);
 }
 
 // @sect4{Function: apply}

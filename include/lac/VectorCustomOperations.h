@@ -26,6 +26,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/UnaryFunctions.h>
 
 #include <base/ForewardDeclarations.h>
+#include <lac/expression_template_helper.h>
 
 
 // TODO: rename this file to CustomOperations.h. Currently, "custom" means generic array arithmetic applying both to matrices and vectors.
@@ -36,28 +37,7 @@ namespace SciPAL {
 //
 namespace LAOOperations
 {
-//! @sect3{struct: ExprChooser}
-//! aux structure to determine the correct type of device expression.
-//! If we have something like sin(a+b) it must be a DevUnaryExpr.
-//! If we just have a+b it is DevBinaryExpr.
-//! We can distinguish them by an static constant of type EType in the host
-//! expression.
-template<EType ExprType, typename E> struct ExprChooser;
 
-template<typename E>
-struct ExprChooser<unE, E>{
-
-    typedef DevUnaryExpr<typename E::L::DevType,
-                  typename E::OpTag> DevEType;
-};
-
-template<typename E>
-struct ExprChooser<binE, E>{
-
-    typedef DevBinaryExpr<typename E::L::DevType,
-                  typename E::OpTag,
-                  typename E::R::DevType> DevEType;
-};
 
 //! @sect3{function: apply}
 //! This is a partial specialization of the function below for setting a matrix or vector to a certain
@@ -93,18 +73,18 @@ static void apply(LAO<T, BW> &result,
 //!
 //! @param result: linear algebra object which will contain the result of the expression.
 //! @param parent: expresion object built on the host-side of the program.
-//template <typename T, //! numbertype
-//          typename BW, //! blas type
-//          template <typename, typename> class LAO, //! template for result type
-//          typename E/*short for Expression*/ >
-//static void apply(LAO<T, BW> &result,
-//                  const ::SciPAL::Expr<E> &parent)
-//{
-//   SciPAL::Kernels<T, BW::arch> bla(4);
-////   result.reinit((~parent).get_l());
-//    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
-//   bla.apply(result, child);
-//}
+template <typename T, //! numbertype
+          typename BW, //! blas type
+          template <typename, typename> class LAO, //! template for result type
+          typename E/*short for Expression*/ >
+static void apply(LAO<T, BW> &result,
+                  const ::SciPAL::Expr<E> &parent)
+{
+   SciPAL::Kernels<T, BW::arch> bla(4);
+//   result.reinit((~parent).get_l());
+    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
+   bla.apply(result, child);
+}
 
 
 } // END namespace LAOOperations

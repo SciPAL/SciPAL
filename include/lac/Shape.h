@@ -22,6 +22,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #include <algorithm>
 #include <lac/ShapeData.h>
+#include <base/ForewardDeclarations.h>
 
 namespace SciPAL {
 
@@ -34,9 +35,10 @@ enum sub_Layout{general, symm, banded, rowvector, columnvector};
 //! The <i>shape</i> of a linear algebra object (LAO) determines whether the LAO can be considered
 //! as matrix or vector. By separating the shape from the data of a LAO it is easy to <i>reshape</i>
 //! a LAO if necessary. The attributes are public for easy use in CUDA kernels.
-template <typename T, LAOType LT>
+template <typename T, typename BW, LAOType LT>
 class Shape : public ShapeData<T>
 {
+    friend class Array<T, BW>;
 public:
 
     //! Data type of the LAO elements.
@@ -45,13 +47,13 @@ public:
     //! is it a matrix or vector
     static const LAOType layout = LT;
 
-    typedef Shape<T, LT> Type;
+    typedef Shape<T, BW, LT> Type;
     //FIX ME unnecessary ? but needed for compiling
     typedef Type MyShape;
 
     typedef  SciPAL::ShapeData<T> DevType;
 
-    typedef blas blas_wrapper_type;
+    typedef BW blas_wrapper_type;
 
     //! The default constructor generates an empty shape.
     Shape():ShapeData<T>()
@@ -62,17 +64,15 @@ public:
     //! @param n_cols : number of columns. If this is set to 1 you get a column vector.
     //! @param stride : If this value is, e.g., 3, then only every 3rd element of the original data array gets accessed.
     //! @param leading_dim : the length of a column in memory. This value can be used to optimize memory access of CUDA warps. We assume column-major storage in order to be compatible with CUBLAS.
-    Shape(T * data,
-          size_t  r_begin_active,
+    Shape(size_t  r_begin_active,
           size_t  r_end_active,
           size_t  c_begin_active,
           size_t  c_end_active,
-          size_t leading_dim, size_t stride = 1)
+          size_t  stride = 1)
     {
-        this->reinit(data,
-                     r_begin_active, r_end_active,
+        this->reinit(r_begin_active, r_end_active,
                      c_begin_active, c_end_active,
-                     leading_dim, stride = 1);
+                     stride = 1);
     }
 
 
@@ -102,26 +102,29 @@ public:
 
     //! Reset the shape data. This function typically gets called in the constructors
     //! and reinit() functions of the Matrix and Vector classes.
-    void reinit(T * data,
-                size_t  r_begin_active,
+    void reinit(size_t  r_begin_active,
                 size_t  r_end_active,
                 size_t  c_begin_active,
                 size_t  c_end_active,
-                size_t leading_dim, size_t stride)
+                size_t  stride)
     {
-        this->data_ptr = data;
-        this->view_begin = data + (c_begin_active * leading_dim + r_begin_active);
-
         this->r_begin_active = r_begin_active;
         this->r_end_active = r_end_active;
         this->c_begin_active = c_begin_active;
         this->c_end_active = c_end_active;
-        this->n_elements_active = this->size();
         this->n_rows = this->n_rows_active();
         this->n_cols = this->n_cols_active();
+        //first get sizes than allocate memory
+        storage.reinit(this->n_rows, this->n_cols);
 
+        this->data_ptr = storage.val();
+        this->leading_dim = storage.leading_dim();
 
-        this->leading_dim = leading_dim;
+        this->view_begin = this->data_ptr +
+                (this->c_begin_active * this->leading_dim + this->r_begin_active);
+
+        this->n_elements_active = this->size();
+
         this->stride = stride;
     }
 
@@ -160,6 +163,7 @@ protected:
 
 
 private:
+    Array<T, BW> storage;
 
 };
 

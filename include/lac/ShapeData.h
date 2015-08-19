@@ -84,6 +84,7 @@ struct ShapeData {
     }
 
     //! The default constructor generates an empty shape.
+    __host__ __device__
     ShapeData()
     {
         this->data_ptr = 0;
@@ -96,7 +97,7 @@ struct ShapeData {
         this->leading_dim = 0;
         this-> stride = 0;
     }
-
+    __host__ __device__
     ShapeData& operator = (const ShapeData& other)
     {
         this->data_ptr = other.data_ptr;
@@ -115,7 +116,7 @@ struct ShapeData {
 
         return *this;
     }
-
+    __host__ __device__
     ShapeData(const ShapeData& other)
     {
         *this = other;

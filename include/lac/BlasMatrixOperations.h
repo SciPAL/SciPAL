@@ -34,18 +34,41 @@ namespace SciPAL {
 template< typename T, typename BW> // IDEA:, MatrixStorage ms>
 struct BlasMatExp/*MatrixExpressions*/
 {
-//    typedef typename ::SciPAL::Matrix<T, BW>::MyShape Mtx;
-//    typedef typename ::SciPAL::Vector<T, BW>::MyShape Vtr;
+    //    typedef typename ::SciPAL::Matrix<T, BW>::MyShape Mtx;
+    //    typedef typename ::SciPAL::Vector<T, BW>::MyShape Vtr;
 
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
-//    typedef ::SciPAL::Shape<T, matrix> Mtx;
-//    typedef ::SciPAL::Shape<T, vector> Vtr;
+    //    typedef ::SciPAL::Shape<T, matrix> Mtx;
+    //    typedef ::SciPAL::Shape<T, vector> Vtr;
 
     typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
     typedef ::SciPAL::VectorView<T, BW> SVtr;
 
     typedef Literal<T, BW> Lit;
+
+    template<EType ET, typename T2>
+    struct traverse_tree;
+
+    template< typename T2>
+    struct traverse_tree<leafE, T2>{
+        typedef typename T2::Type Type;
+    };
+
+    template<EType ET, typename T2>
+    struct traverse_tree {
+        typedef typename ExprChooser<ET, T2>::HostEType Type;
+    };
+
+    template <typename X>
+    struct generic_gemm {
+        typedef typename
+        SciPAL::BinaryExpr<typename traverse_tree< X::L::I_am,
+                                         typename X::L::Type >::Type,
+        typename X::Operation,
+        typename traverse_tree< X::R::I_am,typename X::L>::Type> Type;
+    };
+
     //scaled Matrix
     typedef typename SciPAL::BinaryExpr<Lit,  mult, Mtx> scaledM;
 
@@ -102,6 +125,26 @@ struct BlasMatExp/*MatrixExpressions*/
 // before the custom apply() function is defined.
 namespace LAOOperations
 {
+template <typename X, typename T, typename BW,
+          template<typename, typename> class LAO>
+static void apply(LAO<T, BW> & result,
+                  const typename BlasMatExp<T, BW>::template generic_gemm<X>::Type& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = expr.l.l.l;
+    const Mtx & A = expr.l.l.r;
+    const Mtx & B = expr.l.r;
+
+    T beta = expr.r.l;
+
+    Mtx & C = result;
+
+    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
+}
+
+
+
 template <typename T, typename BW> // IDEA:, MatrixStorage ms>
 static void apply(::SciPAL::Matrix<T, BW> // IDEA:, ms>
                   &result,
@@ -120,9 +163,9 @@ static void apply(::SciPAL::Matrix<T, BW> // IDEA:, ms>
 
     int incx = 1;
 
-    int n = A.array().n_elements();
+    int n = A.size();
 
-    BW::scal(n, alpha, &(C.array().val()[0]), incx);
+    BW::scal(n, alpha, &(C.data()[0]), incx);
 }
 
 
@@ -183,7 +226,7 @@ static void apply(::SciPAL::SubMatrixView<T, BW> // IDEA:, ms>
 template <typename T, typename BW>
 static void apply(::SciPAL::Matrix<T, BW> &result,
                   const typename BlasMatExp<T, BW>::MtM& expr)
-                  //SciPAL::BinaryExpr<SciPAL::transpose<SciPAL::Matrix<T, BW> >, SciPAL::mult, SciPAL::Matrix<T, BW> > & expr)
+//SciPAL::BinaryExpr<SciPAL::transpose<SciPAL::Matrix<T, BW> >, SciPAL::mult, SciPAL::Matrix<T, BW> > & expr)
 
 {
     typedef ::SciPAL::Matrix<T, BW> Mtx;
@@ -346,6 +389,22 @@ static void apply(::SciPAL::Matrix<T, BW> & result,
     A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
 }
 
+template <typename T, typename BW>
+static void apply(::SciPAL::Matrix<T, BW> & result,
+                  const typename BlasMatExp<T, BW>::sMMaM& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = expr.l.l.l;
+    const Mtx & A = expr.l.l.r;
+    const Mtx & B = expr.l.r;
+
+    T beta = 1.0;
+
+    Mtx & C = result;
+
+    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
+}
 
 template <typename T, typename BW>
 static void apply(::SciPAL::Matrix<T, BW> & result,

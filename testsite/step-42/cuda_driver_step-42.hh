@@ -83,6 +83,8 @@ void step42::CUDADriver::gemm_tests()
     Number alpha = 1.1;
     Number beta = 2.;
 
+    size_t bla = A.leading_dim;
+
     std::cout << "A : " << std::endl;
     A.print();
 
@@ -768,7 +770,7 @@ void step42::CUDADriver::operator_precedence(){
     vD.print();
 
     SciPAL::Literal<Number, BW> test(0);
-    test = (SciPAL::transpose<SciPAL::Vector<Number, BW> >(vA)) * vB;
+    test = (SciPAL::transpose(vA)) * vB;
     std::cout<< test << std::endl;
 }
 
@@ -791,7 +793,7 @@ void step42::CUDADriver::stacks_of_LAOs(){
          for(auto &i : h_test)
             i = tmp;
 
-        std::vector<SciPAL::Vector<test_nmbr, cublas> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
+        std::vector<SciPAL::Vector<test_nmbr, BW> > d_test(3, SciPAL::Vector<test_nmbr, BW>(n_elements));
 
         //element wise copy works
 //        for(uint ii=0; ii<h_test.size(); ii++)

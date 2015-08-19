@@ -56,8 +56,7 @@ class Vector
         :
         public SciPAL::Expr<Vector<T, BW> >,
         public  dealii::Subscriptor,
-//        protected Array<T, BW>,
-        public SciPAL::Shape<T, vector> {
+        public SciPAL::Shape<T, BW, vector> {
 
 
     friend class SciPAL::Matrix<T, BW>;
@@ -83,7 +82,7 @@ public:
 
     typedef  SciPAL::ShapeData<T> DevType;
 
-    typedef SciPAL::Shape<T, vector> MyShape;
+    typedef SciPAL::Shape<T, BW, vector> MyShape;
         //! Fuer Optimierungen der Matrix-Vektor-Operationen zwischen
         //! (Teil-)Matrizen und (Teil-)Vektoren muss bekannt sein, was fuer ein
         //! Typ die jeweiligen Objekte sind. Da statische Konstanten zur Compile-Zeit ausgewertet werden
@@ -93,13 +92,12 @@ public:
 
     static const EType I_am = leafE;
 
-    Array<T, BW> storage;
-
     Vector();
 
     Vector(size_t n_elements);
 
-    Vector(size_t n_elements, const Array<T, BW> & raw_data);
+//    FIX ME
+//    Vector(size_t n_elements, const Shape);
 
     Vector(const FullMatrixAccessor<T> & src,
                  int r_begin, int c);
@@ -110,8 +108,7 @@ public:
     Vector(const Vector<T, BW> & other)
         :
           dealii::Subscriptor(),
-          storage(),
-        MyShape()
+          MyShape()
     {
         *this = other;
     }
@@ -123,9 +120,6 @@ public:
         //! Der Zwang explizit diese Funktion aufzurufen sollte Schutz genug sein gegen Missbrauch,
         //! d.h., ist man der Meinung diese Funktion nehmen zu muessen, hat man im Allgemeinen was
         //! falsch gemacht und sich nicht an die Philosophie der Objekt-Orientierung gehalten..
-    inline Array<T, BW> & array() { return storage; }
-
-    inline const Array<T, BW> & array() const { return storage; }
 
     Vector<T, BW> & operator = (const std::vector<T> & other);
 
@@ -145,17 +139,13 @@ public:
     Vector<T, BW> & operator = (const Vector<T, BW2> & other)
     {
 //        if(this->size() != other.n_elements())
-            this->array().reinit(other.array().n_elements());
-
-        // element-wise copy of array.
-        int inc_src  = 1;
-        int inc_this = 1;
+            this->reinit(other.size());
 
         //! copy from cublas matrix to blas matrix -> GetMatrix
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
         {
-            cublas::GetVector(other.array().n_elements(),
+            cublas::GetVector(other.size(),
                               other.data(),
                               other.stride,
                               this->data(),
@@ -166,7 +156,7 @@ public:
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
         {
-            cublas::SetVector(other.array().n_elements(),
+            cublas::SetVector(other.size(),
                               other.data(),
                               other.stride,
                               this->data(),
@@ -281,11 +271,7 @@ protected:
 template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector()
     :
-      storage(),
-      MyShape(this->data(),
-              0, 0,
-              0, 0,
-              this->array().leading_dim()/*TO DO: leading dim*/)
+      MyShape()
 {}
 
 // @sect4{Konstruktor: Vector(n)}
@@ -296,30 +282,25 @@ SciPAL::Vector<T, BW>::Vector()
 template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(size_t n_elements)
     :
-    storage(n_elements),
-    MyShape(this->array().val(),
-              0, n_elements, /*n_rows*/
-              0, 1, /*n_cols*/
-              this->array().leading_dim(), /*leading dim*/
-              1) /*stride*/
+      MyShape(0, n_elements, /*n_rows*/
+              0, 1 /*n_cols*/)
 {}
 
+//FIX ME hasn't been used
 // @sect4{Konstruktor: Vector(n,raw_data)}
 //!
 //! Konstruktor fuer n-elementigen Vector, dessen Inhalt aus einem Array-Objekt kommen
 //! @param n_elements : Groesse des Vectors
 //! @param raw_data : Pointer auf ein Array Objekt
 
-template<typename T, typename BW>
-SciPAL::Vector<T, BW>::Vector(size_t n_elements,
-                              const Array<T, BW> & raw_data)
-    :
-    storage(n_elements),
-    MyShape(this->array().val(),
-            n_elements, 1, n_elements/*TO DO: leading dim*/)
-{
-    *this = raw_data;
-}
+//template<typename T, typename BW>
+//SciPAL::Vector<T, BW>::Vector(size_t n_elements,
+//                              const Shape)
+//    :
+//    MyShape(n_elements, 1, n_elements/*TO DO: leading dim*/)
+//{
+//    *this = raw_data;
+//}
 
 
 // @sect4{Konstruktor: Vector(FullMatrixAccessor,r_begin,c)}
@@ -333,8 +314,8 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(const FullMatrixAccessor<T> & src,
                               int r_begin, int c)
     :
-    storage(src.n_rows() - r_begin),
-    MyShape(this->array().val(), this->__n, 1, this->__n /*TODO: leading dim*/)
+    MyShape(0, src.n_rows()-r_begin,
+            0, 1)
 {
     int n_el = src.n_rows() - r_begin;
 
@@ -365,8 +346,8 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
                               int r_begin, int c)
     :
-    storage(src.n_rows() - r_begin),
-    MyShape(this->array().val(), this->__n, 1, this->__n)
+      MyShape(0, src.n_rows()-r_begin,
+              0, 1)
 {
     int n_el = src.n_rows() - r_begin;
 
@@ -390,14 +371,8 @@ SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
 template<typename T, typename BW>
 void SciPAL::Vector<T, BW>::reinit(size_t new_size)
 {
-    this->storage.reinit(new_size);
-
-    size_t n_cols = 1;
-
-    this->MyShape::reinit(this->storage.val(),
-                          0, new_size,
+    this->MyShape::reinit(0, new_size,
                           0, 1,
-                          this->array().leading_dim() /*leading_dim*/,
                           1/*stride*/);
 }
 

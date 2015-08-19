@@ -261,10 +261,10 @@ SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
                                             int r_begin, int r_end,
                                             int c_begin, int c_end)
     :
-      MyShape(src.array().val(),
+      MyShape(src.data(),
               r_begin, r_end, /*active rows*/
               c_begin, c_end, /*active cols*/
-              src.array().leading_dim()/*leading_dim*/),
+              src.leading_dim/*leading_dim*/),
       __src(&src)
 {
     //! Pruefe im DEBUG-Modus Zulaessigkeit der Indexgrenzen.

@@ -175,9 +175,11 @@ struct blas {
 
         };
 
+        /*
         size_t leading_dim() const {
             return this->leading_dim_elements;
         }
+        */
 
         ~Data()
         {

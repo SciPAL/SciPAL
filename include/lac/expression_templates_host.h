@@ -27,6 +27,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 // Base class for expressions
 #include <lac/Expr.h>
+#include <base/ForewardDeclarations.h>
 #include <lac/ShapeData.h>
 #include <lac/Literal.h>
 
@@ -46,74 +47,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 namespace SciPAL {
 
-// @sect4{Struct: transpose}
-// Interpret Matrices and Vectors in transposed manner.
-//template<typename M>
-//struct transpose
-//        :
-//        public SciPAL::Expr<transpose<M> >
-//{
-//    const M & A;
-
-//    typedef typename M::value_type value_type;
-//    typedef transpose<M> Type;
-//    typedef ShapeData<value_type> DevType;
-
-//    typedef const Type& ConstHandle;
-
-
-
-//    typedef typename M::blas_wrapper_type blas_wrapper_type;
-
-//    static const EType I_am = M::I_am;
-
-//    transpose(const M & m) : A(m) {}
-
-//    operator typename M::MyShape() const
-//    {
-//        return A;
-//    }
-//    };
-
-// @sect4{Struct: adjoint}
-// Interpret Matrices and Vectors in adjoint manner.
-//template<typename M>
-//struct adjoint : public SciPAL::Expr<adjoint<M> > {
-
-//    const M & A;
-
-
-//    typedef typename M::value_type value_type;
-//    typedef adjoint<M> Type;
-//    typedef ShapeData<value_type> DevType;
-
-//    typedef const Type& ConstHandle;
-
-//    typedef typename M::blas_wrapper_type blas_wrapper_type;
-
-//    static const EType I_am = M::I_am;
-
-//    adjoint(const M & m) : A(m) {}
-//};
-
-// @sect4{Struct: diag}
-// Interpret a vector as diagonal matrix.
-//template<typename M>
-//struct diag : public SciPAL::Expr<diag<M> > {
-
-//    const M & A;
-
-//    typedef typename M::value_type value_type;
-//    typedef diag<M> Type;
-//    typedef ShapeData<value_type> DevType;
-
-//    typedef const Type& ConstHandle;
-
-//    typedef typename M::blas_wrapper_type blas_wrapper_type;
-
-//    diag(const M & m) : A(m) {}
-//};
-
 // @sect3{Structs: binary and expressions}
 //
 // This class holds a binary part of the expression. This includes left and right
@@ -126,8 +59,8 @@ struct BinaryExpr
         public Expr< BinaryExpr<_L, Operation, _R> >
 {
     // Redefine template parameters as types, such they are accessible later from the outside
-    typedef _L L; //<- needed in apply function template
-    typedef _R R;
+    typedef typename GetMyType<_L>::Type L; //<- needed in apply function template
+    typedef typename GetMyType<_R>::Type R;
     typedef Operation OpTag;
     static const EType I_am = binE;
     // The following two typedefs are for the recursive use of the BinaryExpr class
@@ -152,16 +85,15 @@ struct BinaryExpr
     //The ~ operator is uesed here again on _l and _r to remove the outer Expr<>
     //envelope. This shortens the types of the generated expressions.
     BinaryExpr(const _L& _l, const _R& _r) : l(_l), r(_r) {}
-//public:
-//    typename _L::ConstHandle get_l()
-//    {
-//        return this->l;
-//    }
-//    typename _R::ConstHandle get_r()
-//    {
-//        return this->r;
-//    }
+    BinaryExpr(const BinaryExpr<_L, Operation, _R> & Ax): l(Ax.l), r(Ax.r){}
 
+
+    operator const BinaryExpr<typename GetMyType<_L>::Type, Operation, typename GetMyType<_R>::Type>() const
+    {
+        return BinaryExpr<typename GetMyType<_L>::Type,
+                Operation,
+                typename GetMyType<_R>::Type>(l, r);
+    }
 };
 
 
@@ -175,7 +107,7 @@ struct UnaryExpr
         public Expr<UnaryExpr<_L,  Operation>
         >
 {
-    typedef _L L; //<- needed in apply function template
+    typedef typename GetMyType<_L>::Type L; //<- needed in apply function template
     typedef Operation OpTag;
     static const EType I_am = unE;
     typedef UnaryExpr<_L, Operation> Type;
@@ -266,23 +198,35 @@ operator *(const T e1, const  LAO<T, BW>& e2)
 //        return BinaryExpr<T1, SciPAL::mult, T2 >(~e1, ~e2);
 
 //    else if ((T1::I_am == unE || T1::I_am == binE) &&
-//            !(T2::I_am == unE || T2::I_am == binE))
+//            (T2::I_am == leafE))
 //        return BinaryExpr<T1, SciPAL::mult, typename T2::MyShape >(~e1, e2);
 
-//    else if (!(T1::I_am == unE || T1::I_am == binE) &&
+//    else if ((T1::I_am == leafE) &&
 //            (T2::I_am == unE || T2::I_am == binE))
 //        return BinaryExpr<typename T1::MyShape, SciPAL::mult, T2>(e1, ~e2);
 
-//    else if (!(T1::I_am == unE || T1::I_am == binE) &&
-//            !(T2::I_am == unE || T2::I_am == binE))
+//    else if ((T1::I_am == leafE) &&
+//            (T2::I_am == leafE))
 //    return BinaryExpr<typename T1::MyShape, SciPAL::mult, typename T2::MyShape>(e1, e2);
 //    else
 //        std::cerr << "SOMETHING WENT TERRIBLY WRONG BUILDING EXPRESSIONS!!1!" << std::endl;
 //}
 
+//template <typename T1, typename T2 >
+//inline
+//const BinaryExpr<typename GetMyType<T1>::Type,
+//                SciPAL::mult,
+//                typename GetMyType<T2>::Type  >
+//operator * (const Expr<T1>& e1, const Expr<T2>& e2)
+//{
+//    return BinaryExpr<typename GetMyType<T1>::Type,
+//                      SciPAL::mult,
+//                      typename GetMyType<T2>::Type >(e1, e2);
+//}
+
 template <typename T1, typename T2 >
 inline
-const BinaryExpr<T1, SciPAL::mult, T2 >
+const BinaryExpr<T1, mult, T2>
 operator * (const Expr<T1>& e1, const Expr<T2>& e2)
 {
     return BinaryExpr<T1, SciPAL::mult, T2 >(~e1, ~e2);

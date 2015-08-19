@@ -204,7 +204,7 @@ struct cublas {
             alloc(n_rows, n_cols);
         }
 
-        size_t leading_dim () const {
+   /*     size_t leading_dim() const {
             size_t n_bytes = sizeof(T);
 
                 if( pitch_in_bytes % n_bytes != 0 )
@@ -218,6 +218,7 @@ struct cublas {
                     return result;
                 }
         }
+        */
 
     protected:
         void swap(Data<T>& other)

@@ -28,29 +28,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <cstdio>
 
 #include <base/ForewardDeclarations.h>
+#include <lac/expression_template_helper.h>
 
 namespace SciPAL {
-
-//template<typename T> struct GetMyType<SciPAL::Literal<T, blas> >
-//{
-//typedef DevLiteral<T> Type;
-//};
-
-//template<typename T> struct GetMyType<SciPAL::Literal<T, cublas> >
-//{
-//typedef DevLiteral<T>  Type;
-//};
-
-template<typename T> struct GetMyType<SciPAL::ShapeData<T> >
-{
-typedef SciPAL::ShapeData<T> Type;
-};
-
-
-template<typename T> struct GetMyType {
-
-    typedef typename T::Type Type;
-};
 
 template<typename T>
 struct  binary<plus, T>

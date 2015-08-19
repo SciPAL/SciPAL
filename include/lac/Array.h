@@ -36,7 +36,11 @@ namespace SciPAL {
 template <typename T, typename BW>
 class Array : protected BW::template Data<T> {
 
+    friend class Matrix<T, BW>;
+    friend class Vector<T, BW>;
+
     typedef typename BW::template Data<T> Base;
+
 
 public:
 
@@ -44,27 +48,31 @@ public:
 
     //! Construct an array of length @p n.
     //! @param n: Number of elements to allocate.
-    Array(size_t n_rows, size_t n_cols);
+    Array(size_t n_rows, size_t n_cols = 1);
 
     //! Resize an array to length @p n.
     //! @param n: New number of elements.
-    void reinit(size_t n_rows, size_t n_cols);
+    void reinit(size_t n_rows, size_t n_cols = 1);
 
     //! Read-Write access to the data pointer. Use this function if you know what you are doing.
     T * val();
 
-     //! Read-only access to the data pointer.
+    //! Read-only access to the data pointer.
     const T * val() const;
 
     //! Return the number of elements this array currently has.
     int n_elements() const { return __n; }
-    size_t leading_dim() const {
-//        return this->Base::leading_dim();
-         return this->n_rows;
-//        return this->Base::pitch;
-    }
+
+
 
 protected:
+
+    size_t leading_dim() const {
+        //        return this->Base::leading_dim();
+        return this->n_rows;
+        //        return this->Base::pitch;
+    }
+
     //! The number of elements this array currently has. By having it in this class
     //! we do not have to put it again and again into the Data classes provided by the different blas wrappers.
     size_t __n;
@@ -88,6 +96,9 @@ private:
 
     //! @param other: Array to copy.
     Array<T, BW> & operator = (const Array<T, BW>& other);
+
+
+
     size_t n_rows;
     size_t n_cols;
 
@@ -106,7 +117,7 @@ SciPAL::Array<T, BW>::Array()
 
 //! @param n : Groesse des Arrays.
 template <typename T, typename BW>
-SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols = 1)
+SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols)
     :
       Base(n_rows, n_cols),
       __n(n_rows * n_cols), n_rows(n_rows), n_cols(n_cols)
@@ -114,7 +125,7 @@ SciPAL::Array<T, BW>::Array(size_t n_rows, size_t n_cols = 1)
 
 
 template <typename T, typename BW>
-inline void SciPAL::Array<T, BW>::reinit(size_t n_rows, size_t n_cols = 1)
+inline void SciPAL::Array<T, BW>::reinit(size_t n_rows, size_t n_cols)
 {
     this->n_rows = n_rows;
     this->n_cols = n_cols;
@@ -170,7 +181,7 @@ SciPAL::Array<T, BW>::operator = (const Array<T, BW>& other)
 {
 
     //Assert(other.__is_allocd,
-      //     dealii::ExcMessage("You cannot copy from an uninitialized object!") );
+    //     dealii::ExcMessage("You cannot copy from an uninitialized object!") );
 
     this->reinit(other.__n);
 

@@ -35,7 +35,7 @@ enum sub_Layout{general, symm, banded, rowvector, columnvector};
 //! as matrix or vector. By separating the shape from the data of a LAO it is easy to <i>reshape</i>
 //! a LAO if necessary. The attributes are public for easy use in CUDA kernels.
 template <typename T, LAOType LT>
-class Shape : public /*protected*/ ShapeData<T>
+class Shape : public ShapeData<T>
 {
 public:
 
@@ -54,16 +54,8 @@ public:
     typedef blas blas_wrapper_type;
 
     //! The default constructor generates an empty shape.
-    Shape()
-    {
-        this->data_ptr = 0;
-        this->r_begin_active = 0;
-        this->r_end_active = 0;
-        this->c_begin_active = 0;
-        this->c_end_active = 0;
-        this->leading_dim = 0;
-        this-> stride = 0;
-    }
+    Shape():ShapeData<T>()
+    {}
 
     //! @param data : pointer to the first element of the linear array containing the elements of the LAO.
     //! @param n_rows : number of rows. If this is set to 1 you get a row vector.
@@ -99,6 +91,8 @@ public:
         this->c_begin_active = other.c_begin_active;
         this->c_end_active = other.c_end_active;
         this->n_elements_active = this->size();
+        this->n_rows = other.n_rows_active();
+        this->n_cols = other.n_cols_active();
 
         this->leading_dim = other.leading_dim;
         this->stride = other.stride;
@@ -123,14 +117,24 @@ public:
         this->c_begin_active = c_begin_active;
         this->c_end_active = c_end_active;
         this->n_elements_active = this->size();
+        this->n_rows = this->n_rows_active();
+        this->n_cols = this->n_cols_active();
 
 
         this->leading_dim = leading_dim;
         this->stride = stride;
     }
 
+    //! Return ptr to data
+    T* data()
+    {
+        return this->data_ptr;
+    }
 
-
+    T* data() const
+    {
+        return this->data_ptr;
+    }
 
     //! Copy constructor. The new object points to the same LAO as @p other.
     //! @param other: source shape to copy.

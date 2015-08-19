@@ -56,7 +56,7 @@ class Vector
         :
         public SciPAL::Expr<Vector<T, BW> >,
         public  dealii::Subscriptor,
-        protected Array<T, BW>,
+//        protected Array<T, BW>,
         public SciPAL::Shape<T, vector> {
 
 
@@ -65,7 +65,6 @@ class Vector
     friend class SciPAL::SubMatrixView<T, BW>;
 
     template<typename, typename> friend class VectorView;
-
 
     template<typename, typename> friend class ColVectorView;
 
@@ -94,6 +93,8 @@ public:
 
     static const EType I_am = leafE;
 
+    Array<T, BW> storage;
+
     Vector();
 
     Vector(size_t n_elements);
@@ -109,7 +110,7 @@ public:
     Vector(const Vector<T, BW> & other)
         :
           dealii::Subscriptor(),
-          Array<T,BW>(),
+          storage(),
         MyShape()
     {
         *this = other;
@@ -122,9 +123,9 @@ public:
         //! Der Zwang explizit diese Funktion aufzurufen sollte Schutz genug sein gegen Missbrauch,
         //! d.h., ist man der Meinung diese Funktion nehmen zu muessen, hat man im Allgemeinen was
         //! falsch gemacht und sich nicht an die Philosophie der Objekt-Orientierung gehalten..
-    inline Array<T, BW> & array() { return *this; }
+    inline Array<T, BW> & array() { return storage; }
 
-    inline const Array<T, BW> & array() const { return *this; }
+    inline const Array<T, BW> & array() const { return storage; }
 
     Vector<T, BW> & operator = (const std::vector<T> & other);
 
@@ -134,8 +135,8 @@ public:
         // element-wise copy of array.
         int inc_src  = 1;
         int inc_this = 1;
-        BW::copy(this->n_elements(), other.array().val(), inc_src,
-                 this->array().val(), inc_this);
+        BW::copy(this->size(), other.data(), inc_src,
+                 this->data(), inc_this);
         return *this;
     }
 
@@ -143,7 +144,7 @@ public:
     template<typename BW2>
     Vector<T, BW> & operator = (const Vector<T, BW2> & other)
     {
-//        if(this->n_elements() != other.n_elements())
+//        if(this->size() != other.n_elements())
             this->array().reinit(other.array().n_elements());
 
         // element-wise copy of array.
@@ -155,9 +156,9 @@ public:
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
         {
             cublas::GetVector(other.array().n_elements(),
-                              other.array().val(),
+                              other.data(),
                               other.stride,
-                              this->array().val(),
+                              this->data(),
                               this->stride);
         }
 
@@ -166,9 +167,9 @@ public:
         if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
         {
             cublas::SetVector(other.array().n_elements(),
-                              other.array().val(),
+                              other.data(),
                               other.stride,
-                              this->array().val(),
+                              this->data(),
                               this->stride);
         }
 
@@ -231,11 +232,11 @@ public:
 
     typename PrecisionTraits<T, BW::arch>::NumberType sum() const;
 
-    size_t size()   const { return this->__n; }
+    size_t size()   const { return this->MyShape::size(); }
 
-    size_t n_rows() const { return this->__n; }
+    size_t n_rows() const { return this->MyShape::n_rows; }
 
-    size_t n_cols() const { return this->__n; }
+    size_t n_cols() const { return this->MyShape::n_cols; }
 
     T operator () (int k) const;
 
@@ -280,7 +281,7 @@ protected:
 template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector()
     :
-      Array<T, BW>(),
+      storage(),
       MyShape(this->data(),
               0, 0,
               0, 0,
@@ -295,7 +296,7 @@ SciPAL::Vector<T, BW>::Vector()
 template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(size_t n_elements)
     :
-    Array<T, BW>(n_elements),
+    storage(n_elements),
     MyShape(this->array().val(),
               0, n_elements, /*n_rows*/
               0, 1, /*n_cols*/
@@ -313,7 +314,7 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(size_t n_elements,
                               const Array<T, BW> & raw_data)
     :
-    Array<T, BW>(n_elements),
+    storage(n_elements),
     MyShape(this->array().val(),
             n_elements, 1, n_elements/*TO DO: leading dim*/)
 {
@@ -332,7 +333,7 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(const FullMatrixAccessor<T> & src,
                               int r_begin, int c)
     :
-    Array<T, BW>(src.n_rows() - r_begin),
+    storage(src.n_rows() - r_begin),
     MyShape(this->array().val(), this->__n, 1, this->__n /*TODO: leading dim*/)
 {
     int n_el = src.n_rows() - r_begin;
@@ -364,7 +365,7 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
                               int r_begin, int c)
     :
-    Array<T, BW>(src.n_rows() - r_begin),
+    storage(src.n_rows() - r_begin),
     MyShape(this->array().val(), this->__n, 1, this->__n)
 {
     int n_el = src.n_rows() - r_begin;
@@ -389,11 +390,11 @@ SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
 template<typename T, typename BW>
 void SciPAL::Vector<T, BW>::reinit(size_t new_size)
 {
-    this->Array<T, BW>::reinit(new_size);
+    this->storage.reinit(new_size);
 
     size_t n_cols = 1;
 
-    this->MyShape::reinit(this->array().val(),
+    this->MyShape::reinit(this->storage.val(),
                           0, new_size,
                           0, 1,
                           this->array().leading_dim() /*leading_dim*/,
@@ -452,14 +453,14 @@ void
 SciPAL::Vector<T, BW>::print() const
 {
 
-    std::vector<T> tmp(this->__n);
+    std::vector<T> tmp(this->size());
     T * dst_ptr = &tmp[0];
 
-    const T * src_ptr = this->val();
+    const T * src_ptr = this->data();
 
-    BW::GetVector(this->__n, src_ptr, 1, dst_ptr, 1);
+    BW::GetVector(this->size(), src_ptr, 1, dst_ptr, 1);
 
-    for (size_t i = 0; i < this->__n; ++i)
+    for (size_t i = 0; i < this->size(); ++i)
          std::cout  << tmp[i] << std::endl;
 }
 
@@ -517,7 +518,7 @@ void
 SciPAL::Vector<T, BW>::set(const int value)
 {
 
-    BW::Memset(this->n_elements(), this->data_ptr, value);
+    BW::Memset(this->size(), this->data_ptr, value);
 }
 
 
@@ -562,7 +563,7 @@ SciPAL::Vector<T, BW>::operator = (const std::vector<T> & other)
 
     size_t incx = 1;
     size_t incy = 1;
-    BW::SetVector(other.size(), src_ptr, incx, this->val(), incy);
+    BW::SetVector(other.size(), src_ptr, incx, this->data(), incy);
 
     return *this;
 }

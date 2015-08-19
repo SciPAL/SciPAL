@@ -41,10 +41,10 @@ struct ShapeData {
     T * data_ptr;
 
     //! Number of rows. If this is set to 1 you get a row vector.
-//    size_t n_rows;
+    size_t n_rows;
 
     //! Nnumber of columns. If this is set to 1 you get a column vector.
-//    size_t n_cols;
+    size_t n_cols;
 
     //! If this value is, e.g., 3, then only every 3rd element of the original data array gets accessed.
     size_t stride;
@@ -83,8 +83,43 @@ struct ShapeData {
         return n_rows_active() * n_cols_active();
     }
 
+    //! The default constructor generates an empty shape.
+    ShapeData()
+    {
+        this->data_ptr = 0;
+        this->n_rows = 0;
+        this->r_begin_active = 0;
+        this->r_end_active = 0;
+        this->n_cols = 0;
+        this->c_begin_active = 0;
+        this->c_end_active = 0;
+        this->leading_dim = 0;
+        this-> stride = 0;
+    }
 
+    ShapeData& operator = (const ShapeData& other)
+    {
+        this->data_ptr = other.data_ptr;
+        this->view_begin = other.view_begin;
 
+        this->r_begin_active = other.r_begin_active;
+        this->r_end_active = other.r_end_active;
+        this->c_begin_active = other.c_begin_active;
+        this->c_end_active = other.c_end_active;
+        this->n_elements_active = this->size();
+        this->n_rows = other.n_rows_active();
+        this->n_cols = other.n_cols_active();
+
+        this->leading_dim = other.leading_dim;
+        this->stride = other.stride;
+
+        return *this;
+    }
+
+    ShapeData(const ShapeData& other)
+    {
+        *this = other;
+    }
 
 //      op()(i,j)
 //     op()(i)

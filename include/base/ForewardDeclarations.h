@@ -9,23 +9,28 @@ struct cublas;
 
 namespace SciPAL
 {
+    //expr base class
+    template <class E> struct Expr;
     template <typename T> struct CudaComplex;
+    //linear algebra objects = LAO
     template<typename, typename> class Array;
     template<typename, typename> class Matrix;
     template<typename, typename> class SubMatrixView;
     template<typename, typename> class Vector;
     template<typename, typename> class VectorView;
     template<typename, typename> class ColVectorView;
+    //wrapper for simple numeric factors
     template<typename T, typename BW> struct Literal;
     template<typename T> struct DevLiteral;
-    template<typename T> struct Setter;
+
     template<typename T, ParallelArch arch> struct Kernels;
 
+    //unary functions to modify LAOs
     struct expr_transpose{};
     struct expr_adjoint{};
     struct expr_diag{};
+    template<typename T> struct Setter;
 
-    template <class E> struct Expr;
 
     //declare device expression types
     template <typename _L, typename Operator, typename _R> struct DevBinaryExpr;
@@ -36,7 +41,7 @@ namespace SciPAL
     template <typename _L, typename Operation > struct UnaryExpr;
 
     //! aux structure to solve the missing Type problem in ShapeData
-    template<typename T> struct GetMyType;
+    template<typename... T> struct GetMyType;
 
     //!definitions of operations for DevBinaryExpr
     template<typename OpTag, typename T> struct  binary;

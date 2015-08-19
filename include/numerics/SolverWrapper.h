@@ -39,7 +39,7 @@ long SVD(const SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas>& A,
     {
         // TODO: Needs to be checked!
         SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas> A_tmp(A.n_cols(), A.n_rows());      // create temporary A_tmp with transposed size
-        A_tmp = SciPAL::adjoint<SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas> >(A);       // copy content of A adjoint into A_tmp
+        A_tmp = adjoint(A);       // copy content of A adjoint into A_tmp
 
         SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas> U_tmp, Vt_tmp;
         long returnValue = SVD(A_tmp, U_tmp, S, Vt_tmp);                                        // performe SVD on A_tmp
@@ -47,8 +47,8 @@ long SVD(const SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas>& A,
         U.reinit(Vt_tmp.n_cols(), S.n_rows());
         Vt.reinit(S.n_rows(), U_tmp.n_rows());
 
-        U = SciPAL::adjoint<SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas> >(Vt_tmp);
-        Vt = SciPAL::adjoint<SciPAL::Matrix<SciPAL::CudaComplex<double>, cublas> >(U_tmp);
+        U = SciPAL::adjoint(Vt_tmp);
+        Vt = SciPAL::adjoint(U_tmp);
 
         return returnValue;
     }

@@ -61,7 +61,7 @@ template<typename T, typename BW> // IDEA:, MatrixStorage my_storage>
 class Matrix
         :
         public SciPAL::Expr<Matrix<T, BW> >,
-        protected SciPAL::Array<T, BW>,
+//        protected SciPAL::Array<T, BW>,
         public dealii::Subscriptor,
         public SciPAL::Shape<T, matrix>
 {
@@ -73,6 +73,8 @@ class Matrix
     friend class SubMatrixView<T, BW>;
 
     friend class FullMatrixAccessor<T>;
+
+    friend class Array<T, BW>;
 
 public:
 
@@ -97,6 +99,8 @@ public:
     //static const bool is_leaf = true;
 
     static const EType I_am = leafE;
+
+    Array<T, BW> storage;
 
     Matrix();
 
@@ -127,7 +131,7 @@ public:
     void reinit(int n_rows, int n_cols);
 
     void swap(Matrix& other) {
-        this->Array<T, BW>::swap(other);
+        this->storage.swap(other);
         this->MyShape::swap(other);
     }
 
@@ -142,8 +146,8 @@ public:
         // element-wise copy of array.
         int inc_src  = 1;
         int inc_this = 1;
-        BW::copy(this->n_elements(), other.array().val(), inc_src,
-                 this->array().val(), inc_this);
+        BW::copy(this->size(), other.data(), inc_src,
+                 this->data(), inc_this);
         return *this;
     }
 
@@ -170,10 +174,10 @@ public:
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
         {
             cublas::GetMatrix(other.n_rows(), other.n_cols(),
-                              other.array().val(),
-                              other.array().leading_dim(),
-                              this->array().val(),
-                              this->array().leading_dim());
+                              other.data(),
+                              other.leading_dim,
+                              this->data(),
+                              this->leading_dim);
         }
 
         //! copy from cublas matrix to blas matrix -> SetMatrix
@@ -181,10 +185,10 @@ public:
         if(typeid(BW) == typeid(cublas) && typeid(BW2) == typeid(blas) )
         {
             cublas::SetMatrix(other.n_rows(), other.n_cols(),
-                              other.array().val(),
-                              other.array().leading_dim(),
-                              this->array().val(),
-                              this->array().leading_dim());
+                              other.data(),
+                              other.leading_dim,
+                              this->data(),
+                              this->leading_dim);
         }
 
         std::cout<<__FUNCTION__<<std::endl;
@@ -254,9 +258,9 @@ public:
 
     T sum() const;
 
-    inline SciPAL::Array<T, BW> & array() { return *this; }
+    inline SciPAL::Array<T, BW> & array() { return storage; }
 
-    inline const SciPAL::Array<T, BW> & array() const { return *this; }
+    inline const SciPAL::Array<T, BW> & array() const { return storage; }
 
     inline MyShape & shape() { return *this; }
 
@@ -276,11 +280,11 @@ private:
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix()
     :
-      Array<T, BW>(),
-      MyShape(this->data(),
+      storage(),
+      MyShape(this->storage.data(),
               0, 0,
               0, 0,
-              this->array().leading_dim())
+              this->storage.leading_dim())
 {}
 
 //! Allocate a matrix of @p n_rows and @p n_cols.
@@ -290,11 +294,11 @@ SciPAL::Matrix<T, BW>::Matrix()
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(int n_rows, int n_cols)
     :
-      Array<T, BW>(n_rows, n_cols),
-      MyShape(this->array().val(),
+      storage(n_rows, n_cols),
+      MyShape(this->data(),
               0, n_rows, /*active rows*/
               0, n_cols, /*active cols*/
-              this->array().leading_dim()/*leading_dim*/)
+              this->leading_dim/*leading_dim*/)
 {
     // TODO: The following should be handled in the Data class
     // from the blas wrapper
@@ -322,11 +326,11 @@ SciPAL::Matrix<T, BW>::Matrix(const unsigned int n_rows,
                                 const unsigned int n_cols,
                                 const std::vector<T2> & src)
     :
-      Array<T, BW>(n_rows, n_cols),
-      MyShape(this->array().val(),
+      storage(n_rows, n_cols),
+      MyShape(this->data(),
               0, n_rows,
               0, n_cols,
-              this->array().leading_dim() /*leading_dim*/ )
+              this->leading_dim /*leading_dim*/ )
 {
     const T2 * const tmp_ptr = &src[0];
 
@@ -336,7 +340,7 @@ SciPAL::Matrix<T, BW>::Matrix(const unsigned int n_rows,
                   tmp_ptr,
                   n_rows,
                   this_data,
-                  this->array().leading_dim());
+                  this->leading_dim);
 
 }
 
@@ -348,8 +352,8 @@ template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(int n_rows, int n_cols,
                                 const Matrix<T, BW> & src_data)
                                     :
-                                    Array<T, BW>(n_rows, n_cols),
-                                    MyShape(this->array().val(), n_rows, n_cols)
+                                    storage(n_rows, n_cols),
+                                    MyShape(this->data(), n_rows, n_cols)
 {
     const std::vector<T> tmp(n_rows*n_cols, 0);
 
@@ -379,6 +383,7 @@ SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator =
 //(const typename ::SciPAL::BlasMatExp<T, BW>::sMMaM& e)
 (const ::SciPAL::Expr<X> & e)
 {
+
     ::SciPAL::LAOOperations::apply(*this, ~e);
 
     return *this;
@@ -389,7 +394,7 @@ SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator =
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
     :
-      Array<T, BW>(),
+      storage(),
       MyShape(this->data(), 0, 0, 0 /*TODO: leading_dim*/)
 {
     *this = Id;
@@ -402,13 +407,14 @@ SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const Matrix<T, BW> & other)
     :
-      Array<T, BW>(),
+      storage(),
       dealii::Subscriptor(),
       MyShape()
 {
 //    Type& self = *this;
 //    self = other;
-    this->Type::operator=(other);
+//    this->Type::operator=(other);
+    *this = other;
 }
 
 
@@ -427,9 +433,9 @@ template<typename T, typename BW>
 void SciPAL::Matrix<T, BW>::reinit(int n_rows, int n_cols)
 {
  /*TODO: leading_dim*/
-    this->Array<T, BW>::reinit(n_rows, n_cols);
+    this->storage.reinit(n_rows, n_cols);
 
-    this->MyShape::reinit(this->array().val(),
+    this->MyShape::reinit(this->storage.val(),
                           0, n_rows,
                           0, n_cols,
                           this->array().leading_dim()/*leading_dim*/,
@@ -455,7 +461,7 @@ SciPAL::Matrix<T, BW>::operator = (const dealii::IdentityMatrix & Id)
     //! Passe bei Bedarf die Array-Groesse an.
     this->Array<T,BW>::reinit(__n_rows, __n_cols);
 
-    this->MyShape::reinit(this->array().val(),
+    this->MyShape::reinit(this->storage.val(),
                           0, __n_rows,
                           0, __n_cols,
                           this->array().leading_dim()/*leading_dim*/,
@@ -494,9 +500,9 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
     int nr = src_matrix.n_rows();
     int nc = src_matrix.n_cols();
 
-    this->Array<T, BW>::reinit(nr, nc);
+    this->storage.reinit(nr, nc);
 
-    this->MyShape::reinit(this->array().val(),
+    this->MyShape::reinit(this->storage.val(),
                           0, nr, /*active rows*/
                           0, nc, /*active cols*/
                           this->array().leading_dim()/*leading_dim*/,
@@ -529,7 +535,7 @@ SciPAL::Matrix<T, BW>::operator += (const Matrix<T, BW> & other)
     One<T> one;
     T alpha = one();
 
-    const T * const x = other.array().val();
+    const T * const x = other.data();
     int incx = 1;
 
     T * y = this->val();
@@ -557,7 +563,7 @@ SciPAL::Matrix<T, BW>::operator -= (const Matrix<T, BW> & other)
     int n = this->n_elements();
     T alpha = -1.;
 
-    const T * const x = other.array().val();
+    const T * const x = other.data();
     int incx = 1;
 
     T * y = this->val();
@@ -792,9 +798,9 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
 {
     // T alpha = 1; T beta = 0;
 
-    int lda = this->array().leading_dim(); //! this == A
-    int ldb = src.array().leading_dim(); /* == this->n_cols() !!! */ //! src == B
-    int ldc = dst.array().leading_dim(); //! dst == C
+    int lda = this->leading_dim; //! this == A
+    int ldb = src.leading_dim; /* == this->n_cols() !!! */ //! src == B
+    int ldc = dst.leading_dim; //! dst == C
 
     BW::gemm(transpose_A,
              transpose_B,
@@ -879,7 +885,7 @@ T
 SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c) const
 {
-    int lead_dim = this->array().leading_dim();
+    int lead_dim = this->leading_dim;
     const T * tmp_d =  & this->data()[c*lead_dim+r];
     T entry;
     T * p_e = &entry;
@@ -901,7 +907,7 @@ void
 SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c, T data)
 {
-    int lead_dim = this->array().leading_dim();
+    int lead_dim = this->leading_dim;
     T * tmp_d =  & this->data()[c*lead_dim+r];
     T * p_e = &data;
     BW::SetMatrix(1, 1,

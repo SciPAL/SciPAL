@@ -39,6 +39,7 @@ public:
     typedef Literal<T, BW> Type;
     typedef DevLiteral<T> DevType;
     typedef const Type ConstHandle;
+    static const EType I_am = leafE;
 
     __host__ __device__
     Literal(const T _val) : val(_val) {}

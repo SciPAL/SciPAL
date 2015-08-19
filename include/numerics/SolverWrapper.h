@@ -2,7 +2,7 @@
 #define SOLVERWRAPPER_H
 
 //including the headers in order, forces an overwrite of the standard complex format by the fftw format
-#include <omp.h>
+// #include <omp.h>
 //STL
 #include <complex>
 #include <iostream>

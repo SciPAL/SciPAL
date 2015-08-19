@@ -31,6 +31,7 @@ void BemCollocationForm<dim, IntegrationTraits, CudaDriver>::assemble_sl_dl(
         this->assemble_sl_dl_cpu(cell, face_id, DL_matrix, SL_matrix);
         break;
     case cuda:
+        std::cout << "running CUDA-based BEM assembly" << std::endl;
         this->assemble_sl_dl_gpu(cell, face_id, DL_matrix, SL_matrix);
         break;
     case both: {
@@ -66,28 +67,6 @@ void BemCollocationForm<dim, IntegrationTraits, CudaDriver>::assemble_sl_dl(
 
         if (dl_max_error > tol_assembly  || sl_max_error > tol_assembly)
             std::cout << std::endl;
-
-        // ----------
-#ifdef BEM_DEBUGffff
-    std::cout << "HALLO SL_MATRIX:" << std::endl;
-    this->matrices.fm(MtxInfo::SLFullMatrix).print_formatted(std::cout,
-                                      12, // const unsigned int 	precision = 3,
-                                      false, // const bool 	scientific = true,
-                                      0, // const unsigned int 	width = 0,
-                                      " * ", // const char * 	zero_string = " ",
-                                      1., //const double 	denominator = 1.,
-                                      0.); // const double 	threshold = 0.);
-
-     std::cout << "HALLO DL_MATRIX:" << std::endl;
-    fem_bem.DL_matrix.print_formatted(std::cout,
-                                      12, // const unsigned int 	precision = 3,
-                                      false, // const bool 	scientific = true,
-                                      0, // const unsigned int 	width = 0,
-                                      " * ", // const char * 	zero_string = " ",
-                                      1., //const double 	denominator = 1.,
-                                      0.); // const double 	threshold = 0.);
-#endif
-        // -----------
         break;
     }
     default:
@@ -150,6 +129,7 @@ void step27::BemCollocationForm<dim, IntegrationTraits, CudaDriver>::assemble_sl
                                     dealii::FullMatrix<double> & DL_matrix,
                                     dealii::FullMatrix<double> & SL_matrix)
 {
+    AssertThrow(false, dealii::ExcNotImplemented());
 }
 
 #else

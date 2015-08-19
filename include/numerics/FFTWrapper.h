@@ -21,7 +21,9 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define CUDA_FFT_H
 
 //including the headers in order, forces an overwrite of the standard complex format by the fftw format
+#ifdef HAVE_OPENMP
 #include <omp.h>
+#endif
 //STL
 #include <complex>
 #include <iostream>

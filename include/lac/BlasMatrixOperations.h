@@ -51,17 +51,20 @@ struct BlasMatExp/*MatrixExpressions*/
     struct traverse_tree;
 
     template< typename T2>
-    struct traverse_tree<leafE, T2>{
+    struct traverse_tree<leafE, T2>
+    {
         typedef typename T2::Type Type;
     };
 
     template<EType ET, typename T2>
-    struct traverse_tree {
+    struct traverse_tree
+    {
         typedef typename ExprChooser<ET, T2>::HostEType Type;
     };
 
     template <typename X>
-    struct generic_gemm {
+    struct generic_gemm
+    {
         typedef typename
         SciPAL::BinaryExpr<typename traverse_tree< X::L::I_am,
                                          typename X::L::Type >::Type,
@@ -90,11 +93,11 @@ struct BlasMatExp/*MatrixExpressions*/
     typedef typename SciPAL::BinaryExpr<Mtx,  mult, UnaryExpr<Vtr, expr_diag> > MdM;
 
 
-    typedef typename SciPAL::BinaryExpr< UnaryExpr<Mtx, expr_transpose >, mult, Mtx> MtM;
+    typedef typename SciPAL::BinaryExpr<UnaryExpr<Mtx, expr_transpose>, mult, Mtx> MtM;
 
-    typedef typename SciPAL::BinaryExpr<Mtx, mult, UnaryExpr<Mtx, expr_transpose > > MMt;
+    typedef typename SciPAL::BinaryExpr<Mtx, mult, UnaryExpr<Mtx, expr_transpose> > MMt;
 
-    typedef typename SciPAL::BinaryExpr< UnaryExpr<Mtx, expr_adjoint>, mult, Mtx> MaM;
+    typedef typename SciPAL::BinaryExpr<UnaryExpr<Mtx, expr_adjoint>, mult, Mtx> MaM;
 
     typedef typename SciPAL::BinaryExpr<Mtx, mult, UnaryExpr<Mtx, expr_adjoint> > MMa;
 
@@ -272,7 +275,7 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     T alpha = 1.0;
     const Mtx & A = expr.l;
-    const Mtx & B = expr.r.A;
+    const Mtx & B = expr.r.l;
 
     T beta = 0.0;
 

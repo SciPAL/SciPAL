@@ -71,12 +71,12 @@ struct BlasVecExp/*VectorExpressions*/
     axpy;
 
     // $ z =  x^t \cdot y$
-    typedef typename SciPAL::BinaryExpr< UnaryExpr<Vtr, expr_transpose>, mult, Vtr>
+    typedef typename SciPAL::BinaryExpr< SciPAL::UnaryExpr<Vtr, SciPAL::expr_transpose>, mult, Vtr>
     scalar_product;
 
     // vector = transpose(A) * vector
     typedef typename SciPAL::BinaryExpr<
-    UnaryExpr<SciPAL::SubMatrixView<T, BW>, expr_transpose > , SciPAL::mult, SciPAL::Vector<T, BW> > SMtmV;
+    SciPAL::UnaryExpr<SciPAL::SubMatrixView<T, BW>, SciPAL::expr_transpose>, SciPAL::mult, SciPAL::Vector<T, BW> > SMtmV;
 
     // vector = (A) * vector
     typedef typename SciPAL::BinaryExpr<
@@ -107,14 +107,12 @@ template <typename T, typename BW>
 static void apply(Literal<T, BW> &result,
                   const typename BlasVecExp<T, BW>::scalar_product& expr)
 {
-    typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef Vector<T, BW> Vtr;
 
     const Vtr& x = expr.l.l;
     const Vtr& y = expr.r;
 
     result = BW::dot(x.size(), x.data(), 1, y.data(), 1);
-
 }
 
 template <typename T, typename BW>

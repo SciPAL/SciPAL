@@ -18,7 +18,7 @@
 
 inline void gpuAssert(cudaError_t code, const char *file, int line, const char *func,bool abort=true)
 {
-    #ifndef DEBUG
+#ifndef DEBUG
    if (code != cudaSuccess)
    {
       fprintf(stderr,"GPUassert: %s %s line: %d\n function:%s\n", cudaGetErrorString(code), file, line, func);
@@ -38,7 +38,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, const char *
       } else {
           waitpid(child_pid,NULL,0);
       }
-#endif
+#endif//Q_OS_OSX
 
       if (abort) exit(code);
    }

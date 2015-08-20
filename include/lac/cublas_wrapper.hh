@@ -249,6 +249,7 @@ struct cublas {
             check_status(status);
 
             // set everything to zero
+            status = cudaMemset( dev_ptr, 0, rows*cols*sizeof(T) );
 //            status = cudaMemset2D(dev_ptr, pitch_in_bytes,
 //                                  0, cols*sizeof(T), rows*sizeof(T));
             // According to the

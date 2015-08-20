@@ -177,53 +177,18 @@ operator *(const typename PrecisionTraits<T, BW::arch>::NumberType e1,
 template <typename T, typename BW, template <typename, typename> class LAO >
 inline
 const BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >
-operator *(const T e1, const  LAO<T, BW>& e2)
+operator *(const typename LAO<T, BW>::value_type e1,
+           const  LAO<T, BW>& e2)
 {
     return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
 }
 
-//template <typename T, LAOType LT1, LAOType LT2>
+//template <typename T, typename BW, template <typename, typename> class LAO >
 //inline
-//const BinaryExpr<Shape<T, LT1>, SciPAL::mult, Shape<T, LT2> >
-//operator * (const Shape<T, LT1>& e1, const Shape<T, LT2>& e2)
+//const BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >
+//operator *(const T e1, const  LAO<T, BW>& e2)
 //{
-//    return BinaryExpr<Shape<T, LT1>, SciPAL::mult, Shape<T, LT2> >(~e1, ~e2);
-//}
-
-//template <typename T1, typename T2 >
-//inline
-//const BinaryExpr<T1, SciPAL::mult, T2 >
-//operator * (const Expr<T1>& e1, const Expr<T2>& e2)
-//{
-//    if ((T1::I_am == unE || T1::I_am == binE) &&
-//            (T2::I_am == unE || T2::I_am == binE))
-//        return BinaryExpr<T1, SciPAL::mult, T2 >(~e1, ~e2);
-
-//    else if ((T1::I_am == unE || T1::I_am == binE) &&
-//            (T2::I_am == leafE))
-//        return BinaryExpr<T1, SciPAL::mult, typename T2::MyShape >(~e1, e2);
-
-//    else if ((T1::I_am == leafE) &&
-//            (T2::I_am == unE || T2::I_am == binE))
-//        return BinaryExpr<typename T1::MyShape, SciPAL::mult, T2>(e1, ~e2);
-
-//    else if ((T1::I_am == leafE) &&
-//            (T2::I_am == leafE))
-//    return BinaryExpr<typename T1::MyShape, SciPAL::mult, typename T2::MyShape>(e1, e2);
-//    else
-//        std::cerr << "SOMETHING WENT TERRIBLY WRONG BUILDING EXPRESSIONS!!1!" << std::endl;
-//}
-
-//template <typename T1, typename T2 >
-//inline
-//const BinaryExpr<typename GetMyType<T1>::Type,
-//                SciPAL::mult,
-//                typename GetMyType<T2>::Type  >
-//operator * (const Expr<T1>& e1, const Expr<T2>& e2)
-//{
-//    return BinaryExpr<typename GetMyType<T1>::Type,
-//                      SciPAL::mult,
-//                      typename GetMyType<T2>::Type >(e1, e2);
+//    return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
 //}
 
 template <typename T1, typename T2 >

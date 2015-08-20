@@ -89,4 +89,3 @@ struct GetMyType<T0, T...> {
 }
 
 #endif // EXPRESSION_TEMPLATE_HELPER_H
-

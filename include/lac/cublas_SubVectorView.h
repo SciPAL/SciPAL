@@ -140,16 +140,8 @@ private:
         dealii::SmartPointer<T_src> __src;
 
     protected:
-//        int __n_el;
-
-    private:
-//        int __view_begin;
-
-    protected:
         bool _is_col;
-    //! public:
-//        int _stride;
-    };
+   };
 
 
 

@@ -453,6 +453,59 @@ public:
         cblas_ccopy(n, reinterpret_cast<const float*>(x), incx, reinterpret_cast<float*>(y), incy);
     }
 
+
+    static void
+    copy(int n, const int *x, int incx, int *y, int incy)
+    {
+        for(int i=0; i<n; i++)
+        {
+            y[i*incy]=x[i*incx];
+        }
+    }
+    // @sect4{Funktion: swap}
+    //!
+    //! @param n : Anzahl Elemente.
+    //! @param x : Quellvektor x.
+    //! @param incx : Speicher Abstand zwischen Elemente in Vector x.
+    //! @param y : Zielvektor
+    //! @param incy: Speicher Abstand zwischen Elemente in Vector y.
+
+    static void
+    swap(int n, float *x, int incx, float *y, int incy)
+    {
+        cblas_sswap(n, x, incx, y, incy);
+    }
+
+    static void
+    swap(int n, double *x, int incx, double *y, int incy)
+    {
+        cblas_dswap(n, x, incx, y, incy);
+    }
+
+    static void
+    swap(int n, float2 *x, int incx, float2 *y, int incy)
+    {
+        cblas_cswap(n, x, incx, y, incy);
+    }
+
+    static void
+    swap(int n, double2 *x, int incx, double2 *y, int incy)
+    {
+        cblas_zswap(n, x, incx, y, incy);
+    }
+
+    static void
+    swap(int n, std::complex<float> *x, int incx, std::complex<float> *y, int incy)
+    {
+        cblas_cswap(n, x, incx, y, incy);
+    }
+
+    static void
+    swap(int n, std::complex<double> *x, int incx, std::complex<double> *y, int incy)
+    {
+        cblas_zswap(n, x, incx, y, incy);
+    }
+
     // @sect4{Funktion: scal}
     //!
     //! @param n : Anzahl Elemente.

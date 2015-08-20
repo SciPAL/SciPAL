@@ -72,7 +72,7 @@ public:
     {
         this->reinit(r_begin_active, r_end_active,
                      c_begin_active, c_end_active,
-                     stride = 1);
+                     stride);
     }
 
 

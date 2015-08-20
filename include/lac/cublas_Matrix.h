@@ -110,7 +110,13 @@ public:
 //    template<typename X>
 //    Matrix (const ::SciPAL::Expr<X> & e);
 
-    Matrix(const Matrix<T, BW> & other);
+    Matrix(const Matrix<T, BW>& other);
+
+//    Matrix(const Shape<T, BW, matrix>& other)
+//        : Subscriptor(),
+//          MyShape(other)
+//    {}
+
 
 // private:
 //    Matrix(const Matrix & other) {
@@ -135,6 +141,7 @@ public:
 
     Matrix<T, BW> & operator= (const dealii::IdentityMatrix & Id);
 
+    //! Generate a deep copy of @p other
     Matrix<T, BW> & operator = (const Matrix<T, BW> & other)
     {
         this->reinit(other.n_rows(), other.n_cols());
@@ -146,24 +153,13 @@ public:
         return *this;
     }
 
-    //! Generate a deep copy of @p other
+    //! Generate a deep copy of @p other with different blas_wrapper_type
     template <typename BW2>
     Matrix<T, BW> & operator = (const Matrix<T, BW2> & other)
     {
-        //! check it both matrices have the same layout
-//        if((this->n_rows() != other.n_rows()) || this->n_cols() != other.n_cols())
-//        {
-//            size_t new_size = other.size();
-//            //does not respect lda
-//            this->reinit(other.n_rows(), other.n_cols());
-//        }
+
         this->reinit(other.n_rows(), other.n_cols());
-//        this->shape() = other.shape();
-//        this->MyShape::operator =(other);
-        // element-wise copy of array.
-        int inc_src  = 1;
-        int inc_this = 1;
-        
+
         //! copy from cublas matrix to blas matrix -> GetMatrix
         //! TODO: what is with asyn copy?
         if(typeid(BW) == typeid(blas) && typeid(BW2) == typeid(cublas) )
@@ -185,8 +181,9 @@ public:
                               this->data(),
                               this->leading_dim);
         }
-
+#ifdef DEBUG
         std::cout<<__FUNCTION__<<std::endl;
+#endif
         return *this;
     }
 
@@ -271,8 +268,7 @@ private:
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix()
     :
-      MyShape(0, 0,
-              0, 0)
+      MyShape()
 {}
 
 //! Allocate a matrix of @p n_rows and @p n_cols.
@@ -362,8 +358,7 @@ SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator =
 template<typename T, typename BW>
 SciPAL::Matrix<T, BW>::Matrix(const dealii::IdentityMatrix & Id)
     :
-      MyShape(0, 0,
-              0, 0)
+      MyShape()
 {
     *this = Id;
 }
@@ -378,9 +373,6 @@ SciPAL::Matrix<T, BW>::Matrix(const Matrix<T, BW> & other)
       dealii::Subscriptor(),
       MyShape()
 {
-//    Type& self = *this;
-//    self = other;
-//    this->Type::operator=(other);
     *this = other;
 }
 

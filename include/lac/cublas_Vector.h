@@ -386,7 +386,6 @@ SciPAL::Vector<T, BW>::reinit(const Vector<T, BW> & other)
 }
 
 
-
 // @sect4{Funktion: l2_norm}
 //!
 //! Berechnet die L2-Norm eines Vectors
@@ -449,10 +448,10 @@ template<typename T, typename BW>
 T
 SciPAL::Vector<T, BW>::operator () (int k) const
 {
-    std::vector<T> tmp(this->__n);
+    std::vector<T> tmp(this->size());
     T * dst_ptr = &tmp[0];
 
-    BW::GetVector(1, this->val()+k, 1, dst_ptr, 1);
+    BW::GetVector(1, this->data()+k, 1, dst_ptr, 1);
     return tmp[0];
 }
 

@@ -78,7 +78,8 @@ public:
 
     //! By assigning one shape to another we get two shapes looking at the same LAO.
     //! @param other: source shape to copy.
-    Shape& operator = (const Shape& other)
+    template<LAOType LT2>
+    Shape& operator = (const Shape<T, BW, LT2>& other)
     {
 #ifdef DEBUG
         std::cout << "line :" << __LINE__ << ", Shape<T>  " << __FUNCTION__<< "\n"  << std::endl;
@@ -90,9 +91,9 @@ public:
         this->r_end_active = other.r_end_active;
         this->c_begin_active = other.c_begin_active;
         this->c_end_active = other.c_end_active;
-        this->n_elements_active = this->size();
-        this->n_rows = other.n_rows_active();
-        this->n_cols = other.n_cols_active();
+        this->n_elements_active = other.n_elements_active;
+        this->n_rows = other.n_rows;
+        this->n_cols = other.n_cols;
 
         this->leading_dim = other.leading_dim;
         this->stride = other.stride;
@@ -141,6 +142,7 @@ public:
 
     //! Copy constructor. The new object points to the same LAO as @p other.
     //! @param other: source shape to copy.
+
     Shape(const Shape& other)
     {
         *this = other;

@@ -114,7 +114,7 @@ template <typename T, typename BW>
 SciPAL::Array<T, BW>::Array()
     :
       Base(),
-      __n(0)
+      __n(0), n_rows(0), n_cols(0)
 {}
 
 //! @param n : Groesse des Arrays.

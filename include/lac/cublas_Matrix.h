@@ -410,17 +410,10 @@ SciPAL::Matrix<T, BW>::operator = (const dealii::IdentityMatrix & Id)
     // Zeilen- und Spaltenzahl einer Identitaetsmatrix sind gleich
     // und entsprechen der Anzahl der Freiheitsgrade.
     int __n_dofs   = Id.m();
-    int __n_src_el = __n_dofs*__n_dofs;
 
-    //! Passe bei Bedarf die Array-Groesse an.
-    this->Array<T,BW>::reinit(__n_rows, __n_cols);
-
-    this->MyShape::reinit(this->storage.val(),
-                          0, __n_rows,
+    this->MyShape::reinit(0, __n_rows,
                           0, __n_cols,
-                          this->array().leading_dim()/*leading_dim*/,
                           1 /*unit stride*/);
-
 
 
     FullMatrixAccessor<T> tmp_id(Id);
@@ -432,8 +425,9 @@ SciPAL::Matrix<T, BW>::operator = (const dealii::IdentityMatrix & Id)
     const T *  id_val = tmp_id.val();
     T * dst_val = this->data();
 
-    BW::SetMatrix(__n_dofs, __n_dofs, id_val,
-                  __n_dofs, dst_val, __n_dofs );
+    BW::SetMatrix(__n_dofs, __n_dofs,
+                  id_val, __n_dofs,
+                  dst_val, this->leading_dim );
 
     return *this;
 }
@@ -454,12 +448,8 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
     int nr = src_matrix.n_rows();
     int nc = src_matrix.n_cols();
 
-    this->storage.reinit(nr, nc);
-
-    this->MyShape::reinit(this->storage.val(),
-                          0, nr, /*active rows*/
+    this->MyShape::reinit(0, nr, /*active rows*/
                           0, nc, /*active cols*/
-                          this->array().leading_dim()/*leading_dim*/,
                           1 /*unit stride*/);
 
 
@@ -485,14 +475,14 @@ SciPAL::Matrix<T, BW>::operator += (const Matrix<T, BW> & other)
            && (this->n_cols() == other.n_cols()),
            dealii::ExcMessage("Dimension mismatch"));
 
-    int n = this->n_elements();
+    int n = this->size();
     One<T> one;
     T alpha = one();
 
     const T * const x = other.data();
     int incx = 1;
 
-    T * y = this->val();
+    T * y = this->data();
     int incy = 1;
 
     BW::axpy(n, alpha, x, incx, y, incy);
@@ -514,13 +504,13 @@ SciPAL::Matrix<T, BW>::operator -= (const Matrix<T, BW> & other)
            && (this->n_cols() == other.n_cols()),
            dealii::ExcMessage("Dimension mismatch"));
 
-    int n = this->n_elements();
+    int n = this->size();
     T alpha = -1.;
 
     const T * const x = other.data();
     int incx = 1;
 
-    T * y = this->val();
+    T * y = this->data();
     int incy = 1;
 
     BW::axpy(n, alpha, x, incx, y, incy);
@@ -539,9 +529,9 @@ SciPAL::Matrix<T, BW>::operator *= (const T2 scale)
 {
     int elem_dist = 1;
 
-    int n = this->n_elements();
+    int n = this->size();
 
-    BW::scal(n, scale, &(this->val()[0]), elem_dist);
+    BW::scal(n, scale, &(this->data()[0]), elem_dist);
 
     return *this;
 }
@@ -552,7 +542,7 @@ SciPAL::Matrix<T, BW>::operator *= (const T2 scale)
 template<typename T, typename BW>
 typename PrecisionTraits<T, BW::arch>::NumberType SciPAL::Matrix<T, BW>::l2_norm() const
 {
-    typename PrecisionTraits<T, BW::arch>::NumberType result = BW::nrm2(this->n_elements(), this->val(), 1/*incx*/);
+    typename PrecisionTraits<T, BW::arch>::NumberType result = BW::nrm2(this->size(), this->data(), 1/*incx*/);
 
     return result;
 }
@@ -565,7 +555,7 @@ typename PrecisionTraits<T, BW::arch>::NumberType SciPAL::Matrix<T, BW>::l2_norm
 template<typename T, typename BW>
 T SciPAL::Matrix<T, BW>::sum() const
 {
-    return BW::asum(this->__n, &(this->val()[0]), 1);
+    return BW::asum(this->__n, &(this->data()[0]), 1);
 }
 
 // @sect4{Function: vmult}
@@ -587,8 +577,8 @@ void SciPAL::Matrix<T, BW>::vmult(VECTOR1& dst, const VECTOR2& src) const
     T beta  = zero();
     int leading_dim_A = this->n_rows();
 
-    T * dst_ptr = dst.val();
-    const T * src_ptr = src.val();
+    T * dst_ptr = dst.data();
+    const T * src_ptr = src.data();
 
     Assert(src.size() == this->n_cols(),
            dealii::ExcMessage("Dimension mismatch"));
@@ -616,7 +606,7 @@ void SciPAL::Matrix<T, BW>::Tvmult(VECTOR1& dst, const VECTOR2& src) const
     int leading_dim_A = this->n_rows();
 
     BW::gemv('t', this->n_rows(), this->n_cols(), alpha, this->data(),
-             leading_dim_A, src.val(), 1, beta, dst.val(), 1);
+             leading_dim_A, src.data(), 1, beta, dst.data(), 1);
 }
 
 
@@ -641,8 +631,8 @@ SciPAL::Matrix<T, BW>::scaled_vmult_add_scaled(T alpha,
 
     int leading_dim_A = this->n_rows(); // TODO: is this always the case?
 
-    T * dst_ptr = dst.val();
-    const T * src_ptr = src.val();
+    T * dst_ptr = dst.data();
+    const T * src_ptr = src.data();
 
 
     Assert(src.size() == this->n_cols(),
@@ -823,8 +813,8 @@ SciPAL::Matrix<T, BW>::add_scaled_outer_product(T alpha,
     int incy = y.stride;
 
     BW::ger(m, n, alpha,
-            x.val(), incx,
-            y.val(), incy,
+            x.data(), incx,
+            y.data(), incy,
             this->data(), lda);
 }
 

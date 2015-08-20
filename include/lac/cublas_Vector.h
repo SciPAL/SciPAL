@@ -320,7 +320,7 @@ SciPAL::Vector<T, BW>::Vector(const FullMatrixAccessor<T> & src,
     int n_el = src.n_rows() - r_begin;
 
     int src_begin = c*src.n_rows() + r_begin;
-    const T * src_val = src.val();
+    const T * src_val = src.data();
 
     int inc_src = 1;
     if (!src.is_column_major())
@@ -331,7 +331,7 @@ SciPAL::Vector<T, BW>::Vector(const FullMatrixAccessor<T> & src,
 
     const T * src_ptr = &(src_val[src_begin]);
 
-    BW::SetVector(n_el, src_ptr, inc_src, this->val(), 1);
+    BW::SetVector(n_el, src_ptr, inc_src, this->data(), 1);
 }
 
 
@@ -355,10 +355,10 @@ SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
     int inc_src = 1;
     int inc_this = 1;
 
-    const T * col = &(src.val()[c*src.n_rows() + r_begin]);
+    const T * col = &(src.data()[c*src.n_rows() + r_begin]);
 
     //! cublasScopy
-    BW::copy(this->__n, col, inc_src, this->val(), inc_this);
+    BW::copy(this->size(), col, inc_src, this->data(), inc_this);
 }
 
 
@@ -394,7 +394,7 @@ template<typename T, typename BW>
 typename PrecisionTraits<T, BW::arch>::NumberType
 SciPAL::Vector<T, BW>::l2_norm() const
 {
-    return BW::nrm2(this->__n, &(this->val()[0]), 1);
+    return BW::nrm2(this->size(), &(this->data()[0]), 1);
 }
 
 // @sect4{Funktion: sum}
@@ -405,7 +405,7 @@ template<typename T, typename BW>
 typename PrecisionTraits<T, BW::arch>::NumberType
 SciPAL::Vector<T, BW>::sum() const
 {
-    return BW::asum(this->__n, &(this->val()[0]), 1);
+    return BW::asum(this->size(), &(this->data()[0]), 1);
 }
 
 
@@ -480,7 +480,7 @@ SciPAL::Vector<T, BW>::set(int k, const T value)
     int inc_src = 1;
     int inc_dst = 1;
 
-    BW::SetVector(1, &value, inc_src, &(this->val()[k]), inc_dst);
+    BW::SetVector(1, &value, inc_src, &(this->data()[k]), inc_dst);
 }
 
 // @sect4{Function: Vector::set}
@@ -513,8 +513,8 @@ SciPAL::Vector<T, BW>::add(int k,const T value)
     tmp_d.set(0, value);
 
 
-    BW::axpy(1/*other.size()*/, 1, tmp_d.val()/*other.val()*/, 1,
-             &(this->val()[k]), 1);
+    BW::axpy(1/*other.size()*/, 1, tmp_d.data()/*other.data()*/, 1,
+             &(this->data()[k]), 1);
 }
 
 
@@ -563,7 +563,7 @@ SciPAL::Vector<T, BW>::push_to(std::vector<T2> & dst) const
 {
     dst.resize(this->size());
 
-    const T * const src_ptr = this->val();
+    const T * const src_ptr = this->data();
 
     T * dst_ptr = reinterpret_cast<T*>(&dst[0]);
 
@@ -581,7 +581,7 @@ SciPAL::Vector<T, BW>::push_to(dealii::Vector<T2> & dst) const
 {
     dst.reinit(this->size());
 
-    const T * const src_ptr = this->val();
+    const T * const src_ptr = this->data();
 
     T * dst_ptr = reinterpret_cast<T*>(dst.begin());
 
@@ -607,16 +607,14 @@ template<typename T_src>
 SciPAL::Vector<T, BW> &
 SciPAL::Vector<T, BW>::operator = (const VectorView<T, T_src > & other)
 {
-    Assert(this->size() >= other.size(),
-           dealii::ExcDimensionMismatch(this->size(), other.size()) );
+    this->reinit(other.n_elements_active);
 
     int incx = other.stride;
     int incy = 1;
-    BW::copy(other.size(), other.val(), incx,
-             &(this->val()[(other._is_col ?
+    BW::copy(other.size(), other.data(), incx,
+             &(this->data()[(other._is_col ?
                               other.r_begin() : other.c_begin())
                              ]), incy);
-
     return *this;
 }
 
@@ -661,7 +659,7 @@ SciPAL::Vector<T, BW>::operator = (const T value)
     tmp.set(0, value);
     int incx = 0; //! copy the same element all the time
     int incy = 1;
-    BW::copy(tmp.size(), tmp.val(), incx, this->val(), incy);
+    BW::copy(tmp.size(), tmp.data(), incx, this->data(), incy);
 
     return *this;
 }
@@ -676,7 +674,7 @@ SciPAL::Vector<T, BW> &
 SciPAL::Vector<T, BW>::operator += (const Vector<T, BW> & other)
 {
     One<T> one;
-    BW::axpy(this->__n, one(), other.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), one(), other.data(), 1, this->data(), 1);
 
     return *this;
 }
@@ -696,8 +694,8 @@ SciPAL::Vector<T, BW>::operator += (const VectorView<T, T_src > & other)
     Assert(this->size() >= other.size(),
            dealii::ExcMessage("Dimension mismatch") );
 
-    BW::axpy(other.size(), one(), other.val(), 1,
-             &(this->val()[other.r_begin()]), 1);
+    BW::axpy(other.size(), one(), other.data(), 1,
+             &(this->data()[other.r_begin()]), 1);
 
     return *this;
 }
@@ -716,8 +714,8 @@ SciPAL::Vector<T, BW>::operator += (const T scalar)
     d_scalar = scalar_vec;
     One<T> one;
 
-    BW::axpy(this->__n, one(), d_scalar.array().val(), 1,
-             this->val(), 1);
+    BW::axpy(this->size(), one(), d_scalar.data(), 1,
+             this->data(), 1);
 
     return *this;
 }
@@ -735,7 +733,7 @@ SciPAL::Vector<T, BW>::operator *= (const T2 scale)
 {
     int elem_dist = 1;
 
-    BW::scal(this->__n, scale, &(this->val()[0]), elem_dist);
+    BW::scal(this->size(), scale, &(this->data()[0]), elem_dist);
 
     return *this;
 }
@@ -754,7 +752,7 @@ SciPAL::Vector<T, BW>::operator -= (const Vector<T, BW> & other)
     One<T> one;
     bool plus = true;
 
-    BW::axpy(this->__n, one(!plus), other.val(), 1, this->val(), 1 );
+    BW::axpy(this->size(), one(!plus), other.data(), 1, this->data(), 1 );
 
     return *this;
 }
@@ -773,8 +771,8 @@ SciPAL::Vector<T, BW>::operator -= (const VectorView<T, T_src > & other)
     Assert(this->size() >= other.size(),
            dealii::ExcMessage("Dimension mismatch") );
 
-    BW::axpy(other.size(), -1, other.val(), 1,
-             &(this->val()[other.r_begin()]), 1);
+    BW::axpy(other.size(), -1, other.data(), 1,
+             &(this->data()[other.r_begin()]), 1);
 
     return *this;
 }
@@ -797,7 +795,7 @@ SciPAL::Vector<T, BW>::operator /= (const T scale)
     Assert(scale,
            dealii::ExcMessage("Division by Zero") );
 
-    BW::scal(this->__n, 1/scale, this->val(), elem_dist);
+    BW::scal(this->size(), 1/scale, this->data(), elem_dist);
 
     return *this;
 }
@@ -823,8 +821,8 @@ SciPAL::Vector<T, BW>::dot(const VECTOR & other) const
 
     int incx = 1; //! this->_stride;
     int incy = 1; //!other.stride;
-    T result = BW::dot(this->__n,
-                       this->val(), incx, other.val(), incy);
+    T result = BW::dot(this->size(),
+                       this->data(), incx, other.data(), incy);
 
     return result;
 }
@@ -841,11 +839,11 @@ void
 SciPAL::Vector<T, BW>::sadd (T alpha, const Vector<T, BW> & other)
 {
     int incx = 1;
-    BW::scal(this->__n, alpha, this->val(), incx);
+    BW::scal(this->size(), alpha, this->data(), incx);
 
     //! cublasSaxpy
     int incy = 1;
-    BW::axpy(this->__n, 1., other.dev_ptr, 1, this->val(), 1);
+    BW::axpy(this->size(), 1., other.dev_ptr, 1, this->data(), 1);
 }
 
 
@@ -859,7 +857,7 @@ bool
 SciPAL::Vector<T, BW>::all_zero ()
 {
     //return ( (x<10.0*DBL_MIN) && (x>-10.0*DBL_MIN) ? true : false)
-    T nrm = BW::nrm2(this->__n, &(this->val()[0]), 1);
+    T nrm = BW::nrm2(this->size(), &(this->data()[0]), 1);
 
     return ( (nrm < 10.0*DBL_MIN) && (nrm >-10.0*DBL_MIN)? true:false);
 }
@@ -869,7 +867,7 @@ void
 SciPAL::Vector<T, BW>::add(const Vector<T, BW> & other)
 {
     One<T> one;
-    BW::axpy(this->__n, one(), other.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), one(), other.data(), 1, this->data(), 1);
 }
 
 
@@ -878,7 +876,7 @@ template<typename T, typename BW>
 void
 SciPAL::Vector<T, BW>::add(T alpha, const Vector<T, BW> & other)
 {
-    BW::axpy(this->__n, alpha, other.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), alpha, other.data(), 1, this->data(), 1);
 
 }
 
@@ -886,8 +884,8 @@ template<typename T, typename BW>
 void
 SciPAL::Vector<T, BW>::add(T alpha, const Vector<T, BW> & other, T beta, const Vector<T, BW> & other2)
 {
-    BW::axpy(this->__n, alpha, other.val(), 1, this->val(), 1);
-    BW::axpy(this->__n, beta, other2.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), alpha, other.data(), 1, this->data(), 1);
+    BW::axpy(this->size(), beta, other2.data(), 1, this->data(), 1);
 
 }
 
@@ -896,9 +894,9 @@ void
 SciPAL::Vector<T, BW>::sadd(T alpha, T beta, const Vector<T, BW> & other)
 {
 
-    BW::scal(this->__n, alpha, &(this->val()[0]), 1);
+    BW::scal(this->size(), alpha, &(this->data()[0]), 1);
 
-    BW::axpy(this->__n, beta, other.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), beta, other.data(), 1, this->data(), 1);
 }
 
 template<typename T, typename BW>
@@ -906,10 +904,10 @@ void
 SciPAL::Vector<T, BW>::sadd(T alpha, T beta, const Vector<T, BW> & other, T gamma, const Vector<T, BW> & other2)
 {
 
-    BW::scal(this->__n, alpha, &(this->val()[0]), 1);
+    BW::scal(this->size(), alpha, &(this->data()[0]), 1);
 
-    BW::axpy(this->__n, beta, other.val(), 1, this->val(), 1);
-    BW::axpy(this->__n, gamma, other2.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), beta, other.data(), 1, this->data(), 1);
+    BW::axpy(this->size(), gamma, other2.data(), 1, this->data(), 1);
 }
 
 template<typename T, typename BW>
@@ -918,9 +916,9 @@ SciPAL::Vector<T, BW>::equ(T alpha, const Vector<T, BW> & other)
 {
 
     // this = \alpha * other
-    BW::scal(this->__n, 0.0, &(this->val()[0]), 1);
+    BW::scal(this->size(), 0.0, &(this->data()[0]), 1);
 
-    BW::axpy(this->__n, alpha, other.val(), 1, this->val(), 1);
+    BW::axpy(this->size(), alpha, other.data(), 1, this->data(), 1);
 
 }
 
@@ -940,8 +938,8 @@ SciPAL::Vector<T, BW>::equ(T alpha, const Vector<T, BW> & other, T beta, const V
     const T * tmp_ptr = &(*tmp.begin());
     BW::SetVector(size(), tmp_ptr, incx, this->data(), incy);
 
-    BW::axpy(this->__n, alpha, other.val(), incx, this->val(), incy);
-    BW::axpy(this->__n, beta, other2.val(), incx, this->val(), incy);
+    BW::axpy(this->size(), alpha, other.data(), incx, this->data(), incy);
+    BW::axpy(this->size(), beta, other2.data(), incx, this->data(), incy);
 
 }
 #endif //! cublas_Vector_H

@@ -152,13 +152,24 @@ public:
         return *__src;
     }
 
-    inline Array<T, BW>& array() {
-        return __src->array();
+    // @sect4{Funktion: data}
+    //!
+    //! Direkter Zugriff auf den den device-Zeiger.
+    //! Zurueckgegeben wird der Zeiger auf das erste Element
+    //! des betrachteten Teils eines Vektors.
+    const T* data() const
+    {
+        //! Indizes in C-Z&auml;hlung!!!
+        return this->view_begin;
     }
 
-    inline const Array<T, BW>& array() const {
-        return __src->array();
+
+    T* data()
+    {
+        //! Indizes in C-Z&auml;hlung!!!
+        return this->view_begin;
     }
+
 
     void shift(size_t m_r, size_t m_c);
     void reset(size_t new_r_begin, size_t new_r_end, size_t new_c_begin, size_t new_c_end);
@@ -207,10 +218,8 @@ void SciPAL::SubMatrixView<T, BW>::reset(size_t new_r_begin, size_t new_r_end,
     AssertThrow(new_c_end <= __src->n_cols(), dealii::ExcMessage("View out of matrix bounds."));
 #endif
 
-    this->MyShape::reinit(this->data_ptr,
-                          new_r_begin, new_r_end,
-                          new_c_begin, new_c_end,
-                          this->MyShape::leading_dim, 1);
+    this->MyShape::reinit(new_r_begin, new_r_end,
+                          new_c_begin, new_c_end, 1);
 }
 
 
@@ -237,10 +246,8 @@ template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
                                             int r_begin, int c_begin)
     :
-      MyShape(src.array().val(),
-              r_begin, src.n_rows(), /*active rows*/
-              c_begin, src.n_cols(), /*active cols*/
-              src.array().leading_dim()/*leading_dim*/),
+      MyShape(r_begin, src.n_rows(), /*active rows*/
+              c_begin, src.n_cols() /*active cols*/),
       __src(&src)
 {
     Assert ((r_begin >= 0) && (r_begin < src.n_rows()),
@@ -322,9 +329,9 @@ SciPAL::SubMatrixView<T, BW>::operator = (const Matrix<T, BW>& col)
 //#ifdef DEBUG
 //    std::cout << " MY new and shiny SMV prod" << std::endl;
 //#endif
-//    const T * A = AB.l.val(); // SubMatrixView::val() automatically computes the begin of the view in memory  //matrix().array().val()[AB.l.__view_begin]) ;
-//    const T * B = AB.r.val(); // &(AB.r.__src->val()[AB.r.__view_begin]) ;
-//    T * C = result.val(); // &( result./*this->*/__src->val()[ result./*this->*/__view_begin]) ;
+//    const T * A = AB.l.data(); // SubMatrixView::val() automatically computes the begin of the view in memory  //matrix().array().data()[AB.l.__view_begin]) ;
+//    const T * B = AB.r.data(); // &(AB.r.__src->val()[AB.r.__view_begin]) ;
+//    T * C = result.data(); // &( result./*this->*/__src->val()[ result./*this->*/__view_begin]) ;
 
 //    T alpha = +1;
 //    T beta  = 0.;
@@ -566,11 +573,11 @@ SciPAL::SubMatrixView<T, BW>::vmult(VECTOR1& dst, const VECTOR2& src) const
     Assert(dst.size() >= n_rows, dealii::ExcMessage("Dimension mismatch"));
 
     const int dst_val_begin = (VECTOR1::is_vector_view ? 0 : this->__r_begin );
-    T *dst_val_ptr = dst.val() + dst_val_begin;
+    T *dst_val_ptr = dst.data() + dst_val_begin;
 
 
     const int src_val_begin = (VECTOR2::is_vector_view ? 0 : this->c_begin_active );
-    const T * const src_val_ptr = src.val() + src_val_begin;
+    const T * const src_val_ptr = src.data() + src_val_begin;
 
     BW::gemv('n', n_rows, n_cols, alpha, this->view_begin,
              this->leading_dim, src_val_ptr, 1, beta, dst_val_ptr, 1);
@@ -597,10 +604,10 @@ SciPAL::SubMatrixView<T, BW>::Tvmult(VECTOR1& dst, const VECTOR2& src) const
     Assert(dst.size() >= n_rows, dealii::ExcMessage("Dimension mismatch"));
 
     const int dst_val_begin = (VECTOR1::is_vector_view ? 0 : this->c_begin_active );
-    T *dst_val_ptr              = dst.val() + dst_val_begin;
+    T *dst_val_ptr              = dst.data() + dst_val_begin;
 
     const int src_val_begin = (VECTOR2::is_vector_view ? 0 :this->__r_begin );
-    const T * const src_val_ptr = src.val() + src_val_begin;
+    const T * const src_val_ptr = src.data() + src_val_begin;
 
     //! AssertThrow(false, dealii::ExcNotImplemented() );
 
@@ -624,9 +631,6 @@ SciPAL::SubMatrixView<T, BW>::add_scaled_outer_product(T alpha,
                                                        const Vector<T, BW>& x,
                                                        const Vector<T, BW>& y)
 {
-
-
-
     int m = this->n_rows_active();
     int n = this->n_cols_active();
 
@@ -643,11 +647,11 @@ SciPAL::SubMatrixView<T, BW>::add_scaled_outer_product(T alpha,
 
     //! @p x wird als Spaltenvektor betrachtet
     const int x_val_begin = this->r_begin_active ;
-    const T * const x_val_ptr              = x.val() + x_val_begin;
+    const T * const x_val_ptr              = x.data() + x_val_begin;
 
     //! @p y wird als Zeilenvektor betrachtet
     const int y_val_begin = this->c_begin_active;
-    const T * const y_val_ptr = y.val() + y_val_begin;
+    const T * const y_val_ptr = y.data() + y_val_begin;
 
 
 
@@ -671,10 +675,10 @@ SciPAL::SubMatrixView<T, BW>::print() const
     int n_cols_2_copy = this->n_cols_active();
 
 
-    int n_el = this->n_elements_active;
+    int n_el = this->size();
     T * tmp = new T[n_el];
 
-    int lda = this->__src->array().leading_dim();
+    int lda = this->__src->leading_dim;
     int ldb = n_rows_2_copy;
     BW::GetMatrix(n_rows_2_copy, n_cols_2_copy,
                   (this->view_begin), lda,

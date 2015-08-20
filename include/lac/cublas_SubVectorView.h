@@ -73,9 +73,7 @@ namespace SciPAL {
         static const bool is_vector_view = true;
 
         VectorView(T_src & src,
-                      int r_begin, int r_end, int c);
-
-        const T * val() const;
+                      int r_begin, int r_end, int c = 0);
 
         typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
 
@@ -95,6 +93,10 @@ namespace SciPAL {
 
         int size() const { return this->n_elements_active; }
 
+        const T* data() const;
+
+        T* data();
+
         template<typename T2_src>
         VectorView & operator += (const VectorView <T, T2_src> &other);
 
@@ -105,9 +107,6 @@ namespace SciPAL {
         VectorView & operator /= (const T alpha);
         VectorView & operator /=(const std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> alpha);
 
-
-        //! Schreibzugriff f&uuml;r Matrix<T>::vmult.
-        T * val();
 
         VectorView & operator = (const VectorView<T, T_src> & other)
         {
@@ -124,7 +123,7 @@ namespace SciPAL {
             int inc_src = other.stride;
             int inc_dst = this->stride;
 
-            BW::copy(this->n_elements_active, other.val(), inc_src, this->val(), inc_dst);
+            BW::copy(this->n_elements_active, other.data(), inc_src, this->data(), inc_dst);
 
             return *this;
         }
@@ -169,7 +168,7 @@ private:
 
         int n = this->n_elements_active;
 
-        Base::BW::scal(n, scale, &(this->val()[0]), elem_dist);
+        Base::BW::scal(n, scale, &(this->data()[0]), elem_dist);
 
         return *this;
     }
@@ -181,7 +180,7 @@ private:
 
 //!        int n = this->n_elements_active;
 
-//!        Base::BW::scal(n, scale, &(this->val()[0]), elem_dist);
+//!        Base::BW::scal(n, scale, &(this->data()[0]), elem_dist);
 
 //!        return *this;
 //!    }
@@ -193,7 +192,7 @@ private:
 
         int incx = 1; //! col._stride;
         int incy = this->stride;
-        Base::BW::copy(this->n_elements_active, col.val(), incx, this->val(), incy);
+        Base::BW::copy(this->n_elements_active, col.data(), incx, this->data(), incy);
 
         return *this;
     }
@@ -276,24 +275,33 @@ template<typename T, typename T_src>
 SciPAL::VectorView<T, T_src >::VectorView(T_src & src,
                                             int r_begin, int r_end, int c)
     :
-      MyShape(src.array().val(),
-              r_begin, r_end, /*rows*/
-              c, c+1,/*cols*/
-              src.array().leading_dim()),
+      MyShape(),
     __src(&src),
     _is_col(true)
-{}
+{
+    MyShape& self = *this;
+
+    self = src;
+    self.r_begin_active = r_begin;
+    self.r_end_active = r_end;
+    self.c_begin_active = c;
+    self.c_end_active = c+1;
+    this->n_elements_active = this->n_rows_active() * this->n_cols_active();
+    this->view_begin = this->data_ptr +
+            (this->c_begin_active * this->leading_dim + this->r_begin_active);
+
+}
 
 
 
-// @sect4{Funktion: val}
+// @sect4{Funktion: data}
 //!
 //! Direkter Zugriff auf den den device-Zeiger.
 //! Zurueckgegeben wird der Zeiger auf das erste Element
 //! des betrachteten Teils eines Vektors.
 template<typename T, typename T_src>
 const T *
-SciPAL::VectorView<T, T_src>::val() const
+SciPAL::VectorView<T, T_src>::data() const
 {
     //! Indizes in C-Z&auml;hlung!!!
     return this->view_begin;
@@ -302,7 +310,7 @@ SciPAL::VectorView<T, T_src>::val() const
 
 template<typename T, typename T_src>
 T *
-SciPAL::VectorView<T, T_src>::val()
+SciPAL::VectorView<T, T_src>::data()
 {
     //! Indizes in C-Z&auml;hlung!!!
     return this->view_begin;
@@ -317,7 +325,7 @@ typename PrecisionTraits<T, T_src::blas_wrapper_type::arch>::NumberType
 SciPAL::VectorView<T, T_src>::l2_norm() const
 {
     typename PrecisionTraits<T, BW::arch>::NumberType result
-            = BW::nrm2(this->n_elements_active, this->val(), this->stride);
+            = BW::nrm2(this->size(), this->data(), this->stride);
     return result;
 }
 
@@ -338,7 +346,7 @@ SciPAL::VectorView<T, T_src>::dot(const VECTOR & other) const
     int incx = this->stride;
     int incy = other.stride;
     T result = BW::dot(this->n_elements_active,
-                       this->val(), incx, other.val(), incy);
+                       this->data(), incx, other.data(), incy);
 
     return result;
 }
@@ -362,7 +370,7 @@ SciPAL::VectorView<T, T_src> ::operator +=(const SciPAL::VectorView <T, T2_src> 
     int incx = other.stride;
     int incy = this->stride;
 
-     BW::axpy(this->n_elements_active, one(), other.val(), incx,this->val(), incy);
+     BW::axpy(this->n_elements_active, one(), other.data(), incx,this->data(), incy);
 
     return *this;
 }
@@ -384,7 +392,7 @@ SciPAL::VectorView<T, T_src> ::operator -=(const SciPAL::VectorView <T, T_src> &
     int incx = other.stride;
     int incy = this->stride;
 
-     BW::axpy(this->n_elements_active, one(false), other.val(), incx,this->val(), incy);
+     BW::axpy(this->n_elements_active, one(false), other.data(), incx,this->data(), incy);
 
     return *this;
 }
@@ -401,8 +409,8 @@ SciPAL::VectorView<T, T_src>::operator -= (const Vector<T, BW>& other)
     int incx = 1; //! col._stride;
     int incy = this->stride;
     T alpha = -1.;
-    //!BW::copy(this->n_elements_active, col.val(), incx,  this->val(), incy);
-    BW::axpy(this->n_elements_active, alpha, other.val()+ this->__view_begin, incx,this->val(), incy);
+    //!BW::copy(this->n_elements_active, col.data(), incx,  this->data(), incy);
+    BW::axpy(this->n_elements_active, alpha, other.data()+ this->__view_begin, incx,this->data(), incy);
 
     return *this;
 }
@@ -418,7 +426,7 @@ SciPAL::VectorView<T, T_src> ::operator *=(const T alpha)
 {
      int incx = this->stride;
 
-     BW::scal(this->n_elements_active, alpha, this->val(), incx);
+     BW::scal(this->n_elements_active, alpha, this->data(), incx);
 
     return *this;
 }
@@ -441,7 +449,7 @@ SciPAL::VectorView<T, T_src> ::operator /=(const T alpha)
 
      int incx = this->stride;
 
-     BW::scal(this->n_elements_active, (1/alpha), this->val(), incx);
+     BW::scal(this->n_elements_active, (1/alpha), this->data(), incx);
 
     return *this;
 }
@@ -460,7 +468,7 @@ SciPAL::VectorView<T, T_src> &
 
      int incx = this->stride;
 
-     BW::scal(this->n_elements_active, (1./alpha), this->val(), incx);
+     BW::scal(this->n_elements_active, (1./alpha), this->data(), incx);
 
     return *this;
 }
@@ -478,7 +486,7 @@ SciPAL::VectorView<T, T_src>::operator = (const Vector<T, BW>& col)
 
     int incx = 1; //! col._stride;
     int incy = this->stride;
-    BW::copy(this->n_elements_active, col.val(), incx,  this->val(), incy);
+    BW::copy(this->n_elements_active, col.data(), incx,  this->data(), incy);
 
     return *this;
 }
@@ -490,7 +498,7 @@ SciPAL::VectorView<T, T_src>::operator = (const std::vector<std::complex<T2> > &
 
 dst.resize(this->size());
 
-const T * const src_ptr = this->val();
+const T * const src_ptr = this->data();
 T * dst_ptr = &dst[0];
 
 static int inc_src = 1;
@@ -515,7 +523,7 @@ SciPAL::VectorView<T, T_src>::print() const
     int inc_dst = 1;
 
     T * tmp_ptr = &tmp[0];
-    BW::GetVector(this->n_elements_active, this->val(), inc_src, tmp_ptr, inc_dst);
+    BW::GetVector(this->n_elements_active, this->data(), inc_src, tmp_ptr, inc_dst);
 
     if (this->_is_col)
         for (int i = 0; i < this->n_elements_active; ++i)

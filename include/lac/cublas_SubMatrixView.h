@@ -269,10 +269,11 @@ SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
                                             int r_begin, int r_end,
                                             int c_begin, int c_end)
     :
-      MyShape(),
+      MyShape(src.shape(),
+              r_begin, r_end,
+              c_begin, c_end),
       __src(&src)
 {
-    *this = src;
     //! Pruefe im DEBUG-Modus Zulaessigkeit der Indexgrenzen.
     Assert ((r_begin >= 0) && (r_begin < src.n_rows()),
             dealii::ExcIndexRange (r_begin, 0, src.n_rows()));

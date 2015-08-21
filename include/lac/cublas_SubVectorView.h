@@ -82,7 +82,7 @@ namespace SciPAL {
 
         void print() const;
 
-        SubVectorView<T, T_src> & operator = (const Vector<T, BW>& col);
+//        SubVectorView<T, T_src> & operator = (const Vector<T, BW>& col);
 
         template <typename T2>
                 SubVectorView<T, T_src> & operator = (const std::vector<std::complex<T2> > & other);
@@ -107,23 +107,21 @@ namespace SciPAL {
         SubVectorView & operator /= (const T alpha);
         SubVectorView & operator /=(const std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> alpha);
 
-
-        SubVectorView & operator = (const SubVectorView<T, T_src> & other)
+        //! Copy the elements of other to this. This changes the elements of the
+        //! source object of this.
+        template <typename T_src2>
+        SubVectorView & operator = (const SubVectorView<T, T_src2> & other)
         {
-//!            this->__src = other.__src;
-//!            this->__r_begin = other.__r_begin;
-//!            this->__col     = other.__col;
-            Assert(this->n_elements_active    == other.__n_el,
+            Assert(this->n_elements_active == other.n_elements_active,
                    dealii::ExcMessage("Cannot copy subarrays of different lengths"));
-//!            this->__view_begin = other.__view_begin;
-//!            this->_is_col   = other._is_col;
-//!            this->stride   = other.stride;
+
 
             //! Elementweise Kopie des arrays.
             int inc_src = other.stride;
             int inc_dst = this->stride;
 
-            BW::copy(this->n_elements_active, other.data(), inc_src, this->data(), inc_dst);
+            BW::copy(this->n_elements_active, other.data(), inc_src,
+                     this->data(), inc_dst);
 
             return *this;
         }
@@ -185,29 +183,19 @@ private:
 //!        return *this;
 //!    }
 
-    ColVectorView<T, T_src> & operator = (const Vector<T, typename Base::BW>& col)
-    {
-        Assert(this->n_elements_active == col.size(),
-               dealii::ExcMessage("Dimension mismatch"));
+//    ColVectorView<T, T_src> & operator = (const Vector<T, typename Base::BW>& col)
+//    {
+//        Assert(this->n_elements_active == col.size(),
+//               dealii::ExcMessage("Dimension mismatch"));
 
-        int incx = 1; //! col._stride;
-        int incy = this->stride;
-        Base::BW::copy(this->n_elements_active, col.data(), incx, this->data(), incy);
+//        int incx = 1; //! col._stride;
+//        int incy = this->stride;
+//        Base::BW::copy(this->n_elements_active, col.data(), incx, this->data(), incy);
 
-        return *this;
-    }
+//        return *this;
+//    }
 
-    //! TO DO:
-    /*
-    template<typename X>
-    ColVectorView<T, T_src> & operator = (const X & x)
-    {
 
-        x.apply(*this);
-
-        return *this;
-    }
-*/
     template<typename T2_src>
     ColVectorView<T, T_src> & operator += (const ColVectorView<T, T2_src> &other)
     {
@@ -226,11 +214,12 @@ private:
                               this->MyShape::leading_dim, 1);
     }
 
-
-    ColVectorView & operator = (const ColVectorView<T, T_src> & other)
+    template<typename T_src2>
+    ColVectorView & operator = (const ColVectorView<T, T_src2> & other)
     {
         Base & self = *this;
-        const Base & src = other;
+        typedef typename ColVectorView<T, T_src2>::Base Base2;
+        const Base2 &src = other;
         self = src;
 
         return *this;
@@ -275,23 +264,12 @@ template<typename T, typename T_src>
 SciPAL::SubVectorView<T, T_src >::SubVectorView(T_src & src,
                                             int r_begin, int r_end, int c)
     :
-      MyShape(),
+      MyShape(src.shape(),
+              r_begin, r_end,
+              c, c+1),
     __src(&src),
     _is_col(true)
-{
-    MyShape& self = *this;
-
-    self = src;
-    self.r_begin_active = r_begin;
-    self.r_end_active = r_end;
-    self.c_begin_active = c;
-    self.c_end_active = c+1;
-    this->n_elements_active = this->n_rows_active() * this->n_cols_active();
-    this->view_begin = this->data_ptr +
-            (this->c_begin_active * this->leading_dim + this->r_begin_active);
-
-}
-
+{}
 
 
 // @sect4{Funktion: data}
@@ -477,19 +455,20 @@ SciPAL::SubVectorView<T, T_src> &
 //!
 //! &Uuml;berladener Operator, bei dem ein Vektor mit einem zweiten Vektor gleichgesetzt wird
 //! @param col: Vektor, dessen Werte gleichgesetzt werden
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src>::operator = (const Vector<T, BW>& col)
-{
-    Assert(this->n_elements_active == col.size(),
-           dealii::ExcMessage("Dimension mismatch"));
+//template<typename T, typename T_src>
+//SciPAL::SubVectorView<T, T_src> &
+//SciPAL::SubVectorView<T, T_src>::operator = (const Vector<T, BW>& col)
+//{
+//    Assert(this->n_elements_active == col.size(),
+//           dealii::ExcMessage("Dimension mismatch"));
 
-    int incx = 1; //! col._stride;
-    int incy = this->stride;
-    BW::copy(this->n_elements_active, col.data(), incx,  this->data(), incy);
+//    int incx = 1; //! col._stride;
+//    int incy = this->stride;
+//    BW::copy(this->n_elements_active, col.data(), incx,  this->data(), incy);
 
-    return *this;
-}
+//    return *this;
+//}
+
 template<typename T, typename T_src>
 template <typename T2>
 SciPAL::SubVectorView<T, T_src> &

@@ -1,0 +1,68 @@
+<h1>Introduction</h1>
+<p> 
+This example program demonstrates the different features of the BLAS wrappers
+which are to be used in our CUDA Lab course using a performance evaluation of
+the QR-factorization as example.
+</p>
+<p>
+The main purpose of the wrappers is to hide BLAS' API
+behind some composition closure objects and expression templates operating on some taylor-made matrix and
+vector classes so that, for instance, matrix-vector multiplications can be
+written in an operator-based form.
+</p>
+<p>
+BLAS itself is a proposal for a standard API for basic linear algebra operations
+and started around 1979. In contrast to programming languages like C, C++ or
+FORTRAN there has never been published an official standard.
+<p>
+</p>
+The BLAS API basically groups operations according to their run-time complexity
+into three levels (vector-vector, matrix-vector and matrix-matrix operations)
+and requires a separate implementation for each precision.
+<ul>
+    <li>
+        <i>Level 1 :</i> vector-vector operations like
+        \f{eqnarray*}
+            y & = & \alpha x + y\,, \\
+            \alpha & = & x \cdot y \,,
+        \f}
+        where $\alpha$ is a floating point number and $x$, $y$ are vectors.
+    </li>
+    <li>
+        <i>Level 2 :</i> matrix-vector operations like
+        \f{eqnarray*}
+            y = \alpha A x + \beta y
+        \f}
+        where $A$ is a matrix, $\alpha$, $\beta$ are numbers and $x$, $y$ are
+        vectors.
+    </li>
+    <li> <i>Level 3 :</i> matrix-matrix operations, most notably the ubiquitous
+    generalized matrix-matrix product
+        \f{eqnarray*}
+            C = \alpha A \cdot B + \beta C
+        \f}
+        where $A$, $B$, $C$ are matrices and $\alpha$, $\beta$ are numbers.
+    </li>
+</ul>
+The precision dependency of the function names can be eliminated by
+C++' polymorphism. For efficiently overloading operators we employ a technique
+called <i>expression templates</i> which employs so-called <i>closure objects</i>
+(cf. Stroustroup) for avoiding unnecessary temporary objects.
+</p>
+<p>
+It is commonly accepted, that object-oriented programming (OOP) can drastically
+increase the reusability of solutions of non-trivial subproblems
+of simulating complex models.
+Due to the ever growing size and complexity of scientific applications it becomes
+more and more challenging to ensure software quality, robustness and performance.
+</p>
+<p>
+Although QR-factorization itself is not really a <i>complex scientific application</i>
+it is a well-suited example for demonstrating how C++' OOP and template
+metaprogramming capabilities allow for converting a textbook-style description
+of an algorithm in an efficient implementation with only a few lines of code.
+The key point is, that numerical work is delegated to a highly optimized FORTRAN,
+C or Assembly implementation of the time-critical parts, i.e. the BLAS routines,
+while OO techniques are used to provide a high-level mathematical description of
+the algorithm.
+</p> 

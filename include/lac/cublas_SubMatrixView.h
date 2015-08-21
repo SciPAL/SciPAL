@@ -218,7 +218,7 @@ void SciPAL::SubMatrixView<T, BW>::reset(size_t new_r_begin, size_t new_r_end,
     AssertThrow(new_c_end <= __src->n_cols(), dealii::ExcMessage("View out of matrix bounds."));
 #endif
 
-    this->MyShape::reinit(new_r_begin, new_r_end,
+    this->MyShape::reinit_attr(new_r_begin, new_r_end,
                           new_c_begin, new_c_end, 1);
 }
 
@@ -365,18 +365,15 @@ SciPAL::SubMatrixView<T, BW>::operator = (const Matrix<T, BW>& col)
 template<typename T, typename BW>
 template<typename X>
 SciPAL::SubMatrixView<T, BW> &
-SciPAL::SubMatrixView<T, BW>::operator = (const SciPAL::Expr<X> &expr)
+SciPAL::SubMatrixView<T, BW>::operator = (const SciPAL::Expr<X> &e)
 {
-
-    SciPAL::LAOOperations::apply(*this,  ~expr);
+#ifdef DEBUG
+    std::cout << "line :" << __LINE__ << ", SubMatrixView<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
+    SciPAL::LAOOperations::apply(*this,  ~e);
     return *this;
 }
-
-
-
-
-
-
 
 
 // @sect4{Operator: +=}

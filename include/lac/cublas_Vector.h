@@ -548,7 +548,8 @@ SciPAL::Vector<T, BW> & SciPAL::Vector<T, BW>::operator =
 (const SciPAL::Expr<X> & e)
 {
 #ifdef DEBUG
-    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
 #endif
 
     SciPAL::LAOOperations::apply(*this, ~e);

@@ -187,12 +187,12 @@ static void apply(Vector<T, BW> &result,
              A.n_rows(), // m
              A.n_cols(), // n
              alpha,
-             A.data_ptr,
+             A.data(),
              A.n_rows(), // lda
-             x.data_ptr,
+             x.data(),
              1, // incx
              beta,
-             dst.data_ptr, // y
+             dst.data(), // y
              1 // incy
              );
 }
@@ -223,12 +223,12 @@ static void apply(Vector<T, BW> &result,
              A.n_rows(), // m
              A.n_cols(), // n
              alpha,
-             A.data_ptr,
+             A.data(),
              A.n_rows(), // lda
-             x.data_ptr,
+             x.data(),
              1, // incx
              beta,
-             dst.data_ptr, // y
+             dst.data(), // y
              1 // incy
              );
 }
@@ -260,12 +260,12 @@ static void apply(Vector<T, BW> &result,
              A.n_rows(), // m
              A.n_cols(), // n
              alpha,
-             A.data_ptr,
+             A.data(),
              A.n_rows(), // lda
-             x.data_ptr,
+             x.data(),
              1, // incx
              beta,
-             dst.data_ptr, // y
+             dst.data(), // y
              1 // incy
              );
 }
@@ -297,12 +297,12 @@ static void apply(Vector<T, BW> &result,
              A.n_rows(), // m
              A.n_cols(), // n
              alpha,
-             A.data_ptr,
+             A.data(),
              A.leading_dim(), // lda
-             x.data_ptr,
+             x.data(),
              1, // incx
              beta,
-             dst.data_ptr, // y
+             dst.data(), // y
              1 // incy
              );
 }
@@ -333,12 +333,12 @@ static void apply(Vector<T, BW> &result,
              A.n_rows(), // m
              A.n_cols(), // n
              alpha,
-             A.data_ptr,
+             A.data(),
              A.leading_dim(), // lda
-             x.data_ptr,
+             x.data(),
              1, // incx
              beta,
-             dst.data_ptr, // y
+             dst.data(), // y
              1 // incy
              );
 }

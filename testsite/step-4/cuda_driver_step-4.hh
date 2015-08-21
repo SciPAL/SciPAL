@@ -123,7 +123,6 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
     Vector k(n_rows);
 
     SubMatrix A_rest(R_d, 0, 0);
-//    SciPAL::transpose<SubMatrix> A_rest_T (A_rest);
 
     SubMatrix Q_0c(Q_d, 0, 0);
 
@@ -162,7 +161,7 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
 
             sigma    = beta_t/alpha;
 
-            view_u = sub_col_A;   // std::cout << "u :\n"; u.print();
+            view_u = sub_col_A;   // FIX ME
 
             u.add(c, alpha); // std::cout << "u("<<c<<") + alpha :\n"; u.print();
 
@@ -179,7 +178,7 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // & = & A -  u (\sigma A^Tu)^T \,. \\
         //\f}
         // To do this, we define $x := A^Tu$
-        x = transpose(A_rest) * u;
+        x = transpose(A_rest) * u; //FIX ME
 
         // and take into account $\sigma$ in the outer product
         // which due to the use of SubMatrixViews is executed only on

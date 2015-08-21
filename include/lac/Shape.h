@@ -137,6 +137,10 @@ public:
         this->n_elements_active = this->size();
 
          this->stride = stride;
+
+        //don't remove this, even if it looks as if it's done twice...
+        this->view_begin = this->data_ptr +
+                (this->c_begin_active * this->leading_dim + this->r_begin_active);
      }
 
     //! Reset the shape data. This function typically gets called in the constructors
@@ -181,12 +185,12 @@ public:
     //! Return ptr to data
     T* data()
     {
-        return this->data_ptr;
+        return this->view_begin;
     }
 
     T* data() const
     {
-        return this->data_ptr;
+        return this->view_begin;
     }
 
     //! Copy constructor. The new object points to the same LAO as @p other.

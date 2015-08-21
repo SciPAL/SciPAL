@@ -347,7 +347,10 @@ SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator =
 //(const typename ::SciPAL::BlasMatExp<T, BW>::sMMaM& e)
 (const ::SciPAL::Expr<X> & e)
 {
-
+#ifdef DEBUG
+    std::cout << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
     ::SciPAL::LAOOperations::apply(*this, ~e);
 
     return *this;

@@ -125,7 +125,23 @@ namespace SciPAL {
 
             return *this;
         }
-private:
+
+        // @sect4{Operator: =}
+        //! Applies expressions to view
+        //!
+        template<typename X>
+        SciPAL::SubVectorView<T, BW> & operator = (const SciPAL::Expr<X> &e)
+        {
+        #ifdef DEBUG
+            std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
+            print_expr_info(__PRETTY_FUNCTION__);
+        #endif
+
+            SciPAL::LAOOperations::apply(*this,  ~e);
+            return *this;
+        }
+
+    private:
         SubVectorView() {}
 
         SubVectorView(const SubVectorView<T, T_src> & ) {}

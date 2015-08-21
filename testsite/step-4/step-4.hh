@@ -439,8 +439,6 @@ public:
 
     typedef typename blas_pp<T, blas>::Matrix       Matrix;
 
-//    typedef          SciPAL::transpose<Matrix>              tr;
-
     typedef typename blas_pp<T, blas>::SubMatrix    SubMatrix;
 
     typedef typename blas_pp<T, blas>::MatrixSubCol MatrixSubCol;
@@ -661,7 +659,7 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
 
 
     Matrix QtQ;
-    QtQ = transpose(QRf.Q()) * Q_tmp;
+    QtQ = transpose(QRf.Q()) * Q_tmp; //FIX ME
 
     // Compute deviations due to factorization
     Matrix  A_m_QR;

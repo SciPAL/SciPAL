@@ -91,8 +91,6 @@ namespace SciPAL {
                                                       const T A_tt, const VecView & entries2kill)
         {
 
-        typedef typename VecView::BW BW;
-
     #ifdef HOUSEHOLDER_DEBUG
         std::cout << "\nZu eliminierende Eintraege :" << std::endl; entries2kill.print();
     #endif

@@ -51,7 +51,7 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
 #else
     int threads_per_block = 1024;
 #endif
-    int size = d_dst.size();
+    int size = d_dst.n_elements_active;
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
     __apply<T, X><<<blocks, threads_per_block>>>(d_dst.data_ptr, Ax, size);
@@ -70,7 +70,7 @@ ImplOpenMP<T>::apply(SciPAL::ShapeData<T> &d_dst,
                   const SciPAL::DevUnaryExpr<X, op> &Ax)
 {
     #pragma omp parallel for
-    for(int i = 0; i < d_dst.size() ; i++)
+    for(int i = 0; i < d_dst.n_elements_active ; i++)
      __apply_element<T, X, op>(d_dst.data_ptr, Ax, i);
 }
 /////////////////////////////////////////
@@ -122,7 +122,7 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
     int threads_per_block = 1024;
 #endif
 
-    int size = d_dst.size();
+    int size = d_dst.n_elements_active;
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
     __apply<T, L, op, R><<<blocks, threads_per_block>>>

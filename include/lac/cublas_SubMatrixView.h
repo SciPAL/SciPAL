@@ -246,8 +246,9 @@ template<typename T, typename BW>
 SciPAL::SubMatrixView<T, BW>::SubMatrixView(Matrix<T, BW> & src,
                                             int r_begin, int c_begin)
     :
-      MyShape(r_begin, src.n_rows(), /*active rows*/
-              c_begin, src.n_cols() /*active cols*/),
+      MyShape(src.shape(),
+              r_begin, src.n_rows(),
+              c_begin, src.n_cols()),
       __src(&src)
 {
     Assert ((r_begin >= 0) && (r_begin < src.n_rows()),
@@ -367,31 +368,6 @@ SciPAL::SubMatrixView<T, BW>::operator = (const SciPAL::Expr<X> &expr)
 {
 
     SciPAL::LAOOperations::apply(*this,  ~expr);
-
-    // OLD IMPL:
-    //    const T * A = &(AB.l.__src->val()[AB.l.__view_begin]) ;
-    //    const T * B = &(AB.r.__src->val()[AB.r.__view_begin]) ;
-    //    T * C = &(this->__src->val()[this->__view_begin]) ;
-
-    //    T alpha = +1;
-    //    T beta  = 0.;
-
-    //    int lda = AB.l.leading_dim;
-    //    int ldb = AB.r.leading_dim;
-    //    int ldc = this->leading_dim;
-
-    //    int m = AB.l.__r_end - AB.l.__r_begin ;
-    //    int n = AB.r.__c_end - AB.r.this->c_begin_active ;
-    //    int k = AB.l.__c_end - AB.l.this->c_begin_active ;
-
-    //    BW::gemm('n', 'n',
-    //             m, n, k,
-    //             alpha,
-    //             A, lda,
-    //             B, ldb,
-    //             beta,
-    //             C, ldc);
-
     return *this;
 }
 
@@ -664,7 +640,7 @@ SciPAL::SubMatrixView<T, BW>::add_scaled_outer_product(T alpha,
 
 
 
-// @sect4{Funktion: VectorView::print}
+// @sect4{Funktion: SubVectorView::print}
 //!
 template<typename T, typename BW>
 void

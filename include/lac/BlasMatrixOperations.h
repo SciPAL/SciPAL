@@ -43,7 +43,7 @@ struct BlasMatExp/*MatrixExpressions*/
     //    typedef ::SciPAL::Shape<T, vector> Vtr;
 
     typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
-    typedef ::SciPAL::VectorView<T, BW> SVtr;
+    typedef ::SciPAL::SubVectorView<T, BW> SVtr;
 
     typedef Literal<T, BW> Lit;
 

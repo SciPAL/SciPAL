@@ -63,7 +63,7 @@ class Vector
 
     friend class SciPAL::SubMatrixView<T, BW>;
 
-    template<typename, typename> friend class VectorView;
+    template<typename, typename> friend class SubVectorView;
 
     template<typename, typename> friend class ColVectorView;
 
@@ -176,7 +176,7 @@ public:
     Vector<T, BW> & operator = (const T value);
 
     template<typename T_src>
-    Vector<T, BW> & operator = (const VectorView<T, T_src > & other);
+    Vector<T, BW> & operator = (const SubVectorView<T, T_src > & other);
 
     template<typename T_src>
     Vector<T, BW> & operator = (const dealii::Vector<T_src> & other);
@@ -188,14 +188,14 @@ public:
     Vector<T, BW> & operator += (const Vector<T, BW> & other);
 
     template<typename T_src>
-    Vector<T, BW> & operator += (const VectorView<T, T_src > & other);
+    Vector<T, BW> & operator += (const SubVectorView<T, T_src > & other);
 
     Vector<T, BW> & operator += (const T scalar);
 
     Vector<T, BW> & operator -= (const Vector<T, BW> & other);
 
     template<typename T_src>
-    Vector<T, BW> & operator -= (const VectorView<T, T_src > & other);
+    Vector<T, BW> & operator -= (const SubVectorView<T, T_src > & other);
 
     template<typename T2>
     Vector<T, BW> & operator *= (const T2 scale);
@@ -598,14 +598,14 @@ SciPAL::Vector<T, BW>::push_to(dealii::Vector<T2> & dst) const
 //!
 //! Elementweise Kopie eines Vektors. Das Ziel wird bei Bedarf
 //! in der Groesse der Quelle angepassst.
-//! @param other : rechte Seite des = ist ein VectorView
+//! @param other : rechte Seite des = ist ein SubVectorView
 //! Beim Kopieren wird das Koordinatensystem des Views uebernommen,
 //! d.h. Beginn und Ende des Views bestimmen den Bereich in den kopiert wird.
 //! Siehe Berechnung der Householder-Vektoren im QR-Beispiel.
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const VectorView<T, T_src > & other)
+SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, T_src > & other)
 {
     this->reinit(other.n_elements_active);
 
@@ -681,13 +681,13 @@ SciPAL::Vector<T, BW>::operator += (const Vector<T, BW> & other)
 
 // @sect4{Operator: +=}
 //!
-//! Addiert VectorView zu Vector
-//! @param other : rechte Seite des += ist ein VectorView
+//! Addiert SubVectorView zu Vector
+//! @param other : rechte Seite des += ist ein SubVectorView
 
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator += (const VectorView<T, T_src > & other)
+SciPAL::Vector<T, BW>::operator += (const SubVectorView<T, T_src > & other)
 {
 
     One<T> one;
@@ -702,8 +702,8 @@ SciPAL::Vector<T, BW>::operator += (const VectorView<T, T_src > & other)
 
 // @sect4{Operator: +=}
 //!
-//! Addiert VectorView zu Vector
-//! @param other : rechte Seite des += ist ein VectorView
+//! Addiert SubVectorView zu Vector
+//! @param other : rechte Seite des += ist ein SubVectorView
 
 template<typename T, typename BW>
 SciPAL::Vector<T, BW> &
@@ -760,13 +760,13 @@ SciPAL::Vector<T, BW>::operator -= (const Vector<T, BW> & other)
 
 // @sect4{Operator: -=}
 //!
-//! Subtrahiert einen VectorView von einem Vector
-//! @param other : VectorView, der subtrahiert werden soll
+//! Subtrahiert einen SubVectorView von einem Vector
+//! @param other : SubVectorView, der subtrahiert werden soll
 
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator -= (const VectorView<T, T_src > & other)
+SciPAL::Vector<T, BW>::operator -= (const SubVectorView<T, T_src > & other)
 {
     Assert(this->size() >= other.size(),
            dealii::ExcMessage("Dimension mismatch") );

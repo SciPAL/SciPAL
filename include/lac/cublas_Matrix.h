@@ -69,7 +69,7 @@ class Matrix
 
     friend class Vector<T, BW>;
 
-    friend class VectorView<T, Matrix<T, BW> >;
+    friend class SubVectorView<T, Matrix<T, BW> >;
 
     friend class SubMatrixView<T, BW>;
 

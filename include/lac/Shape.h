@@ -64,6 +64,27 @@ public:
     //! @param n_cols : number of columns. If this is set to 1 you get a column vector.
     //! @param stride : If this value is, e.g., 3, then only every 3rd element of the original data array gets accessed.
     //! @param leading_dim : the length of a column in memory. This value can be used to optimize memory access of CUDA warps. We assume column-major storage in order to be compatible with CUBLAS.
+    template<LAOType LT2>
+    Shape(const Shape<T, BW, LT2>& other,
+          size_t  r_begin_active,
+          size_t  r_end_active,
+          size_t  c_begin_active,
+          size_t  c_end_active,
+          size_t  stride = 1)
+    {
+        this->reinit_attr(r_begin_active,
+                          r_end_active,
+                          c_begin_active,
+                          c_end_active,
+                          stride);
+
+        this->data_ptr = other.data();
+        this->leading_dim = other.leading_dim;
+
+        this->view_begin = this->data_ptr +
+                (this->c_begin_active * this->leading_dim + this->r_begin_active);
+    }
+
     Shape(size_t  r_begin_active,
           size_t  r_end_active,
           size_t  c_begin_active,
@@ -74,7 +95,6 @@ public:
                      c_begin_active, c_end_active,
                      stride);
     }
-
 
     //! By assigning one shape to another we get two shapes looking at the same LAO.
     //! @param other: source shape to copy.
@@ -101,6 +121,24 @@ public:
         return *this;
     }
 
+    void  reinit_attr(size_t  r_begin_active,
+                      size_t  r_end_active,
+                      size_t  c_begin_active,
+                      size_t  c_end_active,
+                      size_t  stride)
+     {
+         this->r_begin_active = r_begin_active;
+         this->r_end_active = r_end_active;
+         this->c_begin_active = c_begin_active;
+         this->c_end_active = c_end_active;
+         this->n_rows = this->n_rows_active();
+         this->n_cols = this->n_cols_active();
+
+        this->n_elements_active = this->size();
+
+         this->stride = stride;
+     }
+
     //! Reset the shape data. This function typically gets called in the constructors
     //! and reinit() functions of the Matrix and Vector classes.
     void reinit(size_t  r_begin_active,
@@ -109,24 +147,35 @@ public:
                 size_t  c_end_active,
                 size_t  stride)
     {
-        this->r_begin_active = r_begin_active;
-        this->r_end_active = r_end_active;
-        this->c_begin_active = c_begin_active;
-        this->c_end_active = c_end_active;
-        this->n_rows = this->n_rows_active();
-        this->n_cols = this->n_cols_active();
         //first get sizes than allocate memory
-        storage.reinit(this->n_rows, this->n_cols);
+        storage.reinit(r_end_active-r_begin_active, c_end_active-c_begin_active);
+
+        this->reinit_attr( r_begin_active,
+                           r_end_active,
+                           c_begin_active,
+                           c_end_active,
+                           stride);
 
         this->data_ptr = storage.val();
         this->leading_dim = storage.leading_dim();
 
         this->view_begin = this->data_ptr +
                 (this->c_begin_active * this->leading_dim + this->r_begin_active);
+    }
 
-        this->n_elements_active = this->size();
+    //! The following functions er used to access attributes of ShapeData
+    //! Returns active rows
+    size_t n_rows_active() const {
+        return this->r_end_active - this->r_begin_active;
+    }
 
-        this->stride = stride;
+    //! Returns active columns
+    size_t n_cols_active() const {
+        return this->c_end_active - this->c_begin_active;
+    }
+
+    size_t size() const {
+        return n_rows_active() * n_cols_active();
     }
 
     //! Return ptr to data
@@ -155,13 +204,21 @@ protected:
     void swap(Shape& other)
     {
         std::swap(this->data_ptr, other.data_ptr);
+        std::swap(this->view_begin, other.view_begin);
 
         std::swap(this->n_rows, other.n_rows);
+        std::swap(this->r_begin_active, other.r_begin_active);
+        std::swap(this->r_end_active, other.r_end_active);
         std::swap(this->n_cols, other.n_cols);
+        std::swap(this->c_begin_active, other.c_begin_active);
+        std::swap(this->c_end_active, other.c_end_active);
+        std::swap(this->n_elements_active, other.n_elements_active);
 
         std::swap(this->leading_dim, other.leading_dim);
         std::swap(this->stride, other.stride);
     }
+
+//    void swap_memory
 
 
 private:

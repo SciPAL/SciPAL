@@ -165,11 +165,11 @@ operator - (const Expr<T1> &e1, const Expr<T2> &e2)
 }
 
 //for the case that we want to multiply a real-valued literal with a complex LAO
-template <typename T, typename BW, template <typename, typename> class LAO >
+template <typename T, typename BW, template <typename, typename> class LAO>
 inline
 const BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >
 operator *(const typename PrecisionTraits<T, BW::arch>::NumberType e1,
-           const  LAO<T, BW>& e2)
+           const  LAO<typename SciPAL::CudaComplex<typename PrecisionTraits<T, BW::arch>::NumberType>, BW>& e2)
 {
     return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
 }

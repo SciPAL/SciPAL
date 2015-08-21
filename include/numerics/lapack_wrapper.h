@@ -8,6 +8,7 @@
 #include <string>
 
 //BASE includes
+#include <base/VTraits.h>
 #include <base/ParallelArch.h>
 #include <base/ArchTraits.h>
 

@@ -104,18 +104,6 @@ private:
     //! das sie zeigen vorzeitig zerstoert wird.
     dealii::SmartPointer<Matrix<T, BW> >__src;
 
-    //        int __r_begin;
-    //        int this->c_begin_active;
-
-    //            //! Past-the-end-Indizes
-    //        int __r_end;
-    //        int __c_end;
-
-
-    //        int __n_el;
-    //        int __view_begin;
-    //		  int leading_dim;
-
 public:
     // @sect4{Inline Funktionen: SubMatrixView}
     //!

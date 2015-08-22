@@ -196,10 +196,10 @@ static void apply(::SciPAL::Matrix<T, BW> // IDEA:, ms>
 }
 
 
-template <typename T, typename BW> // IDEA:, MatrixStorage ms>
-static void apply(::SciPAL::SubMatrixView<T, BW> // IDEA:, ms>
+template <typename T, typename BW>
+static void apply(::SciPAL::SubMatrixView<T, BW>
                   &result,
-                  const typename BlasMatExp<T, BW> // IDEA:, ms>
+                  const typename BlasMatExp<T, BW>
                   ::SMmSM& expr)
 {
     typedef typename BlasMatExp<T, BW>::SMtx SMtx;
@@ -207,22 +207,25 @@ static void apply(::SciPAL::SubMatrixView<T, BW> // IDEA:, ms>
     const SMtx& B = expr.r;
 
     int lda = A.leading_dim();
-    int ldb = B.leading_dim(); /* == this->n_cols() !!! */ //! src == B
+    int ldb = B.leading_dim(); //! src == B
     int ldc = result.leading_dim(); //! dst == C
+    T alpha = (1.0);
+    T beta = T(0.0);
 
     BW::gemm('n',
              'n',
-             A.n_cols(),
+             A.n_rows(), /*test for transpose...*/
              /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
              B.n_cols(),
              /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
              A.n_cols(),
              /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
-             0,
-             A.data_ptr, lda,
-             B.data_ptr, ldb,
-             0,
-             result.data_ptr, ldc);
+             alpha,
+             A.data(), lda,
+             B.data(), ldb,
+             beta,
+             result.data(), ldc);
+
 }
 
 
@@ -325,9 +328,9 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     BW::dgmm(CUBLAS_SIDE_LEFT,
              A.n_rows(), A.n_cols(),
-             A.data_ptr, A.leading_dim,
-             diag.data_ptr, 1,
-             C.data_ptr, C.leading_dim);
+             A.data(), A.leading_dim(),
+             diag.data(), 1,
+             C.data(), C.leading_dim());
 }
 
 
@@ -348,9 +351,9 @@ static void apply(::SciPAL::Matrix<T, BW> &result,
 
     BW::dgmm(CUBLAS_SIDE_RIGHT,
              A.n_rows(), A.n_cols(),
-             A.data_ptr, A.leading_dim,
-             diag.data_ptr, 1,
-             C.data_ptr, C.leading_dim);
+             A.data(), A.leading_dim(),
+             diag.data(), 1,
+             C.data(), C.leading_dim());
 }
 
 

@@ -78,7 +78,8 @@ void step42::CUDADriver::gemm_tests()
     SciPAL::Matrix<Number, BW>
             A(n_rows, n_cols, a),
             B(n_cols, n_rows, b),
-            C(n_rows, n_rows, c);
+            C(n_rows, n_rows, c),
+            D(n_rows, n_rows, c);
 
     Number alpha = 1.1;
     Number beta = 2.;
@@ -107,6 +108,11 @@ void step42::CUDADriver::gemm_tests()
     std::cout << " ============ C = B * A ======" << std::endl;
     C = B * A;   std::cout << "C : " << std::endl; C.print();
 
+    std::cout << " ============ C = A^T * D ======" << std::endl;
+    std::cout << "D : " << std::endl;
+    D.print();
+    C = transpose(A) * (D);   std::cout << "C : " << std::endl; C.print();
+
     std::cout << " ============ C = alpha * A * B ======" << std::endl;
     C = alpha * A * B; std::cout << "C : " << std::endl; C.print();
 
@@ -116,11 +122,11 @@ void step42::CUDADriver::gemm_tests()
     c.clear();
     c.resize(n_rows * n_rows, 1.);
     SciPAL::Matrix<Number, BW>
-            D(n_rows, n_rows, c);
+            E(n_rows, n_rows, c);
 
 
 
-    C = D;
+    C = E;
     std::cout << "C : " << std::endl; C.print();
     C = alpha * A * B + // beta *
             C; std::cout << "C : " << std::endl; C.print();
@@ -570,6 +576,26 @@ void step42::CUDADriver::feature_demonstration()
         std::cout<<"back on host\n M5=M4:"<<std::endl;
         M5 = M4;
         M5.print();
+
+        std::cout<<"\n\n==========Test shallow copies real type\n\n"<<std::endl;
+        SciPAL::Matrix<Number, cublas> M6(M4);
+        /* stepping through with the debugger shows that only shapedata
+         * information are copied, destruction did not cause segfault.
+         * Explanation:
+         * In the construction via the Shape, the default constructor of Shape
+         * is called, which also calls the default ctor of Array, thus the ptr in
+         * the storage attribute of the Shape is set to a null_ptr. The next
+         * function that is called is operator= of ShapeData. This operator sets
+         * all attributes from the M4 ShapeData to M6's ShapeData, but does not
+         * change M6's storage ptr. Thus we have a mismatch of M6's ptrs in
+         *  storage and ShapeData.
+         *
+        */
+        std::cout<<"Other Matrix on GPU\n M6(M4):"<<std::endl;
+        M6.print();
+
+
+
     }
     {//complex
     std::cout<<"=====Test arbitrary copy directions complex type====="<<std::endl;
@@ -691,33 +717,47 @@ void step42::CUDADriver::views(){
     const unsigned int n_elements = n_rows * n_cols;
 
     std::vector<Number>
-            a(n_elements, 1.),
+            a(n_rows, 1.),
             b(n_elements, 2.),
             c(n_rows * n_rows, 1.23);
 
     for (unsigned int i = 0; i < b.size(); i++ )
-        b[i] = i+1;
+    { b[i] = i+1;}
+    std::iota(a.begin(), a.end(), 1);
 
 
     SciPAL::Matrix<Number, BW>
             A(n_rows, n_cols, b),
             B(n_cols, n_rows, b),
-            C(2, 4, c);
+            C(2, 4);
 
     SciPAL::SubMatrixView<Number, BW> SV_A(A, 0,2,0,4);
     SciPAL::SubMatrixView<Number, BW> SV_B(B, 0,4,0,4);
     SciPAL::SubMatrixView<Number, BW> SV_C(C, 0,2,0,4);
 
+
+    std::cout << "SubMatrix SV_A "<<std::endl;
+    SV_A.print();
+
+    std::cout << "SubMatrix SV_B "<<std::endl;
+    SV_B.print();
+
     SV_C = SV_A * SV_B;
 
-    std::cout << "Matrix A "<<std::endl;
-    A.print();
-
-    std::cout << "Matrix b "<<std::endl;
-    B.print();
-
-    std::cout << "C = A*B "<<std::endl;
+    std::cout << "C = SV_A*SV_B "<<std::endl;
     C.print();
+
+    std::cout<<"gemv test for Views"<<std::endl;
+
+    SciPAL::Vector<Number, BW> V_A(a);
+    SciPAL::Vector<Number, BW> x(n_rows);
+    std::cout << "Vector A "<<std::endl;
+    V_A.print();
+    x = transpose(SV_B) * V_A;
+    std::cout << "Vector x = transpose(SV_B) * V_A "<<std::endl;
+    x.print();
+
+
 
 }
 

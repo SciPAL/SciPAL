@@ -121,7 +121,8 @@ HEADERS += \
     cuda_kernel_wrapper_step-4.cu.h \
     cuda_kernel_step-4.cu.c \
     SimParams.h \
-    autoInstantiations.h
+    autoInstantiations.h\
+    step-4.hh
 
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator

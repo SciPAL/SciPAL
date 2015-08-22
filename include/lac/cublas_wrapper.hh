@@ -1092,9 +1092,13 @@ public:
         if(transb=='C' || transb=='c')
             transactionB = CUBLAS_OP_C;
 
-        cublasStatus_t status = cublasDgemm(handle, transactionA, transactionB, m, n, k, &alpha,
-                    A, lda, B, ldb,
-                    &beta, C, ldc);
+        cublasStatus_t status = cublasDgemm(handle,
+                                            transactionA,
+                                            transactionB,
+                                            m, n, k, &alpha,
+                                            A, lda, B, ldb,
+                                            &beta, C, ldc);
+
 
         check_status(status);
     }

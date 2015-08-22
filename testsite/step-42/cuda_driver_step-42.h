@@ -48,7 +48,7 @@ class CUDADriver {
     typedef double Number;
     typedef SciPAL::CudaComplex<Number> cplxNumber;
 
-    typedef cublas BW;
+    typedef blas BW;
 
 public:
 

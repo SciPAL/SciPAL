@@ -54,46 +54,7 @@ struct blas {
     //! Compile-time variable for identifying the side of PCIe bus this BLAS works on.
     static const ParallelArch arch = cpu;
 
- #ifdef dfkgskdd
-
-    // @sect4{Funktion: check_status}
-    //!
-    //! Wertet das cublasStatus Argument aus und wirft im Falle
-    //! eines Fehlers eine Exception aus.
-    static void  check_status(const cublasStatus & status)
-    {
-
-        std::string cublas_errors(" ");
-
-        if (status != CUBLAS_STATUS_SUCCESS)
-        {
-            if (status == CUBLAS_STATUS_NOT_INITIALIZED)
-                cublas_errors += "cublas not initialized ";
-            if (status == CUBLAS_STATUS_MAPPING_ERROR)
-                cublas_errors +="mapping error ";
-            if (status == CUBLAS_STATUS_INVALID_VALUE)
-                cublas_errors +="invalid value ";
-            if (status == CUBLAS_STATUS_ALLOC_FAILED)
-                cublas_errors +="allocation failed ";
-            if (status == CUBLAS_STATUS_ARCH_MISMATCH)
-                cublas_errors +="architecture mismatch ";
-            if (status == CUBLAS_STATUS_EXECUTION_FAILED)
-                cublas_errors +="execution failed ";
-            if (status == CUBLAS_STATUS_INTERNAL_ERROR)
-                cublas_errors +="cublas internal error ";
-
-            if (cublas_errors == " ")
-                cublas_errors = "unknown cublas error state";
-
-#ifdef QT_NO_DEBUG
-       AssertThrow(false, dealii::ExcMessage(cublas_errors.c_str() ) );
-#else
-       AssertThrow(false, dealii::ExcMessage(cublas_errors.c_str() ) );
-#endif
-        }
-
-    }
-#endif
+    typedef blas blas_wrapper_type;
 
 
     //! Initialize cblas. In this particular case this function does nothing.

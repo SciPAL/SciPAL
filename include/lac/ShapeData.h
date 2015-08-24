@@ -19,7 +19,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #ifndef  SCIPAL_SHAPEDATA_H
 #define  SCIPAL_SHAPEDATA_H
-
+#include <cuda_runtime_api.h>
 namespace SciPAL {
 
 

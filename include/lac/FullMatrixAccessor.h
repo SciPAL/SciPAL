@@ -280,7 +280,7 @@ FullMatrixAccessor<_T>::operator = (const SciPAL::Matrix<_T, BW> & A_d)
     this->reinit(nr, nc);
     this->__is_col_major = true;
 
-    const _T * src = A_d.val();
+    const _T * src = A_d.data();
 
     _T * dst = reinterpret_cast<_T*>(this->val());
 

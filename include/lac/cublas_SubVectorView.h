@@ -171,8 +171,21 @@ namespace SciPAL {
 
     ColVectorView(T_src & src,
                   int r_begin, int c=0) : Base(src, r_begin,
-                                               src.n_rows()/*r_end*/, c)
-    { }
+                                               src.n_rows()/*r_end*/, c){}
+      // @sect4{Operator: =}
+      //! Applies expressions to view
+      //!
+      template<typename X>
+      SciPAL::ColVectorView<T, T_src> & operator = (const SciPAL::Expr<X> &e)
+      {
+      #ifdef DEBUG
+          std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
+          print_expr_info(__PRETTY_FUNCTION__);
+      #endif
+
+          SciPAL::LAOOperations::apply(*this,  ~e);
+          return *this;
+      }
 
 
     template<typename T2>
@@ -364,7 +377,8 @@ SciPAL::SubVectorView<T, T_src> ::operator +=(const SciPAL::SubVectorView <T, T2
     int incx = other.stride;
     int incy = this->stride;
 
-     BW::axpy(this->n_elements_active, one(), other.data(), incx,this->data(), incy);
+     BW::axpy(this->n_elements_active, one(), other.data(), incx, this->data(),
+              incy);
 
     return *this;
 }
@@ -386,7 +400,8 @@ SciPAL::SubVectorView<T, T_src> ::operator -=(const SciPAL::SubVectorView <T, T_
     int incx = other.stride;
     int incy = this->stride;
 
-     BW::axpy(this->n_elements_active, one(false), other.data(), incx,this->data(), incy);
+     BW::axpy(this->n_elements_active, one(false), other.data(), incx,this->data(),
+              incy);
 
     return *this;
 }

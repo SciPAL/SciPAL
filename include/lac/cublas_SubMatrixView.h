@@ -593,8 +593,8 @@ SciPAL::SubMatrixView<T, BW>::add_scaled_outer_product(T alpha,
                                                        const Vector<T, BW>& x,
                                                        const Vector<T, BW>& y)
 {
-    int m = this->n_rows_active();
-    int n = this->n_cols_active();
+    int m = this->n_rows();
+    int n = this->n_cols();
 
 
     size_t lda = this->leading_dim();

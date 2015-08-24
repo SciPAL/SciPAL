@@ -128,23 +128,23 @@ struct BlasMatExp/*MatrixExpressions*/
 // before the custom apply() function is defined.
 namespace LAOOperations
 {
-template <typename X, typename T, typename BW,
-          template<typename, typename> class LAO>
-static void apply(LAO<T, BW> & result,
-                  const typename BlasMatExp<T, BW>::template generic_gemm<X>::Type& expr)
-{
-    typedef ::SciPAL::Matrix<T, BW> Mtx;
+//template <typename X, typename T, typename BW,
+//          template<typename, typename> class LAO>
+//static void apply(LAO<T, BW> & result,
+//                  const typename BlasMatExp<T, BW>::template generic_gemm<X>::Type& expr)
+//{
+//    typedef ::SciPAL::Matrix<T, BW> Mtx;
 
-    T alpha = expr.l.l.l;
-    const Mtx & A = expr.l.l.r;
-    const Mtx & B = expr.l.r;
+//    T alpha = expr.l.l.l;
+//    const Mtx & A = expr.l.l.r;
+//    const Mtx & B = expr.l.r;
 
-    T beta = expr.r.l;
+//    T beta = expr.r.l;
 
-    Mtx & C = result;
+//    Mtx & C = result;
 
-    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
-}
+//    A.scaled_mmult_add_scaled(C, B, 'n', 'n', alpha, beta);
+//}
 
 
 

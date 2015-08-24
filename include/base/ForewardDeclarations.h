@@ -63,8 +63,6 @@ typedef double2 cuDoubleComplex;
 
 template<typename> class FullMatrixAccessor;
 
-struct vmu_view;
-struct vmu;
 
 #endif // FOREWARDDECLARATIONS_H
 

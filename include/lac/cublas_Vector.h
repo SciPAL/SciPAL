@@ -24,8 +24,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/expression_templates_host.h>
 #include <complex>
 #include <float.h>
-//! Vorwaertsdeklaration fuer expression templates
-struct vmu;
 
 //SciPAL implementation for expression templates
 
@@ -174,6 +172,9 @@ public:
     void push_to(dealii::Vector<T2> & dst) const;
 
     Vector<T, BW> & operator = (const T value);
+
+    template<typename T_src>
+    Vector<T, BW> & operator = (const SubVectorView<T, T_src > & other);
 
     template<typename T_src>
     Vector<T, BW> & operator = (const dealii::Vector<T_src> & other);
@@ -596,6 +597,31 @@ SciPAL::Vector<T, BW>::push_to(dealii::Vector<T2> & dst) const
 
 // @sect4{Operator: =}
 //!
+//! Elementweise Kopie eines Vektors. Das Ziel wird bei Bedarf
+//! in der Groesse der Quelle angepassst.
+//! @param other : rechte Seite des = ist ein VectorView
+//! Beim Kopieren wird das Koordinatensystem des Views uebernommen,
+//! d.h. Beginn und Ende des Views bestimmen den Bereich in den kopiert wird.
+//! Siehe Berechnung der Householder-Vektoren im QR-Beispiel.
+template<typename T, typename BW>
+template<typename T_src>
+SciPAL::Vector<T, BW> &
+SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, T_src > & other)
+{
+    Assert(this->size() >= other.size(),
+           dealii::ExcDimensionMismatch(this->size(), other.size()) );
+
+    int incx = other.stride;
+    int incy = 1;
+    BW::copy(other.size(), other.data(), incx,
+             &(this->data()[(other._is_col ?
+                              other.r_begin() : other.c_begin())
+                             ]), incy);
+
+    return *this;
+}
+
+
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &

@@ -36,15 +36,15 @@ namespace SciPAL {
     //! selbst&auml;ndige Objekte darzustellen, so dass man beispielsweise eine
     //! Spalte einer Matrix als Quelle in einem Matrix-Vektorprodukt
     //! nutzen kann.
-    template<typename T, typename T_src>
+    template<typename T, typename BW, typename T_src>
     class SubVectorView
             :
-            public SciPAL::Expr<SubVectorView<T, T_src> >,
-            public SciPAL::Shape<T, typename T_src::blas_wrapper_type, vector>
+            public SciPAL::Expr<SubVectorView<T, BW, T_src> >,
+            public SciPAL::Shape<T, BW, vector>
     {
 
    public:
-        typedef typename T_src::blas_wrapper_type BW;
+        typedef BW blas_wrapper_type;
 
         typedef SciPAL::Shape<T, BW, vector> MyShape;
 
@@ -54,11 +54,11 @@ namespace SciPAL {
 
         friend class SubMatrixView<T, BW>;
 
-        template<typename, typename> friend class  ColVectorView;
+        template<typename, typename, typename> friend class  ColVectorView;
 
         typedef T value_type;
 
-        typedef SubVectorView<T, T_src> Type;
+        typedef SubVectorView<T, BW, T_src> Type;
 
         typedef const Type& ConstHandle;
 
@@ -75,17 +75,29 @@ namespace SciPAL {
         SubVectorView(T_src & src,
                       int r_begin, int r_end, int c = 0);
 
-        typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
+//        typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
+        // @sect4{Funktion: l2_norm}
+        //!
+        //! L2-Norm des betrachteten Vektorteils.
+//        template<typename T, typename BW, typename T_src>
+        typename PrecisionTraits<T, BW::blas_wrapper_type::arch>::NumberType
+//        SciPAL::SubVectorView<T, BW, T_src>::
+        l2_norm() const
+        {
+            typename PrecisionTraits<T, BW::arch>::NumberType result
+                    = BW::nrm2(this->size(), this->data(), this->stride);
+            return result;
+        }
 
         template<typename VECTOR>
         T dot(const VECTOR & other) const;
 
         void print() const;
 
-//        SubVectorView<T, T_src> & operator = (const Vector<T, BW>& col);
+//        SubVectorView<T, BW, T_src> & operator = (const Vector<T, BW>& col);
 
         template <typename T2>
-                SubVectorView<T, T_src> & operator = (const std::vector<std::complex<T2> > & other);
+        SubVectorView<T, BW, T_src> & operator = (const std::vector<std::complex<T2> > & other);
 
         int r_begin() const { return this->r_begin_active; }
 
@@ -98,19 +110,20 @@ namespace SciPAL {
         T* data();
 
         template<typename T2_src>
-        SubVectorView & operator += (const SubVectorView <T, T2_src> &other);
+        SubVectorView & operator += (const SubVectorView <T, BW, T2_src> &other);
 
-        SubVectorView & operator -= (const SubVectorView <T, T_src> &other);
+        SubVectorView & operator -= (const SubVectorView <T, BW, T_src> &other);
         SubVectorView &operator -= (const Vector<T, BW>& col);
 
         SubVectorView & operator *= (const T alpha);
         SubVectorView & operator /= (const T alpha);
-        SubVectorView & operator /=(const std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> alpha);
+        SubVectorView & operator /=
+        (const std::complex<typename PrecisionTraits<T, BW::blas_wrapper_type::arch>::NumberType> alpha);
 
         //! Copy the elements of other to this. This changes the elements of the
         //! source object of this.
         template <typename T_src2>
-        SubVectorView & operator = (const SubVectorView<T, T_src2> & other)
+        SubVectorView & operator = (const SubVectorView<T, BW, T_src2> & other)
         {
             Assert(this->n_elements_active == other.n_elements_active,
                    dealii::ExcMessage("Cannot copy subarrays of different lengths"));
@@ -130,7 +143,7 @@ namespace SciPAL {
         //! Applies expressions to view
         //!
         template<typename X>
-        SciPAL::SubVectorView<T, BW> & operator = (const SciPAL::Expr<X> &e)
+        Type & operator = (const SciPAL::Expr<X> &e)
         {
         #ifdef DEBUG
             std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
@@ -144,7 +157,7 @@ namespace SciPAL {
     private:
         SubVectorView() {}
 
-        SubVectorView(const SubVectorView<T, T_src> & ) {}
+        SubVectorView(const SubVectorView<T, BW, T_src> & ) {}
 
             //! deal.II's SmartPointer sind keine eigenst&auml;ndigen Zeiger,
             //! sondern dazu gedacht, auf schon bestehende Objekte zu zeigen
@@ -161,12 +174,12 @@ namespace SciPAL {
     // @sect3{Klasse: ColVectorView}
     //!
     //! Ansicht auf einen Teil einer Spalte einer Matrix oder eines Spaltenvektors.
-    template<typename T, typename T_src>
-    class ColVectorView : public SubVectorView<T, T_src> {
+    template<typename T, typename BW>
+    class ColVectorView : public SubVectorView<T, BW, Vector<T,BW> > {
 
     public:
-        typedef typename T_src::blas_wrapper_type BW;
-        typedef SubVectorView<T, T_src> Base;
+        typedef BW blas_wrapper_type;
+        typedef SubVectorView<T, BW, Vector<T,BW>> Base;
         typedef Shape<T, BW, vector> MyShape;
 
     ColVectorView(T_src & src,
@@ -176,7 +189,7 @@ namespace SciPAL {
       //! Applies expressions to view
       //!
       template<typename X>
-      SciPAL::ColVectorView<T, T_src> & operator = (const SciPAL::Expr<X> &e)
+      SciPAL::ColVectorView<T, BW> & operator = (const SciPAL::Expr<X> &e)
       {
       #ifdef DEBUG
           std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
@@ -189,7 +202,7 @@ namespace SciPAL {
 
 
     template<typename T2>
-    SciPAL::ColVectorView<T, T_src> & operator *= (const T2 scale)
+    SciPAL::ColVectorView<T, BW> & operator *= (const T2 scale)
                                                     {
         int elem_dist = 1;
 
@@ -201,7 +214,7 @@ namespace SciPAL {
     }
 
 //!    template<typename T2>
-//!    SciPAL::ColVectorView<T, T_src> & operator *= (const T2 scale)
+//!    SciPAL::ColVectorView<T, BW, T_src> & operator *= (const T2 scale)
 //!                                                    {
 //!        int elem_dist = 1;
 
@@ -212,7 +225,7 @@ namespace SciPAL {
 //!        return *this;
 //!    }
 
-//    ColVectorView<T, T_src> & operator = (const Vector<T, typename Base::BW>& col)
+//    ColVectorView<T, BW, T_src> & operator = (const Vector<T, typename Base::BW>& col)
 //    {
 //        Assert(this->n_elements_active == col.size(),
 //               dealii::ExcMessage("Dimension mismatch"));
@@ -226,10 +239,10 @@ namespace SciPAL {
 
 
     template<typename T2_src>
-    ColVectorView<T, T_src> & operator += (const ColVectorView<T, T2_src> &other)
+    ColVectorView<T, BW, T_src> & operator += (const ColVectorView<T, BW, T2_src> &other)
     {
         Base & self = *this;
-        const typename ColVectorView<T, T2_src>::Base & o = other;
+        const typename ColVectorView<T, BW, T2_src>::Base & o = other;
         self += o;
 
         return *this;
@@ -244,10 +257,85 @@ namespace SciPAL {
     }
 
     template<typename T_src2>
-    ColVectorView & operator = (const ColVectorView<T, T_src2> & other)
+    ColVectorView & operator = (const SubVectorView<T, BW, T_src2> & other)
     {
         Base & self = *this;
-        typedef typename ColVectorView<T, T_src2>::Base Base2;
+        typedef typename SubVectorView<T, BW, T_src2>::Base Base2;
+        const Base2 &src = other;
+        self = src;
+
+        return *this;
+    }
+    };
+
+    // @sect3{Klasse: ColVectorViewM}
+    //!
+    //! Ansicht auf einen Teil einer Spalte einer Matrix oder eines Spaltenvektors.
+    template<typename T, typename BW>
+    class ColVectorViewM : public SubVectorView<T, BW, Matrix<T,BW> > {
+
+    public:
+        typedef BW blas_wrapper_type;
+        typedef SubVectorView<T, BW, Vector<T,BW>> Base;
+        typedef Shape<T, BW, vector> MyShape;
+
+    ColVectorViewM(T_src & src,
+                  int r_begin, int c=0) : Base(src, r_begin,
+                                               src.n_rows()/*r_end*/, c){}
+      // @sect4{Operator: =}
+      //! Applies expressions to view
+      //!
+      template<typename X>
+      SciPAL::ColVectorViewM<T, BW> & operator = (const SciPAL::Expr<X> &e)
+      {
+      #ifdef DEBUG
+          std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
+          print_expr_info(__PRETTY_FUNCTION__);
+      #endif
+
+          SciPAL::LAOOperations::apply(*this,  ~e);
+          return *this;
+      }
+
+
+    template<typename T2>
+    SciPAL::ColVectorViewM<T, BW> & operator *= (const T2 scale)
+                                                    {
+        int elem_dist = 1;
+
+        int n = this->n_elements_active;
+
+        Base::BW::scal(n, scale, &(this->data()[0]), elem_dist);
+
+        return *this;
+    }
+
+
+
+
+    template<typename T2_src>
+    ColVectorViewM<T, BW> & operator += (const SubVectorView<T, BW, T2_src> &other)
+    {
+        Base & self = *this;
+        const typename SubVectorView<T, BW, T2_src>::Base & o = other;
+        self += o;
+
+        return *this;
+    }
+
+    void reset(int r_begin, int c=0)
+    {
+        this->MyShape::reinit(this->data_ptr,
+                              r_begin, this->r_end_active,
+                              c, c+1,
+                              this->MyShape::leading_dim, 1);
+    }
+
+    template<typename T_src2>
+    ColVectorViewM & operator = (const ColVectorViewM<T, BW> & other)
+    {
+        Base & self = *this;
+        typedef typename SubVectorView<T, BW, T_src2>::Base Base2;
         const Base2 &src = other;
         self = src;
 
@@ -260,12 +348,12 @@ namespace SciPAL {
     // @sect3{Klasse: RowVectorView}
     //!
     //! Ansicht auf einen Teil einer Zeile einer Matrix oder eines Zeilenvektors.
-    template<typename T, typename T_src>
-    class RowVectorView : public SubVectorView<T, T_src> {
+    template<typename T, typename BW, typename T_src>
+    class RowVectorView : public SubVectorView<T, BW, T_src> {
 
     public:
-        typedef SubVectorView<T, T_src> Base;
-        typedef typename T_src::blas_wrapper_type BW;
+        typedef SubVectorView<T, BW, T_src> Base;
+        typedef BW blas_wrapper_type;
 
         typedef SciPAL::Shape<T, BW, vector> MyShape;
 
@@ -289,8 +377,8 @@ namespace SciPAL {
 //! @param src:      Urspr&uuml;ngliche Matrix oder Vektor
 //! @param r_begin:  Zeilenindex bei dem der Vektor anf&auml;ngt
 //! @param c:        kann sowohl Spalte als auch Zeile sein
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src >::SubVectorView(T_src & src,
+template<typename T, typename BW, typename T_src>
+SciPAL::SubVectorView<T, BW, T_src >::SubVectorView(T_src & src,
                                             int r_begin, int r_end, int c)
     :
       MyShape(src.shape(),
@@ -306,45 +394,35 @@ SciPAL::SubVectorView<T, T_src >::SubVectorView(T_src & src,
 //! Direkter Zugriff auf den den device-Zeiger.
 //! Zurueckgegeben wird der Zeiger auf das erste Element
 //! des betrachteten Teils eines Vektors.
-template<typename T, typename T_src>
+template<typename T, typename BW, typename T_src>
 const T *
-SciPAL::SubVectorView<T, T_src>::data() const
+SciPAL::SubVectorView<T, BW, T_src>::data() const
 {
     //! Indizes in C-Z&auml;hlung!!!
     return this->view_begin;
 }
 
 
-template<typename T, typename T_src>
+template<typename T, typename BW, typename T_src>
 T *
-SciPAL::SubVectorView<T, T_src>::data()
+SciPAL::SubVectorView<T, BW, T_src>::data()
 {
     //! Indizes in C-Z&auml;hlung!!!
     return this->view_begin;
 }
 
 
-// @sect4{Funktion: l2_norm}
-//!
-//! L2-Norm des betrachteten Vektorteils.
-template<typename T, typename T_src>
-typename PrecisionTraits<T, T_src::blas_wrapper_type::arch>::NumberType
-SciPAL::SubVectorView<T, T_src>::l2_norm() const
-{
-    typename PrecisionTraits<T, BW::arch>::NumberType result
-            = BW::nrm2(this->size(), this->data(), this->stride);
-    return result;
-}
+
 
 
 // @sect4{Funktion: dot}
 //!
 //! Skalarprodukt von zwei Teilvektoren.
 //! @param other: 2. Vektor
-template<typename T, typename T_src>
+template<typename T, typename BW, typename T_src>
 template<typename VECTOR>
 T
-SciPAL::SubVectorView<T, T_src>::dot(const VECTOR & other) const
+SciPAL::SubVectorView<T, BW, T_src>::dot(const VECTOR & other) const
 {
 
     Assert(this->n_elements_active == other.size(),
@@ -364,10 +442,10 @@ SciPAL::SubVectorView<T, T_src>::dot(const VECTOR & other) const
 //! &Uuml;berladener Operator, mit dem man zwei Vektoren addieren kann
 //! 1. Vektor += 2. Vektor
 //! @param other: 2. Vektor
-template<typename T, typename T_src>
+template<typename T, typename BW, typename T_src>
 template<typename T2_src>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src> ::operator +=(const SciPAL::SubVectorView <T, T2_src> &other)
+SciPAL::SubVectorView<T, BW, T_src> &
+SciPAL::SubVectorView<T, BW, T_src> ::operator +=(const SciPAL::SubVectorView <T, BW, T2_src> &other)
 {
     Assert(this->n_elements_active == other.size(),
            dealii::ExcMessage("Dimension mismatch"));
@@ -388,9 +466,9 @@ SciPAL::SubVectorView<T, T_src> ::operator +=(const SciPAL::SubVectorView <T, T2
 //! &Uuml;berladener Operator, mit dem man zwei Vektoren subtrahieren kann
 //! 1. Vektor -= 2. Vektor
 //! @param other: 2. Vektor
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src> ::operator -=(const SciPAL::SubVectorView <T, T_src> &other)
+template<typename T, typename BW, typename T_src>
+SciPAL::SubVectorView<T, BW, T_src> &
+SciPAL::SubVectorView<T, BW, T_src> ::operator -=(const SciPAL::SubVectorView <T, BW, T_src> &other)
 {
     Assert(this->n_elements_active == other.size(),
            dealii::ExcMessage("Dimension mismatch"));
@@ -408,9 +486,9 @@ SciPAL::SubVectorView<T, T_src> ::operator -=(const SciPAL::SubVectorView <T, T_
 
 //! &Uuml;berladener Operator, bei dem ein Vektor mit einem zweiten Vektor gleichgesetzt wird
 //! @param col: Vektor, dessen Werte gleichgesetzt werden
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src>::operator -= (const Vector<T, BW>& other)
+template<typename T, typename BW, typename T_src>
+SciPAL::SubVectorView<T, BW, T_src> &
+SciPAL::SubVectorView<T, BW, T_src>::operator -= (const Vector<T, BW>& other)
 {
     Assert(this->n_elements_active <= other.size(),
            dealii::ExcMessage("Dimension mismatch"));
@@ -429,9 +507,9 @@ SciPAL::SubVectorView<T, T_src>::operator -= (const Vector<T, BW>& other)
 //!
 //! &Uuml;berladener Operator, bei dem man einen Vektor mit einem Skalar multipliziert
 //! @param alpha: Skalar mit dem der Vektor multipliziert wird
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src> ::operator *=(const T alpha)
+template<typename T, typename BW, typename T_src>
+SciPAL::SubVectorView<T, BW, T_src> &
+SciPAL::SubVectorView<T, BW, T_src> ::operator *=(const T alpha)
 {
      int incx = this->stride;
 
@@ -444,9 +522,9 @@ SciPAL::SubVectorView<T, T_src> ::operator *=(const T alpha)
 //!
 //! &Uuml;berladener Operator, bei dem ein Vektor durch ein Skalar dividiert wird
 //! @param alpha: Skalar mit dem der Vektor geteilt wird
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src> ::operator /=(const T alpha)
+template<typename T, typename BW, typename T_src>
+SciPAL::SubVectorView<T, BW, T_src> &
+SciPAL::SubVectorView<T, BW, T_src> ::operator /=(const T alpha)
 {
 #ifdef DEBUG
     Assert(alpha,
@@ -463,9 +541,9 @@ SciPAL::SubVectorView<T, T_src> ::operator /=(const T alpha)
     return *this;
 }
 
-template<typename T, typename T_src>
-SciPAL::SubVectorView<T, T_src> &
-        SciPAL::SubVectorView<T, T_src> ::operator /=(const std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> alpha)
+template<typename T, typename BW, typename T_src>
+SciPAL::SubVectorView<T, BW, T_src> &
+        SciPAL::SubVectorView<T, BW, T_src> ::operator /=(const std::complex<typename PrecisionTraits<T, BW::blas_wrapper_type::arch>::NumberType> alpha)
 {
 #ifdef DEBUG
     Assert(norm(alpha),
@@ -486,9 +564,9 @@ SciPAL::SubVectorView<T, T_src> &
 //!
 //! &Uuml;berladener Operator, bei dem ein Vektor mit einem zweiten Vektor gleichgesetzt wird
 //! @param col: Vektor, dessen Werte gleichgesetzt werden
-//template<typename T, typename T_src>
-//SciPAL::SubVectorView<T, T_src> &
-//SciPAL::SubVectorView<T, T_src>::operator = (const Vector<T, BW>& col)
+//template<typename T, typename BW, typename T_src>
+//SciPAL::SubVectorView<T, BW, T_src> &
+//SciPAL::SubVectorView<T, BW, T_src>::operator = (const Vector<T, BW>& col)
 //{
 //    Assert(this->n_elements_active == col.size(),
 //           dealii::ExcMessage("Dimension mismatch"));
@@ -500,10 +578,10 @@ SciPAL::SubVectorView<T, T_src> &
 //    return *this;
 //}
 
-template<typename T, typename T_src>
+template<typename T, typename BW, typename T_src>
 template <typename T2>
-SciPAL::SubVectorView<T, T_src> &
-SciPAL::SubVectorView<T, T_src>::operator = (const std::vector<std::complex<T2> > & dst)
+SciPAL::SubVectorView<T, BW, T_src> &
+SciPAL::SubVectorView<T, BW, T_src>::operator = (const std::vector<std::complex<T2> > & dst)
 {
 
 dst.resize(this->size());
@@ -524,9 +602,9 @@ BW::GetVector(this->size(), src_ptr, inc_src, dst_ptr, inc_dst);
 // @sect4{Funktion: VectorView::print}
 //!
 //! Ausgabe des Vektors
-template<typename T, typename T_src>
+template<typename T, typename BW, typename T_src>
 void
-SciPAL::SubVectorView<T, T_src>::print() const
+SciPAL::SubVectorView<T, BW, T_src>::print() const
 {
     std::vector<T> tmp(this->n_elements_active);
     int inc_src = this->stride;

@@ -65,15 +65,15 @@ struct blas_pp {
     typedef SciPAL::Vector<T, BW> Vector;
 
 
-    typedef SciPAL::ColVectorView<T, Matrix> MatrixSubCol;
+    typedef SciPAL::ColVectorView<T, BW, Matrix> MatrixSubCol;
 
-    typedef SciPAL::RowVectorView<T, Matrix> MatrixSubRow;
+    typedef SciPAL::RowVectorView<T, BW, Matrix> MatrixSubRow;
 
-    typedef SciPAL::ColVectorView<T, Vector> SubColVector;
+    typedef SciPAL::ColVectorView<T, BW, Vector> SubColVector;
 
-    typedef SciPAL::RowVectorView<T, Vector> SubRowVector;
+    typedef SciPAL::RowVectorView<T, BW, Vector> SubRowVector;
 
-    typedef SciPAL::SubVectorView<T, Vector>    SubVectorBase;
+    typedef SciPAL::SubVectorView<T, BW, Vector>    SubVectorBase;
 };
 
 

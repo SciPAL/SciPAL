@@ -69,6 +69,12 @@ struct GetMyType<Vector<T, BW> >
     typedef typename Vector<T, BW>::MyShape Type;
 };
 
+template<typename T, typename BW>
+struct GetMyType<SubVectorView<T, SciPAL::Vector<T, BW>, BW> >
+{
+    typedef typename SubVectorView<T, SciPAL::Vector<T, BW>, BW >::MyShape Type;
+};
+
 
 //! general case
 template<typename T0>

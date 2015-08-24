@@ -69,7 +69,7 @@ class Matrix
 
     friend class Vector<T, BW>;
 
-    friend class SubVectorView<T, Matrix<T, BW> >;
+    friend class SubVectorView<T, BW, Matrix<T, BW> >;
 
     friend class SubMatrixView<T, BW>;
 
@@ -762,9 +762,6 @@ SciPAL::Matrix<T, BW>::scaled_mmult_add_scaled( Matrix<T, BW>& dst,
              src.data(), ldb,
              beta,
              dst.data(), ldc);
-
-    gpuErrchk( cudaPeekAtLastError() );
-
 }
 
 

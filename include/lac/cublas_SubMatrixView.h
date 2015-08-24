@@ -88,6 +88,11 @@ public:
                                   const Vector<T, BW>& x,
                                   const Vector<T, BW>& y);
 
+    template<typename T_src>
+    void add_scaled_outer_product(T alpha,
+                                  const SubVectorView<T, BW, T_src>& x,
+                                  const SubVectorView<T, BW, T_src>& y);
+
     SubMatrixView() {}
 
 private:
@@ -608,19 +613,57 @@ SciPAL::SubMatrixView<T, BW>::add_scaled_outer_product(T alpha,
     int incy = 1;
 
     //! @p x wird als Spaltenvektor betrachtet
-    const int x_val_begin = this->r_begin_active ;
-    const T * const x_val_ptr              = x.data() + x_val_begin;
+//    const int x_val_begin = this->r_begin_active ;
+    const T * const x_val_ptr = x.data();// + x_val_begin;
 
     //! @p y wird als Zeilenvektor betrachtet
-    const int y_val_begin = this->c_begin_active;
-    const T * const y_val_ptr = y.data() + y_val_begin;
+//    const int y_val_begin = this->c_begin_active;
+    const T * const y_val_ptr = y.data();// + y_val_begin;
 
 
 
     BW::ger(m, n, alpha,
             x_val_ptr, incx,
             y_val_ptr, incy,
-            this->view_begin,
+            this->data(),
+            lda);
+}
+
+template<typename T, typename BW>
+template<typename T_src>
+void
+SciPAL::SubMatrixView<T, BW>::add_scaled_outer_product(T alpha,
+                                                       const SubVectorView<T, BW, T_src>& x,
+                                                       const SubVectorView<T, BW, T_src>& y)
+{
+    int m = this->n_rows();
+    int n = this->n_cols();
+
+
+    size_t lda = this->leading_dim();
+
+
+    //! TO DO : correct ASSERTIONS
+    //! Assert(x.size() == m, dealii::ExcMessage("Dimension mismatch"));
+    //! Assert(y.size() == n, dealii::ExcMessage("Dimension mismatch"));
+
+    int incx = 1;
+    int incy = 1;
+
+    //! @p x wird als Spaltenvektor betrachtet
+//    const int x_val_begin = this->r_begin_active ;
+    const T * const x_val_ptr = x.data();// + x_val_begin;
+
+    //! @p y wird als Zeilenvektor betrachtet
+//    const int y_val_begin = this->c_begin_active;
+    const T * const y_val_ptr = y.data();// + y_val_begin;
+
+
+
+    BW::ger(m, n, alpha,
+            x_val_ptr, incx,
+            y_val_ptr, incy,
+            this->data(),
             lda);
 }
 

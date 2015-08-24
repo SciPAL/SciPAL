@@ -17,6 +17,8 @@
 //LAC includes
 #include <lac/cublas_wrapper.hh>
 
+namespace SciPAL
+{
 static cusolverDnHandle_t cusolver_handle;
 
 // @sect3{struct cusolverDn: cusolverDn S,D,C,Z wrapper functions}
@@ -26,7 +28,8 @@ static cusolverDnHandle_t cusolver_handle;
 //! For the numerical purpose of the functions have a look at the cusolverDn doc.
 //!
 
-struct cusolverDn{
+struct cusolverDn
+{
 
     // @sect4{Funktion: name}
     //!
@@ -133,228 +136,17 @@ struct cusolverDn{
 #endif
     }
 
-private:
-
-    // SVD functions:
-    inline static void SVD_check_devInfo(cusolverStatus_t stat, int *devInfo)
-    {
-        // check error information (see cusolver doc.)
-#ifdef DEBUG
-        if(stat != CUSOLVER_STATUS_SUCCESS){
-            std::cout << "cusolver crashed" << std::endl;
-            std::cout << "device information:" << std::endl;
-            int Info;
-            cudaMemcpy(&Info, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
-            if(Info == 0)
-                std::cout << "\tThe operation was successful" << std::endl;
-            if(Info > 0)
-                std::cout << "\t" << Info << " superdiagonal(s) did not converge to zero" << std::endl;
-            if(Info < 0)
-                std::cout << "\tthe " << -Info << "-th parameter is wrong" << std::endl;
-        }
-#endif
-    }
-
-    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, float *A, int lda, float *S, float *U, int ldu, float *VT, int ldvt, float *Work, int Lwork, float *rwork, int *devInfo)
-    {
-        return cusolverDnSgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, double *A, int lda, double *S, double *U, int ldu, double *VT, int ldvt, double *Work, int Lwork, double *rwork, int *devInfo)
-    {
-        return cusolverDnDgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, SciPAL::CudaComplex<float> *A, int lda, float *S, SciPAL::CudaComplex<float> *U, int ldu, SciPAL::CudaComplex<float> *VT, int ldvt, SciPAL::CudaComplex<float> *Work, int Lwork, float *rwork, int *devInfo)
-    {
-        return cusolverDnCgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, SciPAL::CudaComplex<double> *A, int lda, double *S, SciPAL::CudaComplex<double> *U, int ldu, SciPAL::CudaComplex<double> *VT, int ldvt, SciPAL::CudaComplex<double> *Work, int Lwork, double *rwork, int *devInfo)
-    {
-        return cusolverDnZgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
-    }
-
-    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, float /*Zero*/)
-    {
-        return cusolverDnSgesvd_bufferSize(cusolver_handle, m, n, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, double /*Zero*/)
-    {
-        return cusolverDnDgesvd_bufferSize(cusolver_handle, m, n, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, SciPAL::CudaComplex<float> /*Zero*/)
-    {
-        return cusolverDnCgesvd_bufferSize(cusolver_handle, m, n, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, SciPAL::CudaComplex<double> /*Zero*/)
-    {
-        return cusolverDnZgesvd_bufferSize(cusolver_handle, m, n, Lwork);
-    }
-
-    //LUD functions:
-
-    inline static cusolverStatus_t cusolverDngetrf(int m, int n, float *A, int lda, float *Workspace, int *devIpiv, int *devInfo)
-    {
-        return cusolverDnSgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngetrf(int m, int n, double *A, int lda, double *Workspace, int *devIpiv, int *devInfo)
-    {
-        return cusolverDnDgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngetrf(int m, int n, SciPAL::CudaComplex<float> *A, int lda, SciPAL::CudaComplex<float> *Workspace, int *devIpiv, int *devInfo)
-    {
-        return cusolverDnCgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngetrf(int m, int n, SciPAL::CudaComplex<double> *A, int lda, SciPAL::CudaComplex<double> *Workspace, int *devIpiv, int *devInfo)
-    {
-        return cusolverDnZgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
-    }
-
-    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, float *A, int lda, int *Lwork)
-    {
-        return cusolverDnSgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, double *A, int lda, int *Lwork)
-    {
-        return cusolverDnDgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, SciPAL::CudaComplex<float> *A, int lda, int *Lwork)
-    {
-        return cusolverDnCgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, SciPAL::CudaComplex<double> *A, int lda, int *Lwork)
-    {
-        return cusolverDnZgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-
-    //QRF functions:
-
-    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, float *A, int lda, float *TAU, float *Workspace, int Lwork, int *devInfo)
-    {
-        return cusolverDnSgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, double *A, int lda, double *TAU, double *Workspace, int Lwork, int *devInfo)
-    {
-        return cusolverDnDgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, SciPAL::CudaComplex<float> *A, int lda, SciPAL::CudaComplex<float> *TAU, SciPAL::CudaComplex<float> *Workspace, int Lwork, int *devInfo)
-    {
-        return cusolverDnCgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, SciPAL::CudaComplex<double> *A, int lda, SciPAL::CudaComplex<double> *TAU, SciPAL::CudaComplex<double> *Workspace, int Lwork, int *devInfo)
-    {
-        return cusolverDnZgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
-    }
-
-    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, float *A, int lda, int *Lwork)
-    {
-        return cusolverDnSgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, double *A, int lda, int *Lwork)
-    {
-        return cusolverDnDgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, SciPAL::CudaComplex<float> *A, int lda, int *Lwork)
-    {
-        return cusolverDnCgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, SciPAL::CudaComplex<double> *A, int lda, int *Lwork)
-    {
-        return cusolverDnZgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
-    }
-
-    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const float *A, int lda, const float *tau, float *C, int ldc, float *work, int lwork, int *devInfo)
-    {
-        return cusolverDnSormqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const double *A, int lda, const double *tau, double *C, int ldc, double *work, int lwork, int *devInfo)
-    {
-        return cusolverDnDormqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const SciPAL::CudaComplex<float> *A, int lda, const SciPAL::CudaComplex<float> *tau, SciPAL::CudaComplex<float> *C, int ldc, SciPAL::CudaComplex<float> *work, int lwork, int *devInfo)
-    {
-        return cusolverDnCunmqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const SciPAL::CudaComplex<double> *A, int lda, const SciPAL::CudaComplex<double> *tau, SciPAL::CudaComplex<double> *C, int ldc, SciPAL::CudaComplex<double> *work, int lwork, int *devInfo)
-    {
-        return cusolverDnZunmqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
-    }
-
-    //LDL functions:
-
-    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, float *A, int lda, int *ipiv, float *work, int lwork, int *devInfo)
-    {
-        return cusolverDnSsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, double *A, int lda, int *ipiv, double *work, int lwork, int *devInfo)
-    {
-        return cusolverDnDsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, SciPAL::CudaComplex<float> *A, int lda, int *ipiv, SciPAL::CudaComplex<float> *work, int lwork, int *devInfo)
-    {
-        return cusolverDnCsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
-    }
-    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, SciPAL::CudaComplex<double> *A, int lda, int *ipiv, SciPAL::CudaComplex<double> *work, int lwork, int *devInfo)
-    {
-        return cusolverDnZsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
-    }
-
-    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, float *A, int lda, int *Lwork)
-    {
-        return cusolverDnSsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, double *A, int lda, int *Lwork)
-    {
-        return cusolverDnDsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, SciPAL::CudaComplex<float> *A, int lda, int *Lwork)
-    {
-        return cusolverDnCsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
-    }
-    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, SciPAL::CudaComplex<double> *A, int lda, int *Lwork)
-    {
-        return cusolverDnZsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
-    }
-
-    // Does not yet supports leading dimension nor stride
-    template <typename T>
-    static void lower_upper_triangle(const SciPAL::Matrix<T, BW>& A, SciPAL::Matrix<T, BW>& L, SciPAL::Matrix<T, BW>& U)
-    {
-        // dimension of A
-        unsigned int m = A.n_rows(), n = A.n_cols();
-        unsigned int min_mn = (m<=n?m:n);
-        // set diagonal entries of L to 1.0
-        // copy strict lower triangular part of A into L
-        // copy upper triangular part of A into U
-        for(unsigned int i = 0, ip1 = 1, im = 0; i < min_mn - 1; i++, ip1++, im += m)
-        {
-            unsigned int impip1 = im + ip1;
-            L(i, i, 1.0);
-            BW::copy(m - ip1, A.data() + impip1, 1, L.data() + impip1    , 1);
-            BW::copy(    ip1, A.data() + im    , 1, U.data() + i * min_mn, 1);
-        }
-        L(min_mn - 1, min_mn - 1, 1.0);
-        if(n >= m)
-        {
-            BW::copy(m * (n - m + 1), A.data() + m * (m - 1), 1, U.data() + m * (m - 1), 1);
-        }
-        else
-        {
-            BW::copy(m - n, A.data() +m * (n - 1) + n, 1, L.data() + m * (n - 1) + n, 1);
-            BW::copy(m, A.data() + m * (n - 1), 1, U.data() + n * (n - 1), 1);
-        }
-        cudaDeviceSynchronize();
-    }
-
-
-public:
+    //---------------------------------------------------------
+    //SVD functions:
     // Calculates the SVD for a Matrix A (m x n) with A=U*S*Vt for cublas matrices via cuSolver.
     // The content of A is destroyed during the process.
     // A is of matrix type s,d,c or z.  Correspondingly the vector of S is of type s or d.
     // (...)
     template <typename T>
-    static cusolverStatus_t SVD(SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Matrix<T, BW>& U,
-                                SciPAL::Vector<typename SciPAL::VTraits<T, BW::arch>::NumberType, BW>& S,
-                                SciPAL::Matrix<T, BW>& Vt)
+    static cusolverStatus_t SVD(SciPAL::Matrix<T, BW>&                                                  A,
+                                SciPAL::Matrix<T, BW>&                                                  U,
+                                SciPAL::Vector<typename SciPAL::VTraits<T, BW::arch>::NumberType, BW>&  S,
+                                SciPAL::Matrix<T, BW>&                                                  Vt)
     {
         // dimension of A
         unsigned int m = A.n_rows(), n = A.n_cols();
@@ -436,20 +228,20 @@ public:
 
         return stat;
     }
-
     // Calculates the SVD for a Matrix A (m x n) with A=U*S*Vt for cublas matrices via cuSolver.
     // A is of matrix type s,d,c or z.  Correspondingly the vector of S is of type s or d.
     template <typename T>
-    static cusolverStatus_t SVD(const SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Matrix<T, BW>& U,
-                                SciPAL::Vector<typename SciPAL::VTraits<T, BW::arch>::NumberType, BW>& S,
-                                SciPAL::Matrix<T, BW>& Vt)
+    static cusolverStatus_t SVD(const SciPAL::Matrix<T, BW>&                                            A,
+                                SciPAL::Matrix<T, BW>&                                                  U,
+                                SciPAL::Vector<typename SciPAL::VTraits<T, BW::arch>::NumberType, BW>&  S,
+                                SciPAL::Matrix<T, BW>&                                                  Vt)
     {
         SciPAL::Matrix<T, BW> A_tmp(A);
         return SVD(A_tmp, U, S, Vt);
     }
 
-
+    //---------------------------------------------------------
+    //LUD functions:
     // Calculates the LU decomposition for a Matrix A (m x n) with P*A=L*U for cublas matrices via cuSolver.
     // The result is stored in A.
     // A is of matrix type s,d,c or z.
@@ -486,15 +278,14 @@ public:
 
         return stat;
     }
-
     // Calculates the LU decomposition for a Matrix A (m x n) with P*A=L*U for cublas matrices via cuSolver.
     // The content of A is destroyed during the process.
     // A is of matrix type s,d,c or z.
     template <typename T>
-    static cusolverStatus_t LUD(SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Vector<int, BW>& P,
-                                SciPAL::Matrix<T, BW>& L,
-                                SciPAL::Matrix<T, BW>& U)
+    static cusolverStatus_t LUD(SciPAL::Matrix<T, BW>&          A,
+                                SciPAL::Vector<int, BW>&        P,
+                                SciPAL::Matrix<T, BW>&          L,
+                                SciPAL::Matrix<T, BW>&          U)
     {
         // dimension of A
         unsigned int m = A.n_rows(), n = A.n_cols();
@@ -514,28 +305,29 @@ public:
 
         return stat;
     }
-
     // Calculates the LU decomposition for a Matrix A (m x n) with P*A=L*U for cublas matrices via cuSolver.
     // A is of matrix type s,d,c or z.
     template <typename T>
-    static cusolverStatus_t LUD(const SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Vector<int, BW>& P,
-                                SciPAL::Matrix<T, BW>& L,
-                                SciPAL::Matrix<T, BW>& U)
+    static cusolverStatus_t LUD(const SciPAL::Matrix<T, BW>&    A,
+                                SciPAL::Vector<int, BW>&        P,
+                                SciPAL::Matrix<T, BW>&          L,
+                                SciPAL::Matrix<T, BW>&          U)
     {
         SciPAL::Matrix<T, BW> A_tmp(A);
         return LUD(A_tmp, P, L, U);
     }
 
-
+    //---------------------------------------------------------
+    //QRF functions:
     // Calculates the QR decomposition for a Matrix A (m x n) with A=Q*R for cublas matrices via cuSolver.
     // The result is stored in A.
     // A is of matrix type s,d,c or z.
+    // work and Lwork are referenced in order to be reused in xxmqr
     template <typename T>
-    static cusolverStatus_t QRF(SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Vector<T, BW>& tau,
-                                SciPAL::Vector<T, BW>& work=SciPAL::Vector<T, BW>(),
-                                int& Lwork=0)
+    static cusolverStatus_t QRF(SciPAL::Matrix<T, BW>&          A,
+                                SciPAL::Vector<T, BW>&          tau,
+                                SciPAL::Vector<T, BW>&          work = SciPAL::Vector<T, BW>(),
+                                int&                            Lwork = 0)
     {
         // dimension of A
         unsigned int m = A.n_rows(), n = A.n_cols();
@@ -565,22 +357,23 @@ public:
         return stat;
     }
 
-
     // Calculates the QR decomposition for a Matrix A (m x n) with A=Q*R for cublas matrices via cuSolver.
     // The content of A is destroyed during the process.
     // A is of matrix type s,d,c or z.
     template <typename T>
-    static cusolverStatus_t QRF(SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Matrix<T, BW>& Q,
-                                SciPAL::Matrix<T, BW>& R)
+    static cusolverStatus_t QRF(SciPAL::Matrix<T, BW>&          A,
+                                SciPAL::Matrix<T, BW>&          Q,
+                                SciPAL::Matrix<T, BW>&          R)
     {
         // dimension of A
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
 
         // allocate space for Q,R
-        Q.reinit(m, min_mn);
-        R.reinit(min_mn, n);
+        //Q.reinit(m, min_mn);
+        //R.reinit(min_mn, n);
+        Q.reinit(m, m);
+        R.reinit(m, n);
 
         SciPAL::Vector<T, BW> tau(1);
         SciPAL::Vector<T, BW> work(1);
@@ -588,12 +381,16 @@ public:
 
         cusolverStatus_t stat = QRF(A, tau, work, Lwork);
 
-        for (unsigned int i = 0; i < min_mn; i++)
+        //for (unsigned int i = 0; i < min_mn; i++)
+        //    Q(i, i, 1.0);
+        for (unsigned int i = 0; i < m; i++)
             Q(i, i, 1.0);
 
         // copy upper triangle part of A to R
+        //for(unsigned int i = 0; i < n; i++)
+        //    BW::copy(((i+1<min_mn)?i+1:min_mn), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
         for(unsigned int i = 0; i < n; i++)
-            BW::copy(((i+1<min_mn)?i+1:min_mn), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
+            BW::copy(((i+1<m)?i+1:m), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
 
         cudaDeviceSynchronize();
 
@@ -609,18 +406,19 @@ public:
         cudaFree(devInfo);
         return stat;
     }
-
     // Calculates the QR decomposition for a Matrix A (m x n) with A=Q*R for cublas matrices via cuSolver.
     // A is of matrix type s,d,c or z.
     template <typename T>
-    static cusolverStatus_t QRF(const SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Matrix<T, BW>& Q,
-                                SciPAL::Matrix<T, BW>& R)
+    static cusolverStatus_t QRF(const SciPAL::Matrix<T, BW>&    A,
+                                SciPAL::Matrix<T, BW>&          Q,
+                                SciPAL::Matrix<T, BW>&          R)
     {
         SciPAL::Matrix<T, BW> A_tmp(A);
         return QR(A_tmp, Q, R);
     }
 
+    //---------------------------------------------------------
+    // LDL functions:
     // Calculates the LDL decomposition for a Matrix A (n x n) with P*A*Pt=L*D*Lt or
     // P*A*Pt=Lt*D*L=U*D*Ut for cublas matrices via cuSolver.
     // It seems that the cusolver functions cusolverDn<X>sytrf do not work properly. Multiplying
@@ -628,11 +426,11 @@ public:
     // the wrapper function.
     // TODO: repair this wrapper function or wait until cusolverDn<X>sytrf works properly
     template <typename T>
-    static cusolverStatus_t LDL(SciPAL::Matrix<T, BW>& A,
-                                SciPAL::Vector<int, BW>& P,
-                                SciPAL::Matrix<T, BW>& L,
-                                SciPAL::Matrix<T, BW>& D,
-                                cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER)
+    static cusolverStatus_t LDL(SciPAL::Matrix<T, BW>&      A,
+                                SciPAL::Vector<int, BW>&    P,
+                                SciPAL::Matrix<T, BW>&      L,
+                                SciPAL::Matrix<T, BW>&      D,
+                                cublasFillMode_t            uplo = CUBLAS_FILL_MODE_LOWER)
     {
         // dimension of A
         unsigned int n = A.n_cols();
@@ -693,6 +491,218 @@ public:
         cudaDeviceSynchronize();
         return stat;
     }
-};
 
+private:
+    //Helper functions (move them to the Matrix class?):
+    // Does not yet supports leading dimension nor stride
+    template <typename T>
+    static void lower_upper_triangle(const SciPAL::Matrix<T, BW>& A, SciPAL::Matrix<T, BW>& L, SciPAL::Matrix<T, BW>& U)
+    {
+        // dimension of A
+        unsigned int m = A.n_rows(), n = A.n_cols();
+        unsigned int min_mn = (m<=n?m:n);
+        // set diagonal entries of L to 1.0
+        // copy strict lower triangular part of A into L
+        // copy upper triangular part of A into U
+        for(unsigned int i = 0, ip1 = 1, im = 0; i < min_mn - 1; i++, ip1++, im += m)
+        {
+            unsigned int impip1 = im + ip1;
+            L(i, i, 1.0);
+            BW::copy(m - ip1, A.data() + impip1, 1, L.data() + impip1    , 1);
+            BW::copy(    ip1, A.data() + im    , 1, U.data() + i * min_mn, 1);
+        }
+        L(min_mn - 1, min_mn - 1, 1.0);
+        if(n >= m)
+        {
+            BW::copy(m * (n - m + 1), A.data() + m * (m - 1), 1, U.data() + m * (m - 1), 1);
+        }
+        else
+        {
+            BW::copy(m - n, A.data() +m * (n - 1) + n, 1, L.data() + m * (n - 1) + n, 1);
+            BW::copy(n, A.data() + m * (n - 1), 1, U.data() + n * (n - 1), 1);
+        }
+        cudaDeviceSynchronize();
+    }
+
+    //---------------------------------------------------------
+    //SVD cusolverDn-wrapper:
+    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, float *A, int lda, float *S, float *U, int ldu, float *VT, int ldvt, float *Work, int Lwork, float *rwork, int *devInfo)
+    {
+        return cusolverDnSgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, double *A, int lda, double *S, double *U, int ldu, double *VT, int ldvt, double *Work, int Lwork, double *rwork, int *devInfo)
+    {
+        return cusolverDnDgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, SciPAL::CudaComplex<float> *A, int lda, float *S, SciPAL::CudaComplex<float> *U, int ldu, SciPAL::CudaComplex<float> *VT, int ldvt, SciPAL::CudaComplex<float> *Work, int Lwork, float *rwork, int *devInfo)
+    {
+        return cusolverDnCgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, SciPAL::CudaComplex<double> *A, int lda, double *S, SciPAL::CudaComplex<double> *U, int ldu, SciPAL::CudaComplex<double> *VT, int ldvt, SciPAL::CudaComplex<double> *Work, int Lwork, double *rwork, int *devInfo)
+    {
+        return cusolverDnZgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
+    }
+
+    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, float /*Zero*/)
+    {
+        return cusolverDnSgesvd_bufferSize(cusolver_handle, m, n, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, double /*Zero*/)
+    {
+        return cusolverDnDgesvd_bufferSize(cusolver_handle, m, n, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, SciPAL::CudaComplex<float> /*Zero*/)
+    {
+        return cusolverDnCgesvd_bufferSize(cusolver_handle, m, n, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngesvd_bufferSize(int m, int n, int *Lwork, SciPAL::CudaComplex<double> /*Zero*/)
+    {
+        return cusolverDnZgesvd_bufferSize(cusolver_handle, m, n, Lwork);
+    }
+
+    inline static void SVD_check_devInfo(cusolverStatus_t stat, int *devInfo)
+    {
+        // check error information (see cusolver doc.)
+#ifdef DEBUG
+        if(stat != CUSOLVER_STATUS_SUCCESS){
+            std::cout << "cusolver crashed" << std::endl;
+            std::cout << "device information:" << std::endl;
+            int Info;
+            cudaMemcpy(&Info, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
+            if(Info == 0)
+                std::cout << "\tThe operation was successful" << std::endl;
+            if(Info > 0)
+                std::cout << "\t" << Info << " superdiagonal(s) did not converge to zero" << std::endl;
+            if(Info < 0)
+                std::cout << "\tthe " << -Info << "-th parameter is wrong" << std::endl;
+        }
+#endif
+    }
+
+    //---------------------------------------------------------
+    //LUD cusolverDn-wrapper:
+    inline static cusolverStatus_t cusolverDngetrf(int m, int n, float *A, int lda, float *Workspace, int *devIpiv, int *devInfo)
+    {
+        return cusolverDnSgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngetrf(int m, int n, double *A, int lda, double *Workspace, int *devIpiv, int *devInfo)
+    {
+        return cusolverDnDgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngetrf(int m, int n, SciPAL::CudaComplex<float> *A, int lda, SciPAL::CudaComplex<float> *Workspace, int *devIpiv, int *devInfo)
+    {
+        return cusolverDnCgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngetrf(int m, int n, SciPAL::CudaComplex<double> *A, int lda, SciPAL::CudaComplex<double> *Workspace, int *devIpiv, int *devInfo)
+    {
+        return cusolverDnZgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
+    }
+
+    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, float *A, int lda, int *Lwork)
+    {
+        return cusolverDnSgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, double *A, int lda, int *Lwork)
+    {
+        return cusolverDnDgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, SciPAL::CudaComplex<float> *A, int lda, int *Lwork)
+    {
+        return cusolverDnCgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngetrf_bufferSize(int m, int n, SciPAL::CudaComplex<double> *A, int lda, int *Lwork)
+    {
+        return cusolverDnZgetrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+
+    //---------------------------------------------------------
+    //QRF cusolverDn-wrapper:
+    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, float *A, int lda, float *TAU, float *Workspace, int Lwork, int *devInfo)
+    {
+        return cusolverDnSgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, double *A, int lda, double *TAU, double *Workspace, int Lwork, int *devInfo)
+    {
+        return cusolverDnDgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, SciPAL::CudaComplex<float> *A, int lda, SciPAL::CudaComplex<float> *TAU, SciPAL::CudaComplex<float> *Workspace, int Lwork, int *devInfo)
+    {
+        return cusolverDnCgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDngeqrf(int m, int n, SciPAL::CudaComplex<double> *A, int lda, SciPAL::CudaComplex<double> *TAU, SciPAL::CudaComplex<double> *Workspace, int Lwork, int *devInfo)
+    {
+        return cusolverDnZgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
+    }
+
+    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, float *A, int lda, int *Lwork)
+    {
+        return cusolverDnSgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, double *A, int lda, int *Lwork)
+    {
+        return cusolverDnDgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, SciPAL::CudaComplex<float> *A, int lda, int *Lwork)
+    {
+        return cusolverDnCgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDngeqrf_bufferSize(int m, int n, SciPAL::CudaComplex<double> *A, int lda, int *Lwork)
+    {
+        return cusolverDnZgeqrf_bufferSize(cusolver_handle, m, n, A, lda, Lwork);
+    }
+
+    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const float *A, int lda, const float *tau, float *C, int ldc, float *work, int lwork, int *devInfo)
+    {
+        return cusolverDnSormqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const double *A, int lda, const double *tau, double *C, int ldc, double *work, int lwork, int *devInfo)
+    {
+        return cusolverDnDormqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const SciPAL::CudaComplex<float> *A, int lda, const SciPAL::CudaComplex<float> *tau, SciPAL::CudaComplex<float> *C, int ldc, SciPAL::CudaComplex<float> *work, int lwork, int *devInfo)
+    {
+        return cusolverDnCunmqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDnormqr(cublasSideMode_t side, cublasOperation_t trans, int m, int n, int k, const SciPAL::CudaComplex<double> *A, int lda, const SciPAL::CudaComplex<double> *tau, SciPAL::CudaComplex<double> *C, int ldc, SciPAL::CudaComplex<double> *work, int lwork, int *devInfo)
+    {
+        return cusolverDnZunmqr(cusolver_handle, side, trans, m, n, k, A, lda, tau, C, ldc, work, lwork, devInfo);
+    }
+
+    //---------------------------------------------------------
+    //LDL cusolverDn-wrapper:
+    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, float *A, int lda, int *ipiv, float *work, int lwork, int *devInfo)
+    {
+        return cusolverDnSsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, double *A, int lda, int *ipiv, double *work, int lwork, int *devInfo)
+    {
+        return cusolverDnDsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, SciPAL::CudaComplex<float> *A, int lda, int *ipiv, SciPAL::CudaComplex<float> *work, int lwork, int *devInfo)
+    {
+        return cusolverDnCsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
+    }
+    inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, SciPAL::CudaComplex<double> *A, int lda, int *ipiv, SciPAL::CudaComplex<double> *work, int lwork, int *devInfo)
+    {
+        return cusolverDnZsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);
+    }
+
+    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, float *A, int lda, int *Lwork)
+    {
+        return cusolverDnSsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, double *A, int lda, int *Lwork)
+    {
+        return cusolverDnDsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, SciPAL::CudaComplex<float> *A, int lda, int *Lwork)
+    {
+        return cusolverDnCsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
+    }
+    inline static cusolverStatus_t cusolverDnsytrf_bufferSize(int n, SciPAL::CudaComplex<double> *A, int lda, int *Lwork)
+    {
+        return cusolverDnZsytrf_bufferSize(cusolver_handle, n, A, lda, Lwork);
+    }
+};  //END struct cusolverDn
+} //END namespace SciPAL
 #endif // CUSOLVERDN_WRAPPER_STEP43_HH

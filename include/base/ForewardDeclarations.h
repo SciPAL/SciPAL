@@ -17,8 +17,9 @@ namespace SciPAL
     template<typename, typename> class Matrix;
     template<typename, typename> class SubMatrixView;
     template<typename, typename> class Vector;
-    template<typename, typename> class SubVectorView;
-    template<typename, typename> class ColVectorView;
+    template<typename, typename, typename> class SubVectorView;
+    template<typename, typename, typename> class ColVectorView;
+//    template<typename, typename> class ColVectorViewM;
     //wrapper for simple numeric factors
     template<typename T, typename BW> struct Literal;
     template<typename T> struct DevLiteral;

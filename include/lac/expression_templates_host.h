@@ -59,8 +59,8 @@ struct BinaryExpr
         public Expr< BinaryExpr<_L, Operation, _R> >
 {
     // Redefine template parameters as types, such they are accessible later from the outside
-    typedef typename GetMyType<_L>::Type L; //<- needed in apply function template
-    typedef typename GetMyType<_R>::Type R;
+    typedef typename _L::Type L; //<- needed in apply function template
+    typedef typename _R::Type R;
     typedef Operation OpTag;
     static const EType I_am = binE;
     // The following two typedefs are for the recursive use of the BinaryExpr class

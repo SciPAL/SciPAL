@@ -54,9 +54,6 @@ struct blas {
     //! Compile-time variable for identifying the side of PCIe bus this BLAS works on.
     static const ParallelArch arch = cpu;
 
-    typedef blas blas_wrapper_type;
-
-
     //! Initialize cblas. In this particular case this function does nothing.
     static void  Init() {
 
@@ -93,13 +90,13 @@ struct blas {
         static const int leading_dim_multiplier = 32;
 
         //! Default constructor. Sets up nothing.
-        Data() : __data(0)
+        Data() : __data(0), __n_el(0), leading_dim_elements(0)
         {}
 
         //! Construct an array of length @p n.
         //! @param n : Number of elements to allocate.
         Data(size_t n_rows, size_t n_cols = 1)
-            : __data(0), __n_el(0)
+            : __data(0), __n_el(0), leading_dim_elements(0)
         {
             resize(n_rows, n_cols);
         }
@@ -242,6 +239,60 @@ public:
         copy (n_el, A, inc_src, B, inc_dst);
 
         //! check_status(status);
+    }
+
+    // @sect4{Funktion: amax}
+    //!
+    //! @param n : number of elements.
+    //! @param x : source vector x.
+    //! @param incx : stride between consecutive elements of x.
+
+    static int
+    amax (int n, const float *x,
+          int incx)
+    {
+       CBLAS_INDEX result = cblas_isamax(n, x, incx);
+       return result;
+    }
+
+    static int
+    amax (int n, const double *x,
+          int incx)
+    {
+       CBLAS_INDEX result = cblas_idamax(n, x, incx);
+       return result;
+    }
+
+    static int
+    amax (int n, const std::complex<float> *x,
+          int incx)
+    {
+       CBLAS_INDEX result = cblas_icamax(n, reinterpret_cast<const float*>(x), incx);
+       return result;
+    }
+
+    static int
+    amax (int n, const float2 *x,
+          int incx)
+    {
+       CBLAS_INDEX result = cblas_icamax(n, reinterpret_cast<const float*>(x), incx);
+       return result;
+    }
+
+    static int
+    amax (int n, const std::complex<double> *x,
+          int incx)
+    {
+       CBLAS_INDEX result = cblas_izamax(n, reinterpret_cast<const double*>(x), incx);
+       return result;
+    }
+
+    static int
+    amax (int n, const double2 *x,
+          int incx)
+    {
+       CBLAS_INDEX result = cblas_izamax(n, reinterpret_cast<const double*>(x), incx);
+       return result;
     }
 
     // @sect4{Funktion: asum}

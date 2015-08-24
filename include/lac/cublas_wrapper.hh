@@ -50,7 +50,6 @@ static cublasHandle_t handle;
 //!
 struct cublas {
 
-    typedef cublas blas_wrapper_type;
     // @sect4{Funktion: name}
     //!
     //! Return a string identifier. This is useful in the output of performance tests.

@@ -509,12 +509,12 @@ struct SolutionSet : public dealii::BlockVector< double >
 
         if (selected_comps.empty())
         {
-            for (int c = 0; c < n_components; c++)
+            for (uint c = 0; c < n_components; c++)
                 constraints.distribute( this->block(c) );
         }
         else {
 
-            for (int c = 0; c < n_components; c++)
+            for (uint c = 0; c < n_components; c++)
                 if (selected_comps[c])
                     constraints.distribute( this->block(c) );
 

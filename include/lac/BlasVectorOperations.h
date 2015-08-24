@@ -42,6 +42,9 @@ struct BlasVecExp/*VectorExpressions*/
     typedef ::SciPAL::Matrix<T, BW> Mtx;
     typedef ::SciPAL::Vector<T, BW> Vtr;
 
+    typedef ::SciPAL::SubMatrixView<T, BW> SMtx;
+    typedef ::SciPAL::SubVectorView<T, BW, Vtr> SVtr;
+
     typedef Literal<T, BW> Lit;
 
     // $ y = \alpha x$
@@ -71,20 +74,27 @@ struct BlasVecExp/*VectorExpressions*/
     axpy;
 
     // $ z =  x^t \cdot y$
-    typedef typename SciPAL::BinaryExpr< SciPAL::UnaryExpr<Vtr, SciPAL::expr_transpose>, mult, Vtr>
+    typedef typename SciPAL::BinaryExpr< UnaryExpr<Vtr, expr_transpose>, mult, Vtr>
     scalar_product;
 
-    // vector = transpose(A) * vector
+    // vector = (smatrix) * vector
     typedef typename SciPAL::BinaryExpr<
-    SciPAL::UnaryExpr<SciPAL::SubMatrixView<T, BW>, SciPAL::expr_transpose>, SciPAL::mult, Vtr > SMtmV;
+    SubMatrixView<T, BW>, mult, Vtr > SMmV;
 
+    // vector = (smatrix) * svector
     typedef typename SciPAL::BinaryExpr<
-    SciPAL::UnaryExpr<SciPAL::SubMatrixView<T, BW>, SciPAL::expr_transpose>, SciPAL::mult, SubVectorView<T, Vtr> >
+    SubMatrixView<T, BW> , mult, SVtr > SMmSV;
+
+    // vector = transpose(smatrix) * vector
+    typedef typename SciPAL::BinaryExpr<
+    UnaryExpr<SciPAL::SubMatrixView<T, BW>, expr_transpose>, mult, Vtr > SMtmV;
+
+    // vector = transpose(smatrix) * svector
+    typedef typename SciPAL::BinaryExpr<
+    UnaryExpr<SciPAL::SubMatrixView<T, BW>, expr_transpose>, mult, SubVectorView<T, BW, Vtr> >
     SMtmSV;
 
-    // vector = (A) * vector
-    typedef typename SciPAL::BinaryExpr<
-    SciPAL::SubMatrixView<T, BW> , SciPAL::mult, SciPAL::Vector<T, BW> > SMmV;
+
 
 
 };
@@ -322,7 +332,7 @@ static void apply(Vector<T, BW> &result,
 {
 
     typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
-    typedef SubVectorView<T, typename BlasVecExp<T, BW>::Vtr> SVtr;
+    typedef SubVectorView<T, BW, typename BlasVecExp<T, BW>::Vtr> SVtr;
     typedef typename BlasVecExp<T, BW>::Vtr Vtr;
 
     T alpha = T(1);
@@ -354,13 +364,13 @@ static void apply(Vector<T, BW> &result,
 //! $dst = A^t \cdot src$
 
 template <typename T, typename BW>
-static void apply(SubVectorView<T, typename BlasVecExp<T, BW>::Vtr> &result,
+static void apply(SubVectorView<T, BW, typename BlasVecExp<T, BW>::Vtr> &result,
                   const typename BlasVecExp<T, BW>::SMtmSV& expr)
 {
 
     typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
-    typedef SubVectorView<T, typename BlasVecExp<T, BW>::Vtr> SVtr;
-    typedef typename BlasVecExp<T, BW>::Vtr Vtr;
+    typedef SubVectorView<T, BW,typename BlasVecExp<T, BW>::Vtr> SVtr;
+//    typedef typename BlasVecExp<T, BW>::Vtr Vtr;
 
     T alpha = T(1);
     const Mtx & A = expr.l.l;
@@ -368,7 +378,7 @@ static void apply(SubVectorView<T, typename BlasVecExp<T, BW>::Vtr> &result,
 
     T beta = T(0);
 
-    Vtr & dst = result;
+    SVtr & dst = result;
 
 
     BW::gemv('t',
@@ -406,6 +416,42 @@ static void apply(Vector<T, BW> &result,
     T beta = T(0);
 
     Vtr & dst = result;
+
+
+    BW::gemv('n',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data(),
+             A.leading_dim(), // lda
+             x.data(),
+             1, // incx
+             beta,
+             dst.data(), // y
+             1 // incy
+             );
+}
+
+// @sect4{Function: apply}
+//!
+//! Matrix-vector multiplication.
+//! $dst = A \cdot x$
+
+template <typename T, typename BW>
+static void apply(SubVectorView<T, BW, typename BlasVecExp<T, BW>::Vtr> &result,
+                  const typename BlasVecExp<T, BW>::SMmSV& expr)
+{
+
+    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
+    typedef typename BlasVecExp<T, BW>::SVtr SVtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const SVtr & x = expr.r;
+
+    T beta = T(0);
+
+    SVtr & dst = result;
 
 
     BW::gemv('n',

@@ -61,9 +61,9 @@ class Vector
 
     friend class SciPAL::SubMatrixView<T, BW>;
 
-    template<typename, typename> friend class SubVectorView;
+    template<typename, typename, typename> friend class SubVectorView;
 
-    template<typename, typename> friend class ColVectorView;
+    template<typename, typename, typename> friend class ColVectorView;
 
 
 public:
@@ -174,7 +174,7 @@ public:
     Vector<T, BW> & operator = (const T value);
 
     template<typename T_src>
-    Vector<T, BW> & operator = (const SubVectorView<T, T_src > & other);
+    Vector<T, BW> & operator = (const SubVectorView<T, BW, T_src> & other);
 
     template<typename T_src>
     Vector<T, BW> & operator = (const dealii::Vector<T_src> & other);
@@ -186,14 +186,14 @@ public:
     Vector<T, BW> & operator += (const Vector<T, BW> & other);
 
     template<typename T_src>
-    Vector<T, BW> & operator += (const SubVectorView<T, T_src > & other);
+    Vector<T, BW> & operator += (const SubVectorView<T, BW, T_src> & other);
 
     Vector<T, BW> & operator += (const T scalar);
 
     Vector<T, BW> & operator -= (const Vector<T, BW> & other);
 
     template<typename T_src>
-    Vector<T, BW> & operator -= (const SubVectorView<T, T_src > & other);
+    Vector<T, BW> & operator -= (const SubVectorView<T, BW, T_src> & other);
 
     template<typename T2>
     Vector<T, BW> & operator *= (const T2 scale);
@@ -606,7 +606,7 @@ SciPAL::Vector<T, BW>::push_to(dealii::Vector<T2> & dst) const
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, T_src > & other)
+SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, BW, T_src> & other)
 {
     Assert(this->size() >= other.size(),
            dealii::ExcDimensionMismatch(this->size(), other.size()) );
@@ -690,7 +690,7 @@ SciPAL::Vector<T, BW>::operator += (const Vector<T, BW> & other)
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator += (const SubVectorView<T, T_src > & other)
+SciPAL::Vector<T, BW>::operator += (const SubVectorView<T, BW, T_src> & other)
 {
 
     One<T> one;
@@ -769,7 +769,7 @@ SciPAL::Vector<T, BW>::operator -= (const Vector<T, BW> & other)
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator -= (const SubVectorView<T, T_src > & other)
+SciPAL::Vector<T, BW>::operator -= (const SubVectorView<T, BW, T_src> & other)
 {
     Assert(this->size() >= other.size(),
            dealii::ExcMessage("Dimension mismatch") );

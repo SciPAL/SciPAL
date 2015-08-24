@@ -174,12 +174,12 @@ namespace SciPAL {
     // @sect3{Klasse: ColVectorView}
     //!
     //! Ansicht auf einen Teil einer Spalte einer Matrix oder eines Spaltenvektors.
-    template<typename T, typename BW>
-    class ColVectorView : public SubVectorView<T, BW, Vector<T,BW> > {
+    template<typename T, typename BW, typename T_src>
+    class ColVectorView : public SubVectorView<T, BW, T_src > {
 
     public:
         typedef BW blas_wrapper_type;
-        typedef SubVectorView<T, BW, Vector<T,BW>> Base;
+        typedef SubVectorView<T, BW, T_src> Base;
         typedef Shape<T, BW, vector> MyShape;
 
     ColVectorView(T_src & src,
@@ -189,7 +189,7 @@ namespace SciPAL {
       //! Applies expressions to view
       //!
       template<typename X>
-      SciPAL::ColVectorView<T, BW> & operator = (const SciPAL::Expr<X> &e)
+      SciPAL::ColVectorView<T, BW, T_src> & operator = (const SciPAL::Expr<X> &e)
       {
       #ifdef DEBUG
           std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
@@ -202,7 +202,7 @@ namespace SciPAL {
 
 
     template<typename T2>
-    SciPAL::ColVectorView<T, BW> & operator *= (const T2 scale)
+    SciPAL::ColVectorView<T, BW, T_src> & operator *= (const T2 scale)
                                                     {
         int elem_dist = 1;
 
@@ -239,7 +239,7 @@ namespace SciPAL {
 
 
     template<typename T2_src>
-    ColVectorView<T, BW, T_src> & operator += (const ColVectorView<T, BW, T2_src> &other)
+    ColVectorView<T, BW, T_src> & operator += (const SubVectorView<T, BW, T2_src> &other)
     {
         Base & self = *this;
         const typename ColVectorView<T, BW, T2_src>::Base & o = other;
@@ -257,92 +257,16 @@ namespace SciPAL {
     }
 
     template<typename T_src2>
-    ColVectorView & operator = (const SubVectorView<T, BW, T_src2> & other)
+    ColVectorView & operator = (const ColVectorView<T, BW, T_src2> & other)
     {
         Base & self = *this;
-        typedef typename SubVectorView<T, BW, T_src2>::Base Base2;
+        typedef typename ColVectorView<T, BW, T_src2>::Base Base2;
         const Base2 &src = other;
         self = src;
 
         return *this;
     }
-    };
-
-    // @sect3{Klasse: ColVectorViewM}
-    //!
-    //! Ansicht auf einen Teil einer Spalte einer Matrix oder eines Spaltenvektors.
-    template<typename T, typename BW>
-    class ColVectorViewM : public SubVectorView<T, BW, Matrix<T,BW> > {
-
-    public:
-        typedef BW blas_wrapper_type;
-        typedef SubVectorView<T, BW, Vector<T,BW>> Base;
-        typedef Shape<T, BW, vector> MyShape;
-
-    ColVectorViewM(T_src & src,
-                  int r_begin, int c=0) : Base(src, r_begin,
-                                               src.n_rows()/*r_end*/, c){}
-      // @sect4{Operator: =}
-      //! Applies expressions to view
-      //!
-      template<typename X>
-      SciPAL::ColVectorViewM<T, BW> & operator = (const SciPAL::Expr<X> &e)
-      {
-      #ifdef DEBUG
-          std::cout << "line :" << __LINE__ << ", SubVectorView<T,BW>" << std::endl;
-          print_expr_info(__PRETTY_FUNCTION__);
-      #endif
-
-          SciPAL::LAOOperations::apply(*this,  ~e);
-          return *this;
-      }
-
-
-    template<typename T2>
-    SciPAL::ColVectorViewM<T, BW> & operator *= (const T2 scale)
-                                                    {
-        int elem_dist = 1;
-
-        int n = this->n_elements_active;
-
-        Base::BW::scal(n, scale, &(this->data()[0]), elem_dist);
-
-        return *this;
-    }
-
-
-
-
-    template<typename T2_src>
-    ColVectorViewM<T, BW> & operator += (const SubVectorView<T, BW, T2_src> &other)
-    {
-        Base & self = *this;
-        const typename SubVectorView<T, BW, T2_src>::Base & o = other;
-        self += o;
-
-        return *this;
-    }
-
-    void reset(int r_begin, int c=0)
-    {
-        this->MyShape::reinit(this->data_ptr,
-                              r_begin, this->r_end_active,
-                              c, c+1,
-                              this->MyShape::leading_dim, 1);
-    }
-
-    template<typename T_src2>
-    ColVectorViewM & operator = (const ColVectorViewM<T, BW> & other)
-    {
-        Base & self = *this;
-        typedef typename SubVectorView<T, BW, T_src2>::Base Base2;
-        const Base2 &src = other;
-        self = src;
-
-        return *this;
-    }
-    };
-
+    };//end class
 
 
     // @sect3{Klasse: RowVectorView}

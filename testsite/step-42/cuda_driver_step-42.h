@@ -23,7 +23,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/blas_wrapper.hh>
 #include <lac/cublas_wrapper.hh>
 
-#include <numerics/SolverWrapper.h>
+#include <numerics/cusolverDn_wrapper.h>
 
 #include <base/CudaComplex.h>
 

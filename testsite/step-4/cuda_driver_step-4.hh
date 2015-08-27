@@ -119,8 +119,8 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
     T alpha = 0, sigma = 0;
 
     Vector x(n_rows);
-    Vector u(n_rows);
     Vector k(n_rows);
+    Vector u(n_rows);
 
     SubMatrix A_rest(R_d, 0, 0);
 
@@ -135,6 +135,7 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // Move the upper left corner of the view
         // to the next diagonal element.
         A_rest.reset(c, n_rows, c, n_cols);
+        std::cout << "A_rest("<<c<<"):\n"; A_rest.print();
 
         // For $Q$ we have to mask all previously processed columns.
         Q_0c.reset(0, n_rows, c, n_rows);
@@ -145,7 +146,10 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // The non-zero part of the column Householder vector is initialized
         // with the subcolumn of @p A.
         MatrixSubCol sub_col_A(R_d, c, c);
+        std::cout << "sub_col_A("<<c<<"):\n"; sub_col_A.print();
         SubColVector view_u(u, c, 0);
+        SubColVector view_x(x, c, 0);
+        SubColVector view_k(k, 0, 0);
 
 
         // Compute the i-th Householder vektor $\hat u^{(i)}$
@@ -161,14 +165,18 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
 
             sigma    = beta_t/alpha;
 
+            u -= u;
+
             view_u = sub_col_A;   // FIX ME
 
-            u.add(c, alpha); // std::cout << "u("<<c<<") + alpha :\n"; u.print();
+            u.add(c, alpha);
+            std::cout << "u("<<c<<") + alpha "<<alpha<<" :\n"; u.print();
 
             Assert(std::fabs(beta_t) > 1e-14, dealii::ExcMessage("Div by 0!") );
 
 
             u *= 1./beta_t;
+            std::cout << "u *= 1/beta_t "<<beta_t<<" :\n"; u.print();
         }
 
         // The matrix-matrix product $(I - \sigma u u^T)A$
@@ -178,7 +186,10 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // & = & A -  u (\sigma A^Tu)^T \,. \\
         //\f}
         // To do this, we define $x := A^Tu$
-        x = transpose(A_rest) * u; //FIX ME
+        x -= x;
+        view_x = transpose(A_rest) * view_u; //FIX ME
+        std::cout << "x = transpose(A_rest) * u :\n"; x.print();
+        std::cout << "view_x = transpose(A_rest) * u :\n"; view_x.print();
 
         // and take into account $\sigma$ in the outer product
         // which due to the use of SubMatrixViews is executed only on
@@ -187,16 +198,26 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         //                          &=& A(k:m,k:n) - \sigma ux^T\,,
         //\f}
         //FIX ME use expressions
-        A_rest.add_scaled_outer_product(-sigma, u, x);
+        A_rest.add_scaled_outer_product(-sigma, view_u, view_x);
+        std::cout << "A_rest("<<c<<"):\n"; A_rest.print();
 
         // Updating $Q$ is similar
         // \f{eqnarray*} Q(1:m,k:n) &=& Q(1:m,k:n) - \sigma Q(1:m,k:n)uu^T \\
         // k & := &   Q(1:m,k:n)u \\
         // \Rightarrow   Q(1:m,k:n) &=& Q(1:m,k:n) - \sigma ku^T
         //\f}
-        k = Q_0c * u;
+        k -= k;
+//        k = Q_0c * u;
+        view_k = Q_0c * view_u;
+        std::cout << "k("<<c<<"):\n"; k.print();
 
-        Q_0c.add_scaled_outer_product(-sigma, k, u);
+
+        Q_0c.add_scaled_outer_product(-sigma, view_k, view_u);
+        std::cout << "Q0_c("<<c<<"):\n"; Q_0c.print();
+
+        std::cout << "Q_d("<<c<<")\n"; Q_d.print();
+        std::cout << "R_d("<<c<<")\n"; R_d.print();
+
     }
 
     timer.print_elapsed("Time spent on Householder-QR excluding host-device memory traffic : ");

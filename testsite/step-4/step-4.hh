@@ -650,8 +650,8 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
 
     SubMatrix QR_num(QR, 0, 0);
 
-    QR_num = Q_num * R_num;
-
+//    QR_num = Q_num * R_num;
+    QR = QRf.Q() * QRf.R();
     // At the end, @p QtQ should be a diagonal matrix provided @p QRf.Q()
     // is orthogonal.
 
@@ -659,7 +659,7 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
 
 
     Matrix QtQ;
-    QtQ = transpose(QRf.Q()) * Q_tmp; //FIX ME
+    QtQ = transpose(QRf.Q()) * QRf.Q(); //FIX ME
 
     // Compute deviations due to factorization
     Matrix  A_m_QR;

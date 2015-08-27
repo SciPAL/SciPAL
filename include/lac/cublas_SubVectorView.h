@@ -76,7 +76,11 @@ namespace SciPAL {
                       int r_begin, int r_end, int c = 0);
 
         ~SubVectorView()
-        {std::cout<<"Peng"<<std::endl;}
+        {
+        #ifdef DEBUG
+            std::cout<<"Peng"<<std::endl;
+        #endif
+        }
 
         typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
 

@@ -58,7 +58,11 @@ public:
                   int c_begin, int c_end);
 
     ~SubMatrixView()
-    {std::cout<<"Destructor MatrixView"<<std::endl;}
+    {
+    #ifdef DEBUG
+        std::cout<<"Destructor MatrixView"<<std::endl;
+    #endif
+    }
 
     void print() const;
 

@@ -29,6 +29,16 @@
 
 #include <lac/cublas_algorithms.h>
 
+
+//! @sect4{Macro: print_intermediate }
+//! Helper function for debugging, prints intermediate results.
+//! since there is no nice way to conditionally define macros, we have to
+//! comment and uncommet th definition by hand :(
+
+#define DEBUG_RESULTS(var)\
+//    std::cout << #var <<"("<<c<<"):\n"; var.print();
+
+
 // @sect3{Implementation: CudaQRDecomposition Methods}
 //
 // @sect4{Constructor: CudaQRDecomposition}
@@ -135,7 +145,8 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // Move the upper left corner of the view
         // to the next diagonal element.
         A_rest.reset(c, n_rows, c, n_cols);
-        std::cout << "A_rest("<<c<<"):\n"; A_rest.print();
+
+        DEBUG_RESULTS(A_rest);
 
         // For $Q$ we have to mask all previously processed columns.
         Q_0c.reset(0, n_rows, c, n_rows);
@@ -146,7 +157,8 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // The non-zero part of the column Householder vector is initialized
         // with the subcolumn of @p A.
         MatrixSubCol sub_col_A(R_d, c, c);
-        std::cout << "sub_col_A("<<c<<"):\n"; sub_col_A.print();
+        DEBUG_RESULTS(sub_col_A);
+
         SubColVector view_u(u, c, 0);
         SubColVector view_x(x, c, 0);
         SubColVector view_k(k, 0, 0);
@@ -165,18 +177,15 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
 
             sigma    = beta_t/alpha;
 
-            u -= u;
-
             view_u = sub_col_A;   // FIX ME
 
             u.add(c, alpha);
-            std::cout << "u("<<c<<") + alpha "<<alpha<<" :\n"; u.print();
 
             Assert(std::fabs(beta_t) > 1e-14, dealii::ExcMessage("Div by 0!") );
 
-
             u *= 1./beta_t;
-            std::cout << "u *= 1/beta_t "<<beta_t<<" :\n"; u.print();
+            DEBUG_RESULTS(u)
+
         }
 
         // The matrix-matrix product $(I - \sigma u u^T)A$
@@ -186,10 +195,9 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         // & = & A -  u (\sigma A^Tu)^T \,. \\
         //\f}
         // To do this, we define $x := A^Tu$
-        x -= x;
         view_x = transpose(A_rest) * view_u; //FIX ME
-        std::cout << "x = transpose(A_rest) * u :\n"; x.print();
-        std::cout << "view_x = transpose(A_rest) * u :\n"; view_x.print();
+        DEBUG_RESULTS(view_x);
+        DEBUG_RESULTS(x)
 
         // and take into account $\sigma$ in the outer product
         // which due to the use of SubMatrixViews is executed only on
@@ -199,24 +207,22 @@ step4::CudaQRDecomposition<T, blas>::householder(const dealii::FullMatrix<T> &A)
         //\f}
         //FIX ME use expressions
         A_rest.add_scaled_outer_product(-sigma, view_u, view_x);
-        std::cout << "A_rest("<<c<<"):\n"; A_rest.print();
+        DEBUG_RESULTS(A_rest);
 
         // Updating $Q$ is similar
         // \f{eqnarray*} Q(1:m,k:n) &=& Q(1:m,k:n) - \sigma Q(1:m,k:n)uu^T \\
         // k & := &   Q(1:m,k:n)u \\
         // \Rightarrow   Q(1:m,k:n) &=& Q(1:m,k:n) - \sigma ku^T
         //\f}
-        k -= k;
-//        k = Q_0c * u;
-        view_k = Q_0c * view_u;
-        std::cout << "k("<<c<<"):\n"; k.print();
 
+
+        view_k = Q_0c * view_u;
+        DEBUG_RESULTS(k);
 
         Q_0c.add_scaled_outer_product(-sigma, view_k, view_u);
-        std::cout << "Q0_c("<<c<<"):\n"; Q_0c.print();
-
-        std::cout << "Q_d("<<c<<")\n"; Q_d.print();
-        std::cout << "R_d("<<c<<")\n"; R_d.print();
+        DEBUG_RESULTS(Q_0c);
+        DEBUG_RESULTS(Q_d);
+        DEBUG_RESULTS(R_d);
 
     }
 

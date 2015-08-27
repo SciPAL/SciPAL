@@ -659,7 +659,7 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
 
 
     Matrix QtQ;
-    QtQ = transpose(QRf.Q()) * QRf.Q(); //FIX ME
+    QtQ = transpose(QRf.Q()) * Q_tmp; //FIX ME
 
     // Compute deviations due to factorization
     Matrix  A_m_QR;
@@ -677,7 +677,7 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
     QtQ -= I;
 
     T l2_QtQ_error = QtQ.l2_norm();
-
+    QtQ += I;
     std::cout << "||Q^T Q - I||_2 : " << l2_QtQ_error << std::endl;
 
     // To determine $\|Q-Q_{orig}\|_2$ we have to take care of the signs of
@@ -686,7 +686,8 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
     // and then we compute the l2-Norm of the vector of the per-column errors.
     FullMatrixAccessor Q_t_ugly(Q,
                                    true /*column-major copy*/);
-    Matrix Q_orig; Q_orig = Q_t_ugly;
+    Matrix Q_orig;
+    Q_orig = Q_t_ugly;
 
     T l2_Q_error = 0;
     for (int c = 0; c < n_cols; ++c)
@@ -753,7 +754,7 @@ step4::QRTest<T, blas>::check_results(const dealii::FullMatrix<T> & A,
 
 
     if (this->params.print_QtQ) {
-        std::cout << "\nQ^TQ :" << std::endl; QtQ.print();
+        std::cout << "\nQ^TQ:" << std::endl; QtQ.print();
     }
 
 

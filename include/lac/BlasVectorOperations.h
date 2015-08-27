@@ -434,9 +434,42 @@ static void apply(Vector<T, BW> &result,
 
 // @sect4{Function: apply}
 //!
-//! Matrix-vector multiplication.
-//! $dst = A \cdot x$
+//! subMatrix-vector multiplication.
+//! $dst = A \cdot src$
 
+template <typename T, typename BW>
+static void apply(SubVectorView<T, BW, typename BlasVecExp<T, BW>::Vtr> &result,
+                  const typename BlasVecExp<T, BW>::SMmV& expr)
+{
+
+    typedef ::SciPAL::SubMatrixView<T, BW> Mtx;
+    typedef Vector<T, BW> Vtr;
+
+    T alpha = T(1);
+    const Mtx & A = expr.l;
+    const Vtr & x = expr.r;
+
+    T beta = T(0);
+
+    typename BlasVecExp<T, BW>::SVtr & dst = result;
+
+
+    BW::gemv('n',
+             A.n_rows(), // m
+             A.n_cols(), // n
+             alpha,
+             A.data(),
+             A.leading_dim(), // lda
+             x.data(),
+             1, // incx
+             beta,
+             dst.data(), // y
+             1 // incy
+             );
+}
+
+
+//! same as above, but different result type
 template <typename T, typename BW>
 static void apply(SubVectorView<T, BW, typename BlasVecExp<T, BW>::Vtr> &result,
                   const typename BlasVecExp<T, BW>::SMmSV& expr)

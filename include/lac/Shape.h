@@ -64,6 +64,22 @@ public:
     //! @param n_cols : number of columns. If this is set to 1 you get a column vector.
     //! @param stride : If this value is, e.g., 3, then only every 3rd element of the original data array gets accessed.
     //! @param leading_dim : the length of a column in memory. This value can be used to optimize memory access of CUDA warps. We assume column-major storage in order to be compatible with CUBLAS.
+
+    Shape(size_t  r_begin_active,
+          size_t  r_end_active,
+          size_t  c_begin_active,
+          size_t  c_end_active,
+          size_t  stride = 1)
+    {
+        this->reinit(r_begin_active, r_end_active,
+                     c_begin_active, c_end_active,
+                     stride);
+    }
+
+    //! In contrast to the constructor above, this one reuses the memory
+    //! information from @p other. But alters the elements the Shape's information.
+    //! This is particular intresting when we build Views, which don't have own
+    //! memory.
     template<LAOType LT2>
     Shape(const Shape<T, BW, LT2>& other,
           size_t  r_begin_active,
@@ -83,17 +99,6 @@ public:
 
         this->view_begin = this->data_ptr +
                 (this->c_begin_active * this->leading_dim + this->r_begin_active);
-    }
-
-    Shape(size_t  r_begin_active,
-          size_t  r_end_active,
-          size_t  c_begin_active,
-          size_t  c_end_active,
-          size_t  stride = 1)
-    {
-        this->reinit(r_begin_active, r_end_active,
-                     c_begin_active, c_end_active,
-                     stride);
     }
 
     //! By assigning one shape to another we get two shapes looking at the same LAO.
@@ -165,6 +170,12 @@ public:
 
         this->view_begin = this->data_ptr +
                 (this->c_begin_active * this->leading_dim + this->r_begin_active);
+    }
+
+    ~Shape()
+    {
+        this->data_ptr = 0;
+        this->view_begin = 0;
     }
 
     //! The following functions er used to access attributes of ShapeData

@@ -43,20 +43,23 @@ namespace LAOOperations
 //! This is a partial specialization of the function below for setting a matrix or vector to a certain
 //! value given by the Literal.
 
-//template <typename T, //! numbertype
-//          typename BW, //! blas type
-//          template <typename, typename> class LAO //! template for result type
-//          >
-//static void apply(LAO<T, BW> &result,
-//                  const ::SciPAL::Expr<Literal<T, BW> > &lit)
-//{
-//   ::SciPAL::Kernels<T, BW::arch> bla(4);
-//   UnaryExpr<Literal<T, BW>, Setter<T> >parent(~lit) ;//Expr envelope for Literal
-//   DevUnaryExpr<Literal<T, BW>, Setter<T> >child(parent);
+//! this function compile sometimes to some strange behavior in the development
+//! process thus this directive to disable it
+#ifndef DEV_DEBUGGING
+template <typename T, //! numbertype
+          typename BW, //! blas type
+          template <typename, typename> class LAO //! template for result type
+          >
+static void apply(LAO<T, BW> &result,
+                  const ::SciPAL::Expr<Literal<T, BW> > &lit)
+{
+   ::SciPAL::Kernels<T, BW::arch> bla(4);
+   UnaryExpr<Literal<T, BW>, Setter<T> >parent(~lit) ;//Expr envelope for Literal
+   DevUnaryExpr<Literal<T, BW>, Setter<T> >child(parent);
 
-//   bla.apply(result, child);
-//}
-
+   bla.apply(result, child);
+}
+#endif
 
 //! @sect3{function: apply}
 //! This function evaluates unary expressions applied to matrices or vectors, for instance $ A = \sin(A)$ where $A$ is a matrix or vector.
@@ -73,19 +76,23 @@ namespace LAOOperations
 //!
 //! @param result: linear algebra object which will contain the result of the expression.
 //! @param parent: expresion object built on the host-side of the program.
-//template <typename T, //! numbertype
-//          typename BW, //! blas type
-//          template <typename, typename> class LAO, //! template for result type
-//          typename E/*short for Expression*/ >
-//static void apply(LAO<T, BW> &result,
-//                  const ::SciPAL::Expr<E> &parent)
-//{
-//   SciPAL::Kernels<T, BW::arch> bla(4);
-////   result.reinit((~parent).get_l());
-//    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
-//   bla.apply(result, child);
-//}
 
+//! this function compile sometimes to some strange behavior in the development
+//! process thus this directive to disable it
+#ifndef DEV_DEBUGGING
+template <typename T, //! numbertype
+          typename BW, //! blas type
+          template <typename, typename> class LAO, //! template for result type
+          typename E/*short for Expression*/ >
+static void apply(LAO<T, BW> &result,
+                  const ::SciPAL::Expr<E> &parent)
+{
+   SciPAL::Kernels<T, BW::arch> bla(4);
+//   result.reinit((~parent).get_l());
+    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
+   bla.apply(result, child);
+}
+#endif
 
 } // END namespace LAOOperations
 

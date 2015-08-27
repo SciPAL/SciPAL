@@ -132,6 +132,8 @@ public:
         return *this;
     }
 
+    ~Vector(){}
+
     //! Generate a deep copy of @p other
     template<typename BW2>
     Vector<T, BW> & operator = (const Vector<T, BW2> & other)
@@ -508,13 +510,13 @@ SciPAL::Vector<T, BW>::add(int k,const T value)
     Assert((k >= 0) && (k < this->size()),
            dealii::ExcMessage("Index out of range") );
 
-
-    Vector<T, BW> tmp_d(1);
-    tmp_d.set(0, value);
+    std::vector<T> tmp_init{value};
+    Vector<T, BW> tmp_d(tmp_init);
+//    tmp_d.set(0, value);
 
 
     BW::axpy(1/*other.size()*/, 1, tmp_d.data()/*other.data()*/, 1,
-             &(this->data()[k]), 1);
+             this->data()+k, 1);
 }
 
 

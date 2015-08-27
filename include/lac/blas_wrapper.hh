@@ -31,7 +31,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 //! deal.II components
 #include <deal.II/base/exceptions.h>
-
+#include <memory>
 #include <string>
 #include <complex>
 #include <iostream>
@@ -70,15 +70,8 @@ struct blas {
 
     //! Basic memory management. Encapsulates allocation, deallocation and resizing the array.
     template<typename T>
-    class Data {
+    struct Data {
 
-         //! Pointer to the first element of the array.
-        T * __data;
-
-         //! Number of elements in the array.
-        size_t __n_el;
-
-        size_t leading_dim_elements;
 
     public:
         //! This attribute can be used to determine an optimal
@@ -90,7 +83,7 @@ struct blas {
         static const int leading_dim_multiplier = 32;
 
         //! Default constructor. Sets up nothing.
-        Data() : __data(0), __n_el(0), leading_dim_elements(0)
+        Data() : __data(), __n_el(0), leading_dim_elements(0)
         {}
 
         //! Construct an array of length @p n.
@@ -115,23 +108,26 @@ struct blas {
                    dealii::ExcMessage("allocation of 0 elements not allowed"));
 #endif
 
-            if (__n_el == 0)
-            {
-                __data = new T[n];
-                __n_el = n;
-            }
-            else {
-            if (__n_el != n)
-                delete __data;
-                __data = new T[n];
-                __n_el = n;
-            }
+//            if (__n_el == 0)
+//            {
+//                __data = new T[n];
+//                __n_el = n;
+//            }
+//            else {
+//            if (__n_el != n)
+//                delete[] __data;
+//                __data = 0;
+//                __data = new T[n];
+//                __n_el = n;
+//            }
+        __data.reset(new T[n]);
+        __n_el = n;
 
             if(__n_el == n)
                 for(size_t ii = 0; ii <  __n_el; ii++)
                     __data[ii] = T();
 
-        };
+        }
 
         /*
         size_t leading_dim() const {
@@ -141,19 +137,28 @@ struct blas {
 
         ~Data()
         {
-            if (__n_el > 0)
-            {
-                delete __data;
-                __data = 0;
-            }
+//            if (__n_el > 0)
+//            {
+//                delete[] __data;
+//                __data = 0;
+//            }
         }
 
         //! Read-Write access to pointer to the first element of the array.
-        T * data() { return __data; }
+        T * data() { return __data.get(); }
 
         //! Read access to pointer to the first element of the array.
-        const T * data() const { return __data; }
-    };
+        const T * data() const { return __data.get(); }
+
+    private:
+        //! Pointer to the first element of the array.
+//       T * __data;
+        std::unique_ptr<T []> __data;
+        //! Number of elements in the array.
+       size_t __n_el;
+
+       size_t leading_dim_elements;
+    }; //end struct Data
 
 
 public:
@@ -379,10 +384,6 @@ public:
           int incx, double *y, int incy)
     {
        cblas_daxpy(n, alpha, x, incx, y, incy);
-
-       //! cublasStatus status = cublasGetError();
-
-       //! check_status(status);
     }
 
     static void

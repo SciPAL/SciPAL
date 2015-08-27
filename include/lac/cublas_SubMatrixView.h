@@ -56,7 +56,10 @@ public:
 
     SubMatrixView(Matrix<T, BW> & src, int r_begin, int r_end,
                   int c_begin, int c_end);
-    //! ~SubMatrixView() {}
+
+    ~SubMatrixView()
+    {std::cout<<"Destructor MatrixView"<<std::endl;}
+
     void print() const;
 
     SubMatrixView & operator = (const Matrix<T, BW>& col);

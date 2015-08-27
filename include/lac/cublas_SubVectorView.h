@@ -75,19 +75,10 @@ namespace SciPAL {
         SubVectorView(T_src & src,
                       int r_begin, int r_end, int c = 0);
 
-//        typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
-        // @sect4{Funktion: l2_norm}
-        //!
-        //! L2-Norm des betrachteten Vektorteils.
-//        template<typename T, typename BW, typename T_src>
-        typename PrecisionTraits<T, BW::blas_wrapper_type::arch>::NumberType
-//        SciPAL::SubVectorView<T, BW, T_src>::
-        l2_norm() const
-        {
-            typename PrecisionTraits<T, BW::arch>::NumberType result
-                    = BW::nrm2(this->size(), this->data(), this->stride);
-            return result;
-        }
+        ~SubVectorView()
+        {std::cout<<"Peng"<<std::endl;}
+
+        typename PrecisionTraits<T, BW::arch>::NumberType l2_norm() const;
 
         template<typename VECTOR>
         T dot(const VECTOR & other) const;
@@ -118,7 +109,7 @@ namespace SciPAL {
         SubVectorView & operator *= (const T alpha);
         SubVectorView & operator /= (const T alpha);
         SubVectorView & operator /=
-        (const std::complex<typename PrecisionTraits<T, BW::blas_wrapper_type::arch>::NumberType> alpha);
+        (const std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> alpha);
 
         //! Copy the elements of other to this. This changes the elements of the
         //! source object of this.
@@ -312,6 +303,18 @@ SciPAL::SubVectorView<T, BW, T_src >::SubVectorView(T_src & src,
     _is_col(true)
 {}
 
+//!@sect4{Funktion: l2_norm}
+//!
+//! L2-Norm des betrachteten Vektorteils.
+template<typename T, typename BW, typename T_src>
+typename PrecisionTraits<T, BW::arch>::NumberType
+SciPAL::SubVectorView<T, BW, T_src>::
+l2_norm() const
+{
+    typename PrecisionTraits<T, BW::arch>::NumberType result
+            = BW::nrm2(this->size(), this->data(), this->stride);
+    return result;
+}
 
 // @sect4{Funktion: data}
 //!
@@ -467,7 +470,7 @@ SciPAL::SubVectorView<T, BW, T_src> ::operator /=(const T alpha)
 
 template<typename T, typename BW, typename T_src>
 SciPAL::SubVectorView<T, BW, T_src> &
-        SciPAL::SubVectorView<T, BW, T_src> ::operator /=(const std::complex<typename PrecisionTraits<T, BW::blas_wrapper_type::arch>::NumberType> alpha)
+        SciPAL::SubVectorView<T, BW, T_src> ::operator /=(const std::complex<typename PrecisionTraits<T, BW::arch>::NumberType> alpha)
 {
 #ifdef DEBUG
     Assert(norm(alpha),

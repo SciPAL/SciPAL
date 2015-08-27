@@ -21,7 +21,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define SCIPAL_ARRAY_H
 
 //! #include <lac/FullMatrixAccessor.h>
-
+#include <memory>
 #include <lac/Shape.h>
 #include <lac/cublas_wrapper.hh>
 
@@ -68,7 +68,7 @@ public:
 
 
 protected:
-
+    __inline__
     size_t leading_dim() const {
         //        return this->Base::leading_dim();
         return this->n_rows;

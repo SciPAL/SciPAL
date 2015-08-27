@@ -67,6 +67,7 @@ struct ShapeData {
     ShapeData()
     {
         this->data_ptr = 0;
+        this->view_begin = 0;
         this->n_rows = 0;
         this->r_begin_active = 0;
         this->r_end_active = 0;

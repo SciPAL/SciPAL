@@ -267,16 +267,9 @@ struct cublas {
 
         T * dev_ptr;
         size_t pitch_in_bytes;
-    };
-
-
-private:
-
+    }; //end struct Data
 
 public:
-
-
-
     // @sect4{Funktion: SetMatrix}
     //!
     //! @param rows : Anzahl Zeilen.

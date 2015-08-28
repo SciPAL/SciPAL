@@ -7,6 +7,8 @@
 // The parameter class for your simulation.
 #include <step-27/SimParams.h>
 
+#include <iostream>
+
 namespace step27 {
 
 // @sect4{Class: SimulationManager}
@@ -175,8 +177,10 @@ step27::SimulationManager<DRSType, SimParamsType>::SimulationManager(int argc,
     // and write what has been actually read
     // into log file. Basically, this is just another parameter file
     // and thus could be used again as input to another run after stripping the .log suffix.
-    std::ofstream log_master_prm( (this->params.prm_log_dir.absolutePath() + QDir::separator()
-                                   + QString(master_prm_filename.c_str()) + ".log").toStdString().c_str() );
+    QString path_name = (/*this->params.prm_log_dir.absolutePath() + QDir::separator()
+                        + */QString(master_prm_filename.c_str()) + ".log");
+    std::cout<<path_name.toStdString().c_str()<<std::endl;
+    std::ofstream log_master_prm( path_name.toStdString().c_str() );
     prm_handler.print_parameters (log_master_prm,
                                   dealii::ParameterHandler::Text);
 

@@ -245,10 +245,8 @@ namespace SciPAL {
 
     void reset(int r_begin, int c=0)
     {
-        this->MyShape::reinit(this->data_ptr,
-                              r_begin, this->r_end_active,
-                              c, c+1,
-                              this->MyShape::leading_dim, 1);
+        this->MyShape::reinit_attr(r_begin, this->r_end_active,
+                              c, c+1);
     }
 
     template<typename T_src2>

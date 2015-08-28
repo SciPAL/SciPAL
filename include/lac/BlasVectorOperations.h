@@ -225,7 +225,7 @@ static void apply(Vector<T, BW> &result,
     typedef Vector<T, BW> Vtr;
 
     T alpha = T(1);
-    const Mtx & A = expr.l;
+    const Mtx & A = expr.l.l;
     const Vtr & x = expr.r;
 
     T beta = T(0);

@@ -130,7 +130,7 @@ public:
                       size_t  r_end_active,
                       size_t  c_begin_active,
                       size_t  c_end_active,
-                      size_t  stride)
+                      size_t  stride=1)
      {
          this->r_begin_active = r_begin_active;
          this->r_end_active = r_end_active;

@@ -2,8 +2,8 @@
 #define EXPRESSION_TEMPLATE_HELPER_H
 
 #include <base/ForewardDeclarations.h>
-#include <QString>
-#include <QStringList>
+
+
 namespace SciPAL {
 
 //! @sect3{struct: ExprChooser}
@@ -94,15 +94,6 @@ struct GetMyType<T0, T...> {
 };
 
 
-
-//! function to print information about expression evaluation
-#ifdef DEBUG
-void print_expr_info(QString expr_name)
-{
-QStringList names = expr_name.split("[with");
-std::cout<<"evaluating expression :"<<names.at(1).toStdString()<<"\n"<<std::endl;
-}
-#endif
 }
 
 #endif // EXPRESSION_TEMPLATE_HELPER_H

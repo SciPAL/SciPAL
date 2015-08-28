@@ -753,6 +753,10 @@ void step42::CUDADriver::views(){
     SciPAL::Vector<Number, BW> x(n_rows);
     std::cout << "Vector A "<<std::endl;
     V_A.print();
+    x = (SV_B) * V_A;
+    std::cout << "Vector x = (SV_B) * V_A "<<std::endl;
+    x.print();
+
     x = transpose(SV_B) * V_A;
     std::cout << "Vector x = transpose(SV_B) * V_A "<<std::endl;
     x.print();

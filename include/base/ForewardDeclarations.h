@@ -3,7 +3,7 @@
 
 #include <base/ParallelArch.h>
 #include <complex>
-
+#include <QString>
 struct blas;
 struct cublas;
 
@@ -64,6 +64,7 @@ typedef double2 cuDoubleComplex;
 
 template<typename> class FullMatrixAccessor;
 
+void print_expr_info(QString expr_name);
 
 #endif // FOREWARDDECLARATIONS_H
 

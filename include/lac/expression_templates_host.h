@@ -31,7 +31,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/ShapeData.h>
 #include <lac/Literal.h>
 
-// #include <IdOp/IdOp.h>
+#include <lac/expression_template_helper.h>
 
 #include <lac/OperandInfo.h>
 

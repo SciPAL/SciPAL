@@ -24,7 +24,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 // Driver class for GPU part of th program.
 #include <cuda_driver_step-42.h>
 #include <cuda_driver_step-42.hh>
-#include <base/print_info.h>
 
 // The parameter class for your simulation.
 #include <SimParams.h>

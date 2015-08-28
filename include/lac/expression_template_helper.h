@@ -2,7 +2,7 @@
 #define EXPRESSION_TEMPLATE_HELPER_H
 
 #include <base/ForewardDeclarations.h>
-
+#include <base/print_info.h>
 
 namespace SciPAL {
 

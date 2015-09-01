@@ -1,0 +1,20 @@
+PROJECT_NAME = "blas++ SciPAL"
+
+INPUT    = ../../SciPAL/include/base ../../SciPAL/include/lac ../../SciPAL/include/lac/release ../../SciPAL/include/lac/development ../../SciPAL/include/numerics
+
+FILE_PATTERNS          = *.h *.hh 
+
+HTML_OUTPUT      = ../../doc/autogen/SciPAL
+LATEX_OUTPUT     = ../../doc/autogen/SciPAL
+GENERATE_TAGFILE = SciPAL.tag
+FORMULA_FONTSIZE = 14
+
+IMAGE_PATH   = 
+
+HIDE_IN_BODY_DOCS      = YES
+SHOW_INCLUDE_FILES     = YES
+INPUT_FILTER           = ./filter
+FILTER_SOURCE_FILES    = YES
+
+ALPHABETICAL_INDEX = YES
+COLS_IN_ALPHA_INDEX = 3

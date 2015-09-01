@@ -1,0 +1,14 @@
+#!/usr/bin/perl -p
+
+# make sure we can just write $...$ for formulas.
+s/\$/\@f\$/g;
+
+# we don't let doxygen put everything into a namespace
+# dealii. consequently, doxygen can't link references that contain an
+# explicit dealii:: qualification. remove it and replace it by the
+# global scope
+#
+# Now, as of doxygen 1.5, this still produces the wrong result, but
+# that's not our fault. This is reported here:
+#    http://bugzilla.gnome.org/show_bug.cgi?id=365053
+#s/dealii::/::/g;

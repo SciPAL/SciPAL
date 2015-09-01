@@ -18,7 +18,7 @@
 #assemble_system_multithreaded.hh
 #geomgpc.h
 #bemforms.h
-bemforms.hh
+../step-27/bemforms.hh
 #simulation_handler.h
 #timing.h
 #BoundaryDoFTools.hh

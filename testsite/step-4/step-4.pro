@@ -24,7 +24,9 @@
 # QT = core
 # thread-safe console application with rules for debug and release version
 
-
+#this define disables the VectorCustom operations.
+#this is helpful to track down some compiler errors during the development process
+#DEFINES += DEV_DEBUGGING
 
 CONFIG += console \
     thread \

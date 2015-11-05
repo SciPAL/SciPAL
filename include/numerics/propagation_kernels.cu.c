@@ -2,9 +2,9 @@
 //Header for referencing CUDA based part
 //! \file
 #include "propagation_kernels_wrapper.cu.h"
+#include <base/ForewardDeclarations.h>
 #include <iostream>
 #include <base/ParallelArch.h>
-#include <lac/Shape.h>
 #include <typeinfo>
 
 #define TILE_DIM (32)
@@ -13,6 +13,306 @@
 using namespace SciPAL;
 
 //////////////////////////////////////////////////////////////////////////////////////////
+// @sect4{Kernel: Host + Devce: __generate_k_element}
+//The template allows to test the algorithm with T=float2 or double2 numbers.
+template <typename T, ParallelArch arch>
+__host__ __device__ void __generate_k_element(T *d_devPtr,
+                                              PropagationDataStruct<typename PrecisionTraits<T, arch>::NumberType> &params,
+                                              int index)
+{
+
+    typedef typename PrecisionTraits<T, arch>::NumberType NumberType;
+    typedef typename SciPAL::CudaComplex<NumberType> Complex;
+
+    int x = index % params.width - params.x_0;
+    int y = index / params.width - params.y_0;
+
+    NumberType kx2 = x * x * params.delta_x2;
+    NumberType ky2 = y * y * params.delta_y2;
+    NumberType v = -params.delta_z * 0.5 * (kx2+ky2)/params.k;
+    Complex e(cos(v)/params.size, sin(v)/params.size); // take also scaling factor of fft into account
+    //we have our value, now find position in shifted array
+    int new_x = (x + params.width)%params.width;
+    int new_y = (y + params.height)%params.height;
+    int new_index = new_y * params.width + new_x;
+
+    d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+
+}
+
+//trying to optimize
+template <typename T, ParallelArch arch>
+__host__ __device__ void __generate_k_element2(T *d_devPtr,
+                                               PropagationDataStruct<typename PrecisionTraits<T, arch>::NumberType> &params,
+                                               int index)
+{
+
+    typedef typename PrecisionTraits<T, arch>::NumberType NumberType;
+    typedef typename SciPAL::CudaComplex<NumberType> Complex;
+
+    int x = index % (params.width/2 - 1) + 1;
+    int y = index / (params.width/2 - 1) + 1;
+
+    NumberType kx2 = x * x * params.delta_x2;
+    NumberType ky2 = y * y * params.delta_y2;
+    NumberType v = -params.delta_z * 0.5 * (kx2+ky2)/params.k;
+    NumberType cosv;
+    NumberType sinv;
+    sincos(v, &sinv, &cosv);
+    Complex e(cosv/params.size, sinv/params.size); // take also scaling factor of fft into account
+    //we have our value, now find position in shifted array
+    //we can reuse the calculated values, hopefully this will save some time
+    int new_index = y * params.width + x;
+    d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+    //    printf("i am working: x=%d, y=%d, index=%d, new_index=%d,"
+    //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+    //           x ,y, index, new_index,
+    //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+    new_index = y * params.width + (params.width - x);
+    d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+    //    printf("i am working: x=%d, y=%d, index=%d, new_index=%d,"
+    //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+    //           x ,y, index, new_index,
+    //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+    new_index = (params.height - y) * params.width + x;
+    d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+    //    printf("i am working: x=%d, y=%d, index=%d, new_index=%d,"
+    //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+    //           x ,y, index, new_index,
+    //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+    new_index = (params.height - y) * params.width + (params.width - x);
+    d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+    //    printf("i am working: x=%d, y=%d, index=%d, new_index=%d,"
+    //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+    //           x ,y, index, new_index,
+    //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+}
+
+// @sect4{Kernel: __generate_k}
+//
+//This kernel generates rhe quadratic phase factors for Fresnel propagation.
+
+template <typename T>
+__global__
+void
+__generate_k(T *d_devPtr,
+             PropagationDataStruct<typename PrecisionTraits<T, gpu_cuda>::NumberType> params,
+             int size)
+{
+    //Calculate the thread ID. The thread ID determines which pixel is calculated.
+    int x = blockDim.x*blockIdx.x+threadIdx.x;
+
+    //Prevents kernel to calculate something outside the image vector.
+    if(x<size)
+        __generate_k_element2<T,gpu_cuda>(d_devPtr, params, x);
+
+}
+
+//trying to optimize
+template <typename T, ParallelArch arch>
+__host__ __device__ void __generate_k_element_border(T *d_devPtr,
+                                                     PropagationDataStruct<typename PrecisionTraits<T, arch>::NumberType> &params,
+                                                     int index)
+{
+
+    typedef typename PrecisionTraits<T, arch>::NumberType NumberType;
+    typedef typename SciPAL::CudaComplex<NumberType> Complex;
+
+    int x = index % params.width - params.x_0; //x and y
+    int y = index / params.width - params.y_0; //are negative
+
+    NumberType kx2 = x * x * params.delta_x2;
+    NumberType ky2 = y * y * params.delta_y2;
+    NumberType v = -params.delta_z * 0.5 * (kx2+ky2)/params.k;
+    NumberType cosv;
+    NumberType sinv;
+    sincos(v, &sinv, &cosv);
+    Complex e(cosv/params.size, sinv/params.size); // take also scaling factor of fft into account
+    //we have our value, now find position in shifted array
+    //we can reuse the calculated values, hopefully this will save some time
+
+    if(index != 0)
+    {
+
+        //these are border pixels
+        int new_index = -y * params.width + params.width + x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("i am working border: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = -y * params.width - x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("i am working border:: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = (params.height + x) * params.width + params.width/2;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("i am working border: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = -x * params.width + params.width/2;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+
+        //    printf("i am working border: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+        //
+
+        //but we also have have to work on pixels lying on the "cross" for x or y = 0
+        x += params.x_0;
+        kx2 = x * x * params.delta_x2;
+        v = -params.delta_z * 0.5 * (kx2)/params.k;
+        sincos(v, &sinv, &cosv);
+        Complex e(cosv/params.size, sinv/params.size);
+
+        new_index = x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("cross: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = params.width - x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("cross: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = params.width * x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("cross: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = (params.height - x) * params.width;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //    printf("cross: x=%d, y=%d, index=%d, new_index=%d,"
+        //           "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //           x ,y, index, new_index,
+        //           d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+    }
+    else
+    {
+        //works on the central pixel in the shifted array
+        int new_index = -y * params.width + params.width + x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //        printf("upper left: x=%d, y=%d, index=%d, new_index=%d,"
+        //               "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //               x ,y, index, new_index,
+        //               d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        //now fix zero order pixel
+        new_index = 0;
+        Complex e2(1.0/params.size, 0);
+        d_devPtr[new_index] = toNumberType2(e2 * Complex(d_devPtr[new_index]));
+        //        printf("zero order: x=%d, y=%d, index=%d, new_index=%d,"
+        //               "my result: d_devPtr[new_index] = (%10.10f, %10.10f), d_devPtr[index]=(%f, %f)\n",
+        //               x ,y, index, new_index,
+        //               d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        //outliers on the zero cross
+        x = params.x_0;
+        kx2 = x * x * params.delta_x2;
+        v = -params.delta_z * 0.5 * (kx2)/params.k;
+        sincos(v, &sinv, &cosv);
+        e(cosv/params.size, sinv/params.size);
+
+        new_index = x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //        printf("cross: x=%d, y=%d, index=%d, new_index=%d,"
+        //               "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //               x ,y, index, new_index,
+        //               d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+        new_index = params.width * x;
+        d_devPtr[new_index] = toNumberType2(e * Complex(d_devPtr[new_index]));
+        //        printf("cross: x=%d, y=%d, index=%d, new_index=%d,"
+        //               "my result: d_devPtr[new_index] = (%f, %f), d_devPtr[index]=(%f, %f)\n",
+        //               x ,y, index, new_index,
+        //               d_devPtr[new_index].x, d_devPtr[new_index].y, d_devPtr[index].x, d_devPtr[index].y);
+
+    }
+
+}
+
+// @sect4{Kernel: __generate_k}
+//
+//This kernel generates the quadratic phase factors for Fresnel propagation.
+
+template <typename T>
+__global__
+void
+__generate_k_border(T *d_devPtr,
+                    PropagationDataStruct<typename PrecisionTraits<T, gpu_cuda>::NumberType> params,
+                    int size)
+{
+    //Calculate the thread ID. The thread ID determines which pixel is calculated.
+    int x = blockDim.x*blockIdx.x+threadIdx.x;
+
+    //Prevents kernel to calculate something outside the image vector.
+    if(x<size)
+        __generate_k_element_border<T,gpu_cuda>(d_devPtr, params, x);
+
+}
+
+
+
+//Wrapper functions
+template<typename T>
+template< typename dummy>
+inline void
+PropagationKernelsImpl<T>::Impl<gpu_cuda, dummy>::generate_k(cShape &d_devPtr, NumberType delta_z,
+                                                             NumberType k, NumberType pixel_size,
+                                                             int width, int height, int size)
+{
+#if __CUDA_ARCH__ < 200
+    int threads_per_block = 512;
+#else
+    int threads_per_block = 1024;
+#endif
+    int blocks = (pow(width/2 -1, 2) + threads_per_block - 1) / threads_per_block;
+    //    int blocks = (size + threads_per_block - 1) / threads_per_block;
+    int border_blocks = (width/2 + 512 - 1) / threads_per_block;
+
+    PropagationDataStruct<NumberType> params(delta_z, k, pixel_size, width, height);
+    __generate_k_border<T><<<border_blocks, 512>>>(d_devPtr.data(), params, width/2);
+    __generate_k<T><<<blocks, threads_per_block>>>(d_devPtr.data(), params, pow(width/2 -1, 2));
+    //    __generate_k<T><<<blocks, threads_per_block>>>(d_devPtr.data(), params, size );
+
+
+    cudaDeviceSynchronize();
+}
+//CPU specialization:
+
+template<typename T>
+template< typename dummy>
+inline void
+PropagationKernelsImpl<T>::Impl<cpu, dummy>::generate_k(cShape &d_devPtr, NumberType delta_z,
+                                                        NumberType k, NumberType pixel_size,
+                                                        int width, int height,
+                                                        int size)
+{
+    PropagationDataStruct<NumberType> params(delta_z, k, pixel_size, width, height);
+#pragma omp parallel for
+    for(int i = 0;i < size;i++)
+    {__generate_k_element<T, cpu>(d_devPtr.data(), params, i); }
+}
+
+
 
 // @sect4{Kernel: Host + Devce: __transpose2_element}
 //is for aike
@@ -297,7 +597,7 @@ PropagationKernelsImpl<T>::Impl<gpu_cuda, dummy>::merge_cplx(rShape &re, rShape 
     dim3 dimGrid(width/TILE_DIM, height/TILE_DIM, 1);
     dim3 dimBlock(TILE_DIM, BLOCK_ROWS, 1);
 
-    __merge_cplx<T><<<dimGrid, dimBlock>>>(re.data_ptr, im.data_ptr, d_devPtr.data_ptr);
+    __merge_cplx<T><<<dimGrid, dimBlock>>>(re.data(), im.data(), d_devPtr.data());
     cudaThreadSynchronize();
 
 }
@@ -377,7 +677,7 @@ PropagationKernelsImpl<T>::Impl<gpu_cuda, dummy>::separate_cplx(rShape &re, rSha
     dim3 dimGrid(width/TILE_DIM, height/TILE_DIM, 1);
     dim3 dimBlock(TILE_DIM, BLOCK_ROWS, 1);
 
-    __separate_cplx<T><<<dimGrid, dimBlock>>>(re.data_ptr, im.data_ptr, d_devPtr.data_ptr);
+    __separate_cplx<T><<<dimGrid, dimBlock>>>(re.data(), im.data(), d_devPtr.data());
     cudaThreadSynchronize();
 
 }

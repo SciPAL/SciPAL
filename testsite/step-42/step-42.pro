@@ -17,14 +17,10 @@
 
 
 
-# rules for host part
-# Remove any QT-dependency
-# QT =
-# Due to QThread we need at least
-# QT = core
-# thread-safe console application with rules for debug and release version
 
-
+#this define disables the VectorCustom operations.
+#this is helpful to track down some compiler errors during the development process
+#DEFINES += DEV_DEBUGGING
 
 CONFIG += console \
     thread \

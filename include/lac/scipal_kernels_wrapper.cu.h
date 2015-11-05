@@ -23,8 +23,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <omp.h>
 #endif
 //SciPAL includes
+#include <base/ForewardDeclarations.h>
 #include <base/PrecisionTraits.h>
-#include <lac/Shape.h>
 #include <base/CudaComplex.h>
 #include <lac/expression_templates_device.h>
 #include <lac/UnaryFunctions.h>

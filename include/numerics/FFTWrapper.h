@@ -205,8 +205,9 @@ public:
     typedef typename FFTTraits<cufft_type, arch>::T_dst T_dst;
     typedef typename FFTTraits<cufft_type, arch>::T_src T_src;
 
-    typedef SciPAL::Shape<T_dst> FFTDataDST;
-    typedef SciPAL::Shape<T_src> FFTDataSRC;
+
+    typedef SciPAL::Shape<T_dst, typename archTraits<arch>::BlasType, matrix> FFTDataDST;
+    typedef SciPAL::Shape<T_src, typename archTraits<arch>::BlasType, matrix> FFTDataSRC;
 
 
 

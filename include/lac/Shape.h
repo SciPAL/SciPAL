@@ -20,17 +20,13 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef SCIPAL_SHAPE_H
 #define SCIPAL_SHAPE_H
 
+#include <base/ForewardDeclarations.h>
 #include <algorithm>
 #include <lac/ShapeData.h>
-#include <base/ForewardDeclarations.h>
+#include <lac/Array.h>
 
 namespace SciPAL {
 
-//!Shape Layouts
-enum LAOType {matrix, vector};
-//!specialization of layout
-//!TODO use that to choose memory representation
-enum sub_Layout{general, symm, banded, rowvector, columnvector};
 
 //! The <i>shape</i> of a linear algebra object (LAO) determines whether the LAO can be considered
 //! as matrix or vector. By separating the shape from the data of a LAO it is easy to <i>reshape</i>
@@ -39,6 +35,11 @@ template <typename T, typename BW, LAOType LT>
 class Shape : public ShapeData<T>
 {
     friend class Array<T, BW>;
+
+
+private:
+    Array<T, BW> storage;
+
 public:
 
     //! Data type of the LAO elements.
@@ -236,8 +237,6 @@ protected:
 //    void swap_memory
 
 
-private:
-    Array<T, BW> storage;
 
 };
 

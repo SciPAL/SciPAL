@@ -46,19 +46,12 @@ DEFINES += BEM_DEBUG
     PRAK = $$_PRO_FILE_PWD_/../../ #$$HOME/cuda-2014/Praktikum_2013 # path to your copy of the lab course folder. Typically, this 2 levels above the source folder of your step-
     SciPAL_DIR = $$PRAK/
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/..
+    STEP_DIR = $$_PRO_FILE_PWD_/
 
 message("SciPALs home :" $$SciPAL_DIR)
 message("step home :" $$STEP_DIR)
 
-# Qt considers OSX as a unix.
-#    macx {
-#         DEALHOME = /usr/local #
-#           }
-#    else {
-#        unix {
-#         DEALHOME = /usr/local/deal.II-7.2.0 # path to deal II in NAM
-#        }
-#    }
+
 
 
      #put here some non standard header includes for cuda
@@ -99,7 +92,7 @@ message("Load deal.II simple config")
     else {
         unix {
 message("Load deal.II MPI config")
-         include($$SciPAL_DIR/config/dealii_mpi_conf.pro)
+         include($$SciPAL_DIR/config/dealii_simple_conf.pro)
         }
     }
 

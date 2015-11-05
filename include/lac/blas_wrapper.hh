@@ -89,7 +89,7 @@ struct blas {
         //! Construct an array of length @p n.
         //! @param n : Number of elements to allocate.
         Data(size_t n_rows, size_t n_cols = 1)
-            : __data(0), __n_el(0), leading_dim_elements(0)
+            : __data(), __n_el(0), leading_dim_elements(0)
         {
             resize(n_rows, n_cols);
         }
@@ -153,7 +153,7 @@ struct blas {
     private:
         //! Pointer to the first element of the array.
 //       T * __data;
-        std::unique_ptr<T []> __data;
+        std::unique_ptr<T[]> __data;
         //! Number of elements in the array.
        size_t __n_el;
 

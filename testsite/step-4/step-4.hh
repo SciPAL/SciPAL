@@ -65,9 +65,9 @@ struct GlobalData {
         printf("Warpsize: %d \n",prop.warpSize);
         printf("Number of Multiprocessors: %d \n",prop.multiProcessorCount);
 
-        printf("Shared Memory: %lKB\n",prop.sharedMemPerBlock/KB);
-        printf("Constant Memory: %lKB \n",prop.totalConstMem/KB);
-        printf("Global Memory: %l"
+        printf("Shared Memory: %zd KB\n",prop.sharedMemPerBlock/KB);
+        printf("Constant Memory: %zd KB \n",prop.totalConstMem/KB);
+        printf("Global Memory: %zd"
                "MB \n",prop.totalGlobalMem/MB);
         printf("the device %s can concurrently copy memory "
                "between host and device while executing a kernel\n",

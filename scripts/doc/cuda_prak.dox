@@ -1,0 +1,49 @@
+PROJECT_NAME = "CUDA HPC Praktikum"
+
+INPUT    = ../../doc/tutorial/doxygen  ../../doc/intro.dox.hh 
+#../../include/lac
+
+HTML_OUTPUT      = ../../doc/autogen/CUDA_HPC_Praktikum
+LATEX_OUTPUT     = ../../doc/autogen/CUDA_HPC_Praktikum/LaTeX
+GENERATE_TAGFILE = CUDA_HPC.tag
+FORMULA_FONTSIZE = 14
+
+IMAGE_PATH   =  ../../testsite/step-1/doc/images \
+                ../../testsite/step-2/doc/images \
+                ../../testsite/step-3/doc/images \
+                ../../testsite/step-4/doc/images \
+                ../../testsite/step-5/doc/images \
+                ../../testsite/step-6/doc/images \
+                ../../testsite/step-7/doc/images \
+                ../../testsite/step-8/doc/images \
+                ../../testsite/step-9/doc/images \
+                ../../testsite/step-10/doc/images \
+                ../../testsite/step-11/doc/images \
+                ../../testsite/step-12/doc/images \
+                ../../testsite/step-13/doc/images \
+                ../../testsite/step-14/doc/images \
+                ../../testsite/step-15/doc/images \
+                ../../testsite/step-16/doc/images \
+                ../../testsite/step-17/doc/images \
+                ../../testsite/step-18/doc/images \
+                ../../testsite/step-19/doc/images \
+                ../../testsite/step-20/doc/images \
+                ../../testsite/step-21/doc/images \
+                ../../testsite/step-22/doc/images \
+                ../../testsite/step-23/doc/images \
+                ../../testsite/step-24/doc/images \
+                ../../testsite/step-25/doc/images \
+                ../../testsite/step-26/doc/images \
+                ../../testsite/step-27/doc/images \
+                ../../testsite/step-28/doc/images \
+                ../../testsite/step-29/doc/images \
+                ../../testsite/step-30/doc/images \
+                ../../testsite/step-31/doc/images \
+                ../../testsite/step-32/doc/images \
+                ../../testsite/step-33/doc/images \
+                ../../testsite/step-34/doc/images \
+                ../../testsite/step-35/doc/images \
+                ../../testsite/step-36/doc/images \
+                ../../testsite/step-37/doc/images \
+                ../../testsite/step-38/doc/images \
+                ../../testsite/step-39/doc/images

@@ -229,6 +229,43 @@ static void apply(::SciPAL::SubMatrixView<T, BW>
 
 }
 
+template <typename T, typename BW>
+static void apply(::SciPAL::Matrix<T, BW>
+                  &result,
+                  const typename BlasMatExp<T, BW>
+                  ::SMmSM& expr)
+{
+    typedef typename BlasMatExp<T, BW>::SMtx SMtx;
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    const SMtx& A = expr.l;
+    const SMtx& B = expr.r;
+
+    Mtx & C = result;
+
+    C.reinit(A.n_rows(), B.n_cols());
+
+    int lda = A.leading_dim();
+    int ldb = B.leading_dim(); //! src == B
+    int ldc = result.leading_dim; //! dst == C
+    T alpha = (1.0);
+    T beta = T(0.0);
+
+    BW::gemm('n',
+             'n',
+             A.n_rows(), /*test for transpose...*/
+             /* cublas doc : m == n_rows of op(A), i.e. n_cols for A^T*/
+             B.n_cols(),
+             /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */
+             A.n_cols(),
+             /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B) or n_rows for A^T */
+             alpha,
+             A.data(), lda,
+             B.data(), ldb,
+             beta,
+             result.data(), ldc);
+
+}
 
 template <typename T, typename BW>
 static void apply(::SciPAL::Matrix<T, BW> &result,

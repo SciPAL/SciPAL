@@ -1,0 +1,3 @@
+*.pro.user
+/cblas.h
+/autoInstantiations.h

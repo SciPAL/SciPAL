@@ -1,0 +1,61 @@
+# $Id: Makefile.in 15004 2007-08-21 16:24:27Z bangerth $
+# $Name$
+#
+# Copyright (c) the deal.II authors 2003
+
+###############################
+# Configured variables
+
+PERL = /usr/bin/perl
+
+
+html: cuda_prak.tag
+
+private:
+	perl -pi -e 's/(EXTRACT_PRIVATE\s*=\s*)NO/$$1YES/;s/(INTERNAL_DOCS\s*=\s*)NO/$$1YES/;' options.dox
+	$(MAKE) html
+
+# generate documentation. write the output to a file so as not to hide the
+# important message to impatient observers that this process can take quite
+# a while
+cuda_prak cuda_prak.tag: tutorial \
+          cuda_prak.dox \
+#	  ../../include/*/*.hh \
+#	  $D/lac/include/*/*.h \
+#	  $D/deal.II/include/*/*.h \
+#	  headers/*.h \
+	  $(addprefix ../../tutorial/doxygen/, $(shell ls ../../tutorial/doxygen/))
+	@echo "=== Generating reference documentation. " \
+              "This can take several minutes..."
+	cat options.136 cuda_prak.dox | /usr/bin/doxygen - > doxygen.log
+#	@cp deal.css blanc++
+	( rm ../../testsite/step-*/step-cu.cc )
+tutorial:
+	@echo "=== Generating tutorial ... "
+	@cd ../../doc/tutorial ; $(MAKE)
+	@echo "... DONE"
+
+
+
+# validate cross references. there are so many html files in these
+# directories that we can just call
+#    $(PERL) $D/common/scripts/validate-xrefs.pl deal.II/*.html
+# as this leads to error messages of the kind "/usr/bin/perl: Argument 
+# list too long". Instead, use a loop over all html files
+validate-xrefs:
+	@echo --- Validating xrefs in doxygen/deal.II/ ---
+	@cd deal.II ; \
+		for i in *.html ; do \		
+			$(PERL) validate-xrefs.pl $$i ; \
+		done
+
+# we have so many files that we can't just do "rm deal.II/*" because that
+# leads to overlong command lines. gotta split it up
+clean:
+	-for i in ../../doc/autogen/CUDA_HPC_Praktikum/* ; do rm -rf $$i ; done
+	-rm *.tag
+	@cd ../../doc/tutorial ; $(MAKE) clean
+
+
+.PHONY: html tutorial private blanc++ \
+	validate-xrefs clean tutorial

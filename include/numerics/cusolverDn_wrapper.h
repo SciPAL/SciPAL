@@ -372,8 +372,8 @@ struct cusolverDn
         // allocate space for Q,R
         //Q.reinit(m, min_mn);
         //R.reinit(min_mn, n);
-        Q.reinit(m, m);
-        R.reinit(m, n);
+        Q.reinit(m, min_mn);
+        R.reinit(min_mn, n);
 
         SciPAL::Vector<T, BW> tau(1);
         SciPAL::Vector<T, BW> work(1);
@@ -383,14 +383,14 @@ struct cusolverDn
 
         //for (unsigned int i = 0; i < min_mn; i++)
         //    Q(i, i, 1.0);
-        for (unsigned int i = 0; i < m; i++)
-            Q(i, i, 1.0);
+        for (unsigned int i = 0; i < min_mn; i++)
+            Q(i, i, T(1));
 
         // copy upper triangle part of A to R
         //for(unsigned int i = 0; i < n; i++)
         //    BW::copy(((i+1<min_mn)?i+1:min_mn), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
         for(unsigned int i = 0; i < n; i++)
-            BW::copy(((i+1<m)?i+1:m), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
+            BW::copy(((i+1<min_mn)?i+1:min_mn), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
 
         cudaDeviceSynchronize();
 

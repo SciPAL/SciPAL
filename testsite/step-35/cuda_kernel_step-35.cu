@@ -40,9 +40,6 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 //SciPAL
 #include <base/PrecisionTraits.h>
-#include <src/cuda/scipal_kernels.cu>
-#include <step-35/autoInstantiations.h>
-#include <lac/ShapeData.h>
 
 //Our stuff
 #include "cuda_helper.h"
@@ -176,19 +173,6 @@ struct __element_norm_product <double> {
     }
 };
 
-//@sect5{Struct: __mult}
-//@brief Unary function to calculate elementwise multiplication with a constant value.
-template <typename T>
-struct __mult : public thrust::unary_function<T,T> {
-    const T factor;
-
-    __mult(T _f) : factor(_f) {}
-
-    __device__
-    T operator()(T x) {
-        return factor*x;
-    }
-};
 
 //@sect5{Function: power_of_two}
 //@param x exponent
@@ -210,6 +194,46 @@ __device__ T mysign(T in)
     else
         return (T)1;
 }
+
+
+// @sect5{Function: InverseErf}
+//
+// For the computation of the weights $c_S$ we need the inverse error function. The implementation is taken from the
+// <a href="https://people.maths.ox.ac.uk/gilesm/files/gems_erfinv.pdf">paper</a> by Mike Giles.
+__forceinline__ __device__ float MBG_erfinv(float x)
+{
+    float w, p;
+    w = - __logf((1.0f-x)*(1.0f+x));
+
+    if ( w < 5.000000f )
+    {
+        w = w - 2.500000f;
+        p =  2.81022636e-08f;
+        p =  3.43273939e-07f + p*w;
+        p = -3.5233877e-06f  + p*w;
+        p = -4.39150654e-06f + p*w;
+        p =  0.00021858087f  + p*w;
+        p = -0.00125372503f  + p*w;
+        p=  -0.00417768164f  + p*w;
+        p=   0.246640727f    + p*w;
+        p=   1.50140941f     + p*w;
+    }
+    else
+    {
+        w = sqrtf(w) - 3.000000f;
+        p = -0.000200214257f;
+        p =  0.000100950558f + p*w;
+        p =  0.00134934322f  + p*w;
+        p = -0.00367342844f  + p*w;
+        p =  0.00573950773f  + p*w;
+        p = -0.0076224613f   + p*w;
+        p =  0.00943887047f  + p*w;
+        p =  1.00167406f     + p*w;
+        p =  2.83297682f     + p*w;
+    }
+    return p*x;
+}
+
 
 // @sect4{Kernel}
 //
@@ -294,7 +318,796 @@ __dykstra(T *qg, T *A, int **cinfo, const int * q_offset, const int ni, const in
     qg[threadIdx.x+q_offset[blockIdx.x]] = q[threadIdx.x] + f[threadIdx.x];
 }
 
-//@sect5{Kernel: __incomplete_dykstra}
+
+
+template<typename T>
+__forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
+    volatile T * m_ps = ps_sum + tIx;
+
+    T x =  // 1.0; //
+    *m_ps;
+    __syncthreads();
+
+    *m_ps = x * x;
+    __syncthreads();
+
+    int edge_x = pow_of_two(s);
+
+
+    // ------------------
+//    for (int e = edge_x; e>0; e/= 2)
+//    {
+//        int lane_id = col % (edge_x);
+
+//        if (lane_id < e/2)
+//        {
+//            *m_ps += *(m_ps + e/2);
+//            if (blockIdx.x == 0)
+//                printf ("col : %d, e : %d, lane_id : %d \n", col, e, lane_id);
+//        }
+
+//__syncthreads();
+//    }
+    // ------------------
+
+
+
+    // Each line is processed by one warp
+    for (int e = 2; e <= edge_x; e*= 2)
+    {
+        if ((col+e) % e == 0)
+        {
+                *m_ps += *(m_ps + e/2);
+           // if (*m_ps != e)
+             // printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
+        }
+        __syncthreads();
+    }
+
+}
+
+
+template<typename T>
+__forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
+    volatile T * m_ps = ps_sum + tIx;
+
+    // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
+    T x = // 1.0; //
+    *m_ps;
+    __syncthreads();
+
+    *m_ps = x * x;
+    __syncthreads();
+
+    int edge_x = pow_of_two(s);
+
+    // Each line is processed by one warp
+    for (int e = 2; e <= edge_x; e*= 2)
+    {
+        if ((col+e) % e == 0)
+        {
+                *m_ps += *(m_ps + e/2);
+            //  printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
+        }
+// __syncthreads();
+    }
+
+    __syncthreads();
+
+    int edge_y = pow_of_two(s);
+
+    for (int e = 2; e <= edge_y; e*= 2) // add rows
+    {
+         __syncthreads(); // Needed for some reason to ensure thread safety.
+        int neighbor = blockDim.x*(row + e/2) + col;
+        if ((row+e) % e == 0)
+        {
+//            if (*m_ps != ps_sum[neighbor] /*&& row == 0 && col == 0*/)
+//            {
+//                printf("adding rows : ps_sum[%d] : %f, ps_sum[%d] : %f, e : %d\n", tIx, *m_ps, neighbor, ps_sum[neighbor], e);
+//            }
+            *m_ps += ps_sum[neighbor];
+        }
+
+  __syncthreads();
+
+    }
+
+}
+
+
+template<typename T>
+__forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x, T data, T g_noise, T weight)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+    // FIXME: move into kernel
+    int edge_x = pow_of_two(s_x);
+    int edge_y = pow_of_two(s_y);
+
+    int ws_isx = blockDim.x*edge_y*(row/edge_y) +  edge_x*(col/edge_x);
+
+    T ws = (ps_sum[ws_isx]/(g_noise*g_noise)) * weight;
+    __syncthreads();
+
+#ifndef nFMM_VERSION
+    if (ws > 1.)
+      x *= 1.
+              / sqrt(ws); // x /= sqrt(ws);
+#else
+  // Dantzig version:  x = data + (x - data)*g_noise/sqrt(ws);
+  //  x = x * (1. + 1./sqrt(weight*ps_sum[ws_isx]));
+// JVIM version
+    if ( ws > 1)
+    x = data // paper : +
+            +
+            (x - data) // already in ws : * g_noise
+            / sqrt(ws);
+#endif
+    // For debugging the 2D summation
+     if (false) //  ( blockIdx.x == blockIdx.y) && (ws != T(edge_x*edge_y)) ) //  && blockIdx.y == gridDim.y/2)
+        printf("ws_isx : %d, ws(%d, %d) : %f, x : %f, ps : %f\n ", ws_isx, col, row, ps_sum[ws_isx], x, T(edge_x*edge_y));
+
+    if(false) // ( blockIdx.x == 0) && (blockIdx.y == 0) && row == 0 && col == 0)
+        printf("weight[s=%d] : %f\n", s_x, weight);
+
+    return x;
+}
+
+
+template<typename T>
+__forceinline__ __device__ T L2_norm(T * ps_sum)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+
+   ps_sum[tIx] *= ps_sum[tIx]; // Compute squares of entries.
+   __syncthreads();
+
+   int k_max = blockDim.x*blockDim.y/2;
+
+   for (int k = k_max; k > 0; k/=2)
+   {
+     //  if (tIx == 0)  printf ("k in reduction : %d\n", k);
+       if (tIx < k)
+           ps_sum[tIx] += ps_sum[tIx+k];
+       __syncthreads();
+   }
+
+   T result = ps_sum[0];
+   __syncthreads();
+
+   // Maybe we need the following for debugging again someday.
+   if (false) // tIx == 0)
+       printf ("ps_sum[%d] in reduction : %f, blockDim.x : %d\n", tIx, result, blockDim.x);
+
+   return sqrt(result/(blockDim.x*blockDim.y)); // returns norm squared.
+}
+
+#define N_SCALES_2D 5
+#define N_PX_X_2D 16
+#define N_PX_Y_2D 16
+
+
+#define N_SCALES_1D 10
+#define N_PX_X_1D 512
+
+/*
+gnuplot script for computing weights for dyadic Dykstra without shifts
+
+mu_S(S) = (S -.5)**.25
+sigma_S(S) = sqrt(1./(8 * sqrt(S)))
+q(a,S) = sqrt(2)*inverf(a**(1./S))
+c_S(a,S) = (q(a,S) * sigma_S(S) + mu_S(S))**(-4)
+
+do for [k=0:4] {; print c_S(4**k); }
+
+using the image rows as largest subsets gives for a 512x512 image:
+
+ do for [k=0:9] {; print c_S(.95, 512*2**k); }
+0.00154391203759664
+0.00081990498443775
+0.000429039881840065
+0.000221956966667552
+0.000113828038818893
+5.79917105865275e-05
+2.93993246304473e-05
+1.48495267507585e-05
+7.48008622774254e-06
+3.76036659965917e-06
+
+These are the weights one has to use for the subsets within the rows. Therefore the factor of 512 in c_S.
+*/
+
+
+template<typename T, bool horizontal>
+__global__ void
+__incomplete_dykstra_1D(T *residual,
+                     const T * data, // new argument w.r.t. LJ
+                     const T g_noise,
+                     const int height, const int width, const int depth, const int n_max_steps, const T Tol)
+{
+    const int n_scales = N_SCALES_1D;
+
+    T h[N_SCALES_1D + 1];
+    T Q[N_SCALES_1D];
+
+    T ICD_weights[] = {
+        0.0271138027865195,
+        0.0267867372407835,
+        0.0249654121336563,
+        0.0212163669068055,
+        0.016364546216846,
+        0.0115308932622277,
+        0.00751081908224469,
+        0.00458500994380723,
+        0.00265856153102295,
+        0.00148168722893069,
+        0.000801553557730089,
+        //
+       0.244266654223811,
+        0.123736396966113,
+        0.0729229695774703,
+        0.0445585553148736,
+        0.0270981150609612,
+        0.0161298109104501,
+        0.00934412994711567,
+        0.00526764212249119,
+        0.00289717856415689,
+        0.00154391203759664,   // 512 * 512x1
+                        0.00081990498443775,   // 256
+                        0.000429039881840065,  // 128
+                        0.000221956966667552,  // 64
+                        0.000113828038818893,  // 32
+                        5.79917105865275e-05,  // 16
+                        2.93993246304473e-05,  // 8
+                        1.48495267507585e-05,  // 4
+                        7.48008622774254e-06,  // 2
+                        3.76036659965917e-06   // 1
+                      };
+
+
+    T __shared__ ps_sum[N_PX_X_1D];
+    T __shared__ ps_sum_2[N_PX_X_1D];
+
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int idx = row*blockDim.x + col; // This is for QTCreator's insufficient Intellisense.
+
+
+    volatile T * m_ps = ps_sum + idx;
+    volatile T * m_ps_2 = ps_sum_2 + idx;
+
+    *m_ps = T(0);
+    *m_ps_2 = T(0);
+    __syncthreads();
+
+    int global_row = blockDim.y*blockIdx.y + row;
+    int global_col = blockDim.x*blockIdx.x + col;
+
+    int global_idx = global_row*width + global_col;
+
+    if (!horizontal)
+    {
+        // swap row and column-
+        int tmp = global_row;
+        global_row = global_col;
+        global_col = tmp;
+        
+        // position in global memory this thread is working on.
+        global_idx = global_row*width + global_col;
+    }
+
+
+
+    volatile T * m_px = residual + global_idx; // Ptr to pixel this thread is responsible for.
+
+    const T m_data = data[global_idx];
+    
+    h[0] =  *m_px;
+    for (int j = 1; j <= n_scales; j++)
+         Q[j-1] = 0;
+
+    int iter = 0;
+    bool iterate = true;
+    while (iterate)
+    {
+        for (int j = 1; j <= n_scales; j++)         // loop over subsets
+        {
+             h[j-1] -= Q[j-1];
+#ifndef nFMM_VERSION
+            *m_ps  = h[j-1];
+#else
+             *m_ps  = h[j-1] - m_data;
+#endif
+            __syncthreads();
+
+            T weight = // 0.25*
+                    ICD_weights[ //j-1]; //
+            n_scales - (j)]; // cs[j-1];
+
+            L2_norm_on_sub_rows(n_scales - j // j-1
+                                , ps_sum);
+
+            h[j] = project(n_scales-j, // j-1 /* s_x*/,
+                           0 /* s_y */,
+                           ps_sum, h[j-1], m_data, g_noise, weight);
+
+            __syncthreads();
+
+            Q[j-1] = h[j] - h[j-1];
+        }
+
+        // For debugging L2_norm:
+//        h[0] = -.5*sqrt(T(idx));;
+//        h[n_scales] = .5*sqrt(T(idx));
+
+        *m_ps_2 = /* 1.0; */ h[n_scales] - h[0];
+        __syncthreads();
+
+        T norm = L2_norm(ps_sum_2);
+
+         if ( false) // (blockIdx.x == blockIdx.y) && (60 < idx && idx < 90))
+            printf("iter : %d, norm : %f, h[0] : %f, h[1] : %f, h[2] : %f, h[3] : %f, h[4] : %f, h[5] : %f, h[6] : %f\n", iter, norm, h[0], h[1], h[2], h[3], h[4], h[5], h[6]);
+
+        iterate = ( norm > Tol &&
+                   iter < n_max_steps);
+        iterate ?  h[0] = h[n_scales] : *m_px = h[n_scales];
+        iter++;
+    }
+
+  //  if (blockIdx.x == blockIdx.y) //  && blockIdx.y == gridDim.y/2)
+    //    printf("e(%d, %d) : %f\n ", col, row, h[n_scales]);
+}
+
+
+
+template<typename T, int offset_x, int offset_y>
+__global__ void
+__incomplete_dykstra_2D(T *residual,
+                     const T * data, // new argument w.r.t. LJ
+                     const T g_noise,
+                     const int height, const int width, const int depth, const int n_max_steps, const T Tol)
+{
+    const int n_scales = N_SCALES_2D;
+
+    T h[N_SCALES_2D + 1];
+    T Q[N_SCALES_2D];
+
+    // 2D
+    T ICD_weights[] = {
+//        // alpha = 0.5
+//        0.0247175052482826,
+//        0.0234101860882775,
+//        0.0157064920498531,
+//        0.00733315498850165,
+//        0.00262402918350882,
+//        0.000796077044123706,
+//        0.000220114811039996,
+        // alpha = 0.1
+        0.0284849245029229,
+        0.0258315596691237,
+        0.0167229685717504,
+        0.00760602018197696,
+        0.00267687492501606,
+//        // alpha = 0.9
+//        0.0202187993308712,
+//        0.0203274835770538,
+//        0.0143412644022621,
+//        0.00695182573457273,
+//        0.00254827749287444,
+        /* 1.,
+                        0.5,
+                       0.25,
+                        0.125,
+                        0.0625,
+                        0.03125,
+                        0.015625,
+                        0.00390625,*/
+//                        0.0009765625,
+                        // From extreme value theory:
+      0.28, //
+        //            1, //
+        0.180406, // 1 subset
+     //      0.14, //
+                     //
+        //             0.25, //
+        0.0636429, // 4 subsets
+       //     0.06, //
+          //           0.1,  //
+        0.0253601, // 16 subsets
+         //   0.02, //
+                  //   0.02, //
+        0.00904285, // 64
+          //  0.005, //
+                        0.00284996, // 256
+                    0.000818855, // 1024 16x16 tiles in 512x512 image
+                    0.000221662, // 4096  8x8
+    5.79917105865275e-05,  // 4x4
+    1.48495267507585e-05,   // 2x2
+    3.76036659965917e-06,   // 1x1
+    9.46523485047832e-07 };
+
+
+    T __shared__ ps_sum[// 4 *
+            N_PX_X_2D * N_PX_Y_2D];
+    T __shared__ ps_sum_2[// 4 *
+            N_PX_X_2D * N_PX_Y_2D];
+
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int idx = row*blockDim.x + col; // This is for QTCreator's insufficient Intellisense.
+
+    int min_scale = 1;
+
+
+    volatile T * m_ps = ps_sum + idx;
+    volatile T * m_ps_2 = ps_sum_2 + idx;
+
+    *m_ps = T(0);
+    *m_ps_2 = T(0);
+    __syncthreads();
+
+    int global_row = blockDim.y*blockIdx.y + row + offset_y;
+    int global_col = blockDim.x*blockIdx.x + col + offset_x;
+
+    int global_idx = global_row*width + global_col;
+
+
+    {
+        // Let threads working outside the computational domain idle.
+        if (global_col < 0 || global_col >= width - offset_x)
+            return;
+
+        if (global_row < 0 || global_row >= height - offset_y)
+            return;
+    }
+
+
+
+    volatile T * m_px = residual + global_idx; // Ptr to pixel this thread is responsible for.
+
+    const T m_data = data[global_idx];
+
+    h[min_scale] =  *m_px;
+    for (int j = 1; j <= n_scales; j++)
+         Q[j-1] = 0;
+
+    int iter = 0;
+    bool iterate = true;
+    while (iterate)
+    {
+#ifndef nOLD_IMPL
+        for (int j = min_scale+1; j <= n_scales; j++)         // loop over subsets
+        {
+             h[j-1] -= Q[j-1];
+#ifndef nFMM_VERSION
+            *m_ps  = h[j-1];
+#else
+             *m_ps  = h[j-1] - m_data;
+#endif
+            __syncthreads();
+
+            int s_x = n_scales - j; // we loop trough the scales from coarse to fine
+            int s_y = s_x;
+
+            sum_of_squares_on_2D_subsets(s_x/*j-1*/, ps_sum);
+
+            T weight =  // 0.25*
+                    ICD_weights[ //
+                    n_scales-j]; //   j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+
+
+
+            h[j]   = project(s_x, //j-1 /* s_x*/,
+                             s_y, // j-1 /* s_y */,
+                             ps_sum, h[j-1], m_data, g_noise, weight);
+
+            __syncthreads();
+
+            Q[j-1] = h[j] - h[j-1];
+        }
+#else
+
+#endif
+        // For debugging L2_norm:
+//        h[0] = -.5*sqrt(T(idx));;
+//        h[n_scales] = .5*sqrt(T(idx));
+
+        *m_ps_2 = /* 1.0; */ h[n_scales] - h[min_scale];
+        __syncthreads();
+
+        T norm = L2_norm(ps_sum_2);
+
+         if ( false) // (blockIdx.x == blockIdx.y) && (60 < idx && idx < 90))
+            printf("iter : %d, norm : %f, h[0] : %f, h[1] : %f, h[2] : %f, h[3] : %f, h[4] : %f, h[5] : %f, h[6] : %f\n", iter, norm, h[0], h[1], h[2], h[3], h[4], h[5], h[6]);
+
+        iterate = ( norm > Tol &&
+                   iter < n_max_steps);
+        iterate ?  h[min_scale] = h[n_scales] : *m_px = h[n_scales];
+        iter++;
+    }
+
+  //  if (blockIdx.x == blockIdx.y) //  && blockIdx.y == gridDim.y/2)
+    //    printf("e(%d, %d) : %f\n ", col, row, h[n_scales]);
+}
+
+
+//@sect5{Function: dyadyc_dykstra}
+//@brief This is a wrapper for the __dyadyc_dykstra Kernel function.
+//@param A pointer to the image
+//@param ni height of the image
+//@param nj width of the image
+//@param offseti offset in vertical direction
+//@param offsetj offset in horizontal direction
+//@param smin minimum frame size is $2^{smin}$
+template<typename T>
+void step35::Kernels<T>::dyadic_dykstra(T *A_image, 
+                                        const T * data, // new argument w.r.t. LJ
+                                        const T g_noise, // dto.
+                                        const int ni, const int nj, const int nk, const int n_max_steps=200, const T Tol=1e-4)
+{
+    int grid_2D_i= ni/N_PX_X_2D;
+    int grid_2D_j= nj/N_PX_Y_2D;
+    dim3 grid_2D(grid_2D_i, grid_2D_j);
+    dim3 blocks_2D(N_PX_X_2D, N_PX_Y_2D);
+
+    int grid_1D_i= ni/N_PX_X_1D;
+    int grid_1D_j= nj;
+    dim3 grid_1D(grid_1D_i, grid_1D_j);
+    dim3 blocks_1D(N_PX_X_1D);
+
+
+
+    static const bool horizontal = true;
+
+    // We first project on the rows. Since the largest subsets span through the whole image
+    // this gives a fairly good exchange of information.
+
+//    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
+//                                                          data, g_noise,
+//                                                          ni, nj, nk, n_max_steps, Tol);
+//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+//    cudaDeviceSynchronize();
+
+// return;
+
+    // Then we project onto squares for a more isotropic equilibration.
+
+
+    __incomplete_dykstra_2D<T, 0, 0><<<grid_2D, blocks_2D>>> (A_image,
+                                                           data,
+                                                           g_noise,
+                                                           ni, nj, nk, n_max_steps, Tol);
+
+    getLastCudaError("__incomplete_dykstra_2D(0,0)<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+
+    return;
+
+
+
+
+    // Then on the columns.
+    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
+                                                           data,
+                                                           g_noise,
+                                                           ni, nj, nk, n_max_steps, Tol);
+    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+
+
+
+    __incomplete_dykstra_2D<T, 0, 4><<<grid_2D, blocks_2D>>> (A_image,
+                                                           data,
+                                                           g_noise,
+                                                           ni, nj, nk, n_max_steps, Tol);
+
+    getLastCudaError("__incomplete_dykstra_2D(0,1)<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+
+
+//    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
+//                                                           data,
+//                                                           g_noise,
+//                                                           ni, nj, nk, n_max_steps, Tol);
+//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+//    cudaDeviceSynchronize();
+
+
+    __incomplete_dykstra_2D<T, 4, 0><<<grid_2D, blocks_2D>>> (A_image,
+                                                           data,
+                                                           g_noise,
+                                                           ni, nj, nk, n_max_steps, Tol);
+
+    getLastCudaError("__incomplete_dykstra_2D(1,0)<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+
+
+//    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
+//                                                           data,
+//                                                           g_noise,
+//                                                           ni, nj, nk, n_max_steps, Tol);
+//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+//    cudaDeviceSynchronize();
+
+    __incomplete_dykstra_2D<T, 0, -4><<<grid_2D, blocks_2D>>> (A_image,
+                                                           data,
+                                                           g_noise,
+                                                           ni, nj, nk, n_max_steps, Tol);
+
+    getLastCudaError("__incomplete_dykstra_2D(0,-1)<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+
+
+//    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
+//                                                           data,
+//                                                           g_noise,
+//                                                           ni, nj, nk, n_max_steps, Tol);
+//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+//    cudaDeviceSynchronize();
+
+    __incomplete_dykstra_2D<T, -4, 0><<<grid_2D, blocks_2D>>> (A_image,
+                                                           data,
+                                                           g_noise,
+                                                           ni, nj, nk, n_max_steps, Tol);
+
+    getLastCudaError("__incomplete_dykstra_2D(-1,0)<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+
+//    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
+//                                                           data,
+//                                                           g_noise,
+//                                                           ni, nj, nk, n_max_steps, Tol);
+//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+//    cudaDeviceSynchronize();
+
+
+
+}
+
+
+
+//@setc5{Kernel: __tv_derivative}
+//@brief kernel for evaluation of the functional derivative of th TV regularization functional.
+template<typename T>
+__global__ void
+__tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, const int width, const int depth)
+{
+    T beta = 1e-4;
+
+    // Arrays for the gradient at a given site.
+    T grad_p[3/*dim*/];
+    T grad_m[3];
+
+    for (int d = 0; d < 3; d++)
+    {
+        grad_p[d] = 0.;
+        grad_m[d] = 0.;
+    }
+
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+
+    int global_row = blockDim.y*blockIdx.y + row;
+    int global_col = blockDim.x*blockIdx.x + col;
+
+    int site = global_row*width + global_col;
+
+    int north = site + width;
+    int south = site - width;
+
+    int east = site + 1;
+    int west = site - 1;
+
+    // TO DO: 3D
+
+    // The gradient is computed using forward differences.
+    if (global_col < width-1)
+        grad_p[0] = u[east]  - u[site];
+
+    if (global_row < height-1)
+        grad_p[1] = u[north] - u[site];
+    // grad_p[2] = u[top] -u[site];
+
+    if (global_col > 0)
+        grad_m[0] = u[site] - u[west];
+
+    if (global_row > 0)
+        grad_m[1] = u[site] - u[south];
+
+    // grad_m[2] = u[site] - u[bottom];
+
+    // From the components of the gradient we can compute the local diffusion coefficient.
+    T alpha_p = 0;
+    T alpha_m = 0;
+
+    for (int d = 0; d < 3; d++)
+    {
+        alpha_p += grad_p[d]*grad_p[d];
+        alpha_m += grad_m[d]*grad_m[d];
+    }
+
+    alpha_p = 1./(sqrt(alpha_p + beta));
+    alpha_m = 1./(sqrt(alpha_m + beta));
+
+    // from the diffusion coefficient and the gradients
+    // we finally compute the divergence weighted by
+    // the regularization parameter $\lambda$.
+    // To minimize multiplications we first add up the components
+    // of the gradients and multiply with the diffusion coefficients only afterwards.
+    T sum_grad_p = 0.;
+    T sum_grad_m = 0.;
+
+    for (int d = 0; d < 3; d++)
+    {
+        sum_grad_p += grad_p[d];
+        sum_grad_m += grad_m[d];
+    }
+
+     dTV_du[site] = lambda * (
+                 (alpha_p *
+                      sum_grad_p
+                  -
+                  alpha_m *
+                      sum_grad_m)
+                 +
+                  2 * ( // f[site] -
+                           u[site])
+                 );
+}
+
+
+
+
+//@sect5{Function: dyadyc_dykstra}
+//@brief This is a wrapper for the __dyadyc_dykstra Kernel function.
+//@param A pointer to the image
+//@param ni height of the image
+//@param nj width of the image
+//@param offseti offset in vertical direction
+//@param offsetj offset in horizontal direction
+//@param smin minimum frame size is $2^{smin}$
+template<typename T>
+void step35::Kernels<T>::tv_derivative(T * dTV_du,
+                                       const T *A_image,
+                                       const T* f,
+                                       const T lambda,
+                                       const int ni, const int nj, const int nk)
+{
+    int gridsi= ni/N_PX_X_2D;
+    int gridsj= nj/N_PX_Y_2D;
+    dim3 grid(gridsi,gridsj);
+    dim3 blocks(N_PX_X_2D, N_PX_Y_2D);
+
+    __tv_derivative<T><<<grid,blocks>>> (dTV_du,
+                                         A_image,
+                                         f,
+                                         lambda,
+                                         ni, nj, nk);
+    getLastCudaError("__tv_derivative<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+}
+
+
+
+
 //@brief CUDA adapted approximate Dykstra
 //@param A pointer to the image
 //@param ni height of the image
@@ -304,7 +1117,7 @@ __dykstra(T *qg, T *A, int **cinfo, const int * q_offset, const int ni, const in
 //@param smin minimum frame size is $2^{smin}$
 template<typename T>
 __global__ void
-__incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int smin) {
+__incomplete_dykstra_LJ(T *A_image, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int smin) {
     //Shared memory
     __shared__ float q[6144];
     __shared__ float f[1024];
@@ -325,13 +1138,14 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
 
     // FIXME: make adjustable from outside
     // Maximum iteration count
-    const int itmax=300;
+    const int itmax=100;
 
     // FIXME: make adjustable from outside
     // Tolerance for convergence check
-    const T tol = 1e-2;
+    const T tol = 1e-4;
     // Increment
     T delta=2.0*tol;
+
     while ( delta > tol && it < itmax ) {
         it++;
         delta=0;
@@ -346,27 +1160,28 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
         // Wait for every step before starting the iteration
         __syncthreads();
         for (int s=5; s>=smin; s--) {
-            //Edge length of one chunk = $2^s$
-            int ChunkLength = pow_of_two(s);
-            //Number of chunks in one threadblock = $2^{5-s}$
-            int ChunkNum =pow_of_two(5-s);
-            //Number of pixels in one = $2^{2\cdot s}$
-            int ChunkSize = pow_of_two(2*s);
+            //Edge length of one subset = $2^s$
+            int subset_length = pow_of_two(s);
+            //Number of subsets in one threadblock = $2^{5-s}$
+            int n_subsets =pow_of_two(5-s);
+            //Number of pixels in one threadblock = $2^{2\cdot s}$
+            int n_px_per_subset = pow_of_two(2*s);
 
             //i = blockInd + row * MaxBlock + col * MaxRow * MaxBlock \n
             //row= ( i / MaxBlock ) % MaxRow                          \n
             //col = ( i / MaxRow ) / MaxBlock
-
+int tci = threadIdx.x/n_px_per_subset;
+int tci_s = tci*n_px_per_subset;
             //Line in global image
-            is = ChunkLength*((threadIdx.x/ChunkSize)%ChunkNum) +
-                 (threadIdx.x%ChunkSize)%ChunkLength + blockIdx.x*32 + offseti;
+            is = subset_length*(tci%n_subsets) +
+                 (threadIdx.x%n_px_per_subset)%subset_length + blockIdx.x*32 + offseti;
             //Column in global image
-            js = ChunkLength*((threadIdx.x/ChunkSize)/ChunkNum) +
-                 (threadIdx.x%ChunkSize)/ChunkLength + blockIdx.y*32 + offsetj;
+            js = subset_length*(tci/n_subsets) +
+                 (threadIdx.x%n_px_per_subset)/subset_length + blockIdx.y*32 + offsetj;
             ks=offsetk;
             is=is%ni;
             js=js%nj;
-            //Pixel index in the current in the global image
+            //Pixel index in the current global image
             idx = ks*ni*nj + is*nj + js;
 
 #ifdef DY_DEBUG
@@ -376,13 +1191,13 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
             //Fill shared memory with variables we later use
             f[threadIdx.x] = A_image[idx] - q[s*1024+threadIdx.x];
             e[threadIdx.x] = f[threadIdx.x]*f[threadIdx.x];
-
-            m=1;
             __syncthreads();
 
-            //Sum over all pixels of one chuck, write result to e[(threadIdx.x/ChunkSize)*ChunkSize]
+            m=1;
+
+            //Sum over all pixels of one chunck, write result to e[tci_s]
             while (m <= pow_of_two(2*s-1)) {
-                if (threadIdx.x -(threadIdx.x/ChunkSize)*ChunkSize + m < ChunkSize) {
+                if (threadIdx.x - tci_s + m < n_px_per_subset) {
                     e[threadIdx.x] += e[threadIdx.x + m];
                 }
                 m = m << 1; // m = m*2
@@ -392,8 +1207,8 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
             //$q = x_{r+1} - x_r$
             q[s*1024+threadIdx.x] = -f[threadIdx.x];
 
-            if (cs[s]*e[(threadIdx.x/ChunkSize)*ChunkSize] > 1.0) {
-                f[threadIdx.x] = f[threadIdx.x]/(sqrt(cs[s]*e[(threadIdx.x/ChunkSize)*ChunkSize]));
+            if (cs[s]*e[tci_s] > 1.0) {
+                f[threadIdx.x] = f[threadIdx.x]/(sqrt(cs[s]*e[tci_s]));
             }
             // Update $q$
             q[s*1024+threadIdx.x] += f[threadIdx.x];
@@ -407,331 +1222,12 @@ __incomplete_dykstra(T *A_image, const int ni, const int nj, const int nk, const
             __syncthreads();
         }
     }
-}
-
-template<typename T>
-__device__ __forceinline__ T mymin(T a,T b) {
-     return (a<b)? a : b;
+   // if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
+     //   printf("ICD convergence of block (%d,%d) in step %d : res_init = %f, res = %f, tol = %f\n", blockIdx.x, blockIdx.y, it, delta_init, delta, tol);
 }
 
 
-//@sect5{Kernel: __stoch_dykstra}
-//@brief CUDA adapted approximate Dykstra
-//@param A pointer to the image
-//@param ni height of the image
-//@param nj width of the image
-//@param offseti offset in vertical direction
-//@param offsetj offset in horizontal direction
-//@param smin minimum frame size is $2^{smin}$
-template<typename T>
-__global__ void
-__stoch_dykstra(SciPAL::ShapeData<T> src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int smin, const int powerx,const bool both_halving) {
 
-    int resolution_depth;
-
-    if (powerx > 10-powerx)
-        resolution_depth = powerx;
-    else
-        resolution_depth = 10-powerx;
-
-    // x and y dimension of rectangle
-    const int xdim = 1<<powerx;
-    const int ydim = 1<<(10-powerx);
-
-    //Shared memory
-    __shared__ T e[1024];
-    //sum of errors in chunk,1024 values is max, never needed completely
-    __shared__ T c_err[1024];
-
-    //temp storage for dykstra's algorithm
-    T q[11];
-    T f;
-
-    // Set q = 0
-    for (int s=resolution_depth; s>=0; s--) {
-        q[s]=0.;
-    }
-
-    //The rectangle is decomposed into chunks with the following egde lengths each
-    int chunkWidth =xdim;
-    int chunkHeight = ydim;
-
-    // Iteration counter
-    int it=0;
-
-    // FIXME: make adjustable from outside
-    // Maximum iteration count
-    const int itmax=300;
-
-    // FIXME: make adjustable from outside
-    // Tolerance for convergence check
-    const T tol = 1e-2;
-    // Increment
-    T delta=2.0*tol;
-    while ( delta > tol && it < itmax ) {
-        it++;
-        delta=0;
-
-        // Wait for every step before starting the iteration
-        __syncthreads();       
-
-        //multi-resolution loop (at least 5, if smin==0), else s=smin
-        for (int s=(smin) ? smin : resolution_depth; (smin)? (s==smin) : (s>0); s--) {
-
-            // rule of decomposing rectangles into chunks
-            if (both_halving) {// halving both edges simultaneously
-                if (xdim<ydim) {
-                    chunkHeight = 1<<s;
-                    if (10- resolution_depth -( resolution_depth - s) >=0)
-                        chunkWidth = 1<<(10- resolution_depth -( resolution_depth - s));
-                    else
-                        chunkWidth = 1;
-                }
-                if (xdim>ydim) {
-                    chunkWidth = 1<<s;
-                    if (10- resolution_depth -( resolution_depth - s) >=0)
-                        chunkHeight = 1<<(10- resolution_depth -( resolution_depth - s));
-                    else
-                        chunkHeight = 1;
-                }
-            } else {//halving only the longest edge
-                if (xdim>ydim&&s>10-resolution_depth) //still chunkHeight = ydim
-                    chunkWidth=1<<s;
-                if (xdim < ydim&&s>10-resolution_depth) //still chunkWidth = xdim
-                    chunkHeight=1<<s ;
-                if (s <= 10-resolution_depth){
-                    chunkHeight=1<<s;
-                    chunkWidth=1<<s;
-                }
-            }
-            int chunkSize = chunkHeight * chunkWidth;
-            int numChunksx = xdim/chunkWidth;
-            int numChunksy = ydim/chunkHeight;
-            // Map the threads to pixels by following scheme (depending on chunk decomposition because of easy sum reducing later for e[]):
-            // Fill first chunk (in the left top of the rectangle) columnwise with the threads beginning with threadIdx.x=0,
-            // Continue with the next chunk below the current, if there is left any, else continue with chunk to the right top (again fill chunk columnwise left to right)
-            // Then the pixel belonging to the current thread is given by:
-            //int idx = (threadIdx.y+offsety+blockIdx.y*blockDim.y)%im_height+((blockIdx.x*blockDim.x+offsetx+threadIdx.x)%im_width)*im_height; //ks*ni*nj + is*nj + js;;
-            int chunkIdx = threadIdx.x/chunkSize;
-
-            int colInChunk = (threadIdx.x%chunkSize)/chunkHeight;
-            int rowInChunk = (threadIdx.x%chunkSize)%chunkHeight;
-
-            int xPos = offsetx+blockIdx.x*xdim + /*num of pixels from the left of rectangle to current chunk*/(chunkIdx/numChunksy)*chunkWidth + /*column in chunk*/colInChunk;
-            int yPos = offsety+blockIdx.y*ydim + /*num of pixels from the top of rectangle to current chunk*/(chunkIdx%numChunksy)*chunkHeight + /*row in chunk*/rowInChunk;
-            int idx = yPos%im_height + im_height*(xPos%im_width);
-
-//            // check if image borders are crossed, split chunks on boundary (no periodic boundary)
-
-//            int bdry_id = 0; // 8 different cases need to be considered on bdry, identifier 1 to 8
-
-//            if (xPos < im_width && xPos + chunkWidth -colInChunk > im_width)
-//                bdry_id = 1;
-//            if (xPos >= im_width && xPos - colInChunk < im_width)
-//                bdry_id = 2;
-//            if (yPos < im_height && yPos + chunkHeight - rowInChunk > im_height) {
-//                if (bdry_id == 1)
-//                    bdry_id = 5;
-//                else if (bdry_id == 2)
-//                    bdry_id = 6;
-//                else
-//                    bdry_id = 3;
-//            }
-//            if (yPos >= im_height && yPos - rowInChunk < im_height) {
-//                if (bdry_id == 1)
-//                    bdry_id = 7;
-//                else if (bdry_id == 2)
-//                    bdry_id = 8;
-//                else
-//                    bdry_id = 4;
-//            }
-            // set chunk index for bdry elements (parts of chunks in image are normally counted, parts of chunks that lay off image
-            // are counted with index > numer of chunks, chunks completely off image are counted normally)
-            int c_idx = chunkIdx;
-//            switch (bdry_id) {
-//            case 2: case 6:
-//                c_idx = numChunksx*numChunksy+chunkIdx%numChunksy;
-//                break;
-//            case 4: case 7:
-//                c_idx = numChunksx*numChunksy+numChunksy+chunkIdx/numChunksy;
-//                break;
-//            case 8:
-//                c_idx = numChunksx*numChunksy+numChunksy+chunkIdx/numChunksy+1;
-//                break;
-//            }
-
-            //errors are shared
-            f = src_dst.data_ptr[idx] - q[s];
-            e[threadIdx.x] = f*f;
-
-            int m=1;
-            __syncthreads(); //every thread needs to know the values from the others in the following
-//            c_err[c_idx] = 0;
-
-//            //sum errors, take care of image borders first (slow summation, improve by reducing?)
-//            if (idx_x_out_of_bounds&&idx_y_out_of_bounds)
-//                for (int i = 0; i < offsetx; i++)
-//                    for (int j = 0; j < offsety; j++) {
-//                        c_err[c_idx] += e[j+i*im_height];
-//                        e[j+i*im_height] = 0;
-//                    }
-//            else {
-//                if (idx_x_out_of_bounds)
-//                    for (int i = 0; i < offsetx; i++)
-//                        for (int j = yPos-(threadIdx.x/chunkSize)%chunkHeight; j < yPos-(threadIdx.x/chunkSize)%chunkHeight+chunkHeight; j++) {
-//                            c_err[c_idx] += e[j+i*im_height];
-//                            e[j+i*im_height] = 0;
-//                        }
-//                if (idx_y_out_of_bounds)
-//                    for (int i = xPos - (threadIdx.x/chunkSize)/chunkHeight; i < xPos - (threadIdx.x/chunkSize)/chunkHeight + chunkWidth; i++)
-//                        for (int j = 0; j < offsety; j++) {
-//                            c_err[c_idx] += e[j+i*im_height];
-//                            e[j+i*im_height] = 0;
-//                        }
-//            }
-            //fast summation
-//            if (!idx_x_out_of_bounds&&!idx_y_out_of_bounds)  {
-                while(m < chunkSize) {
-                    if (threadIdx.x%chunkSize+m<chunkSize) //indices out of bounds were set to 0 previously
-                            e[threadIdx.x]+= e[threadIdx.x+m];
-                    m = m << 1;
-                }
-                __syncthreads();
-                c_err[c_idx] = e[(threadIdx.x/chunkSize)*chunkSize];
-//            }
-//            printf("Indix is: %d",c_idx);
-//            __syncthreads();
-//        //check case: 1. when xdim>ydim divide only in x-direction by 2^s
-//        if (xdim>ydim && s>10-resolution_depth) {
-//            chunkHeight = ydim;
-//            chunkWidth = 1<<s;
-//            c_idx = (int)(threadIdx.x/chunkWidth);
-//            c_err[c_idx] = 0;
-//            for (int i = c_idx*chunkWidth; i<(c_idx+1)*chunkWidth;i++)
-//                for (int j = 0; j < ydim; j++)
-//                    c_err[c_idx]+= e[i*ydim+j];
-//            __syncthreads();
-//        }
-//        //check case: 2. when xdim<ydim divide only in y-direction by 2^s
-//        if (xdim<ydim && s>10-resolution_depth){
-//            chunkHeight = 1<<s;
-//            chunkWidth = xdim;
-//            c_idx = (int)(threadIdx.y/chunkHeight);
-//            c_err[c_idx] = 0;
-//            for (int i = 0; i<xdim;i++)
-//                for (int j = c_idx*chunkHeight; j < (c_idx+1)*chunkHeight; j++)
-//                    c_err[c_idx]+= e[i*ydim+j];
-//            __syncthreads();
-//        }
-//        //check case: 3. squares divide in x- and y-direction by 2^s
-//        if (s<=10-resolution_depth) {
-//            chunkHeight = 1 << s;
-//            chunkWidth = chunkHeight;
-//            c_idx = (int)(threadIdx.y/chunkHeight)+(int)(threadIdx.x/chunkWidth)*(int)(ydim/chunkHeight);
-//            c_err[c_idx] = 0;
-//            for (int i = (int)(threadIdx.x/chunkWidth)*chunkWidth; i<(int)(threadIdx.x/chunkWidth+1)*chunkWidth;i++)
-//                for (int j = (int)(threadIdx.y/chunkHeight)*chunkHeight; j < (int)(threadIdx.y/chunkHeight+1)*chunkHeight; j++)
-//                    c_err[c_idx]+= e[i*ydim+j];
-//            __syncthreads();
-//        }
-
-            //$q = x_{r+1} - x_r$
-            q[s] = -f;
-//#ifdef BALBLABLA
-//T cs = 1/((T)3/(T)8/sqrt((T)chunkSize)+sqrt(sqrt(chunkSize-0.5)));
-//cs*=cs*cs*cs;
-//#endif
-            if (cs[s]*c_err[c_idx] > 1.0)
-                f = f/(sqrt(cs[s]*c_err[c_idx]));
-
-            // Update $q$
-            q[s] += f;
-
-            // Templatized abs function
-            __abs<T> mabs;
-            // Calculate increment
-            delta+=mabs(src_dst.data_ptr[idx]-f);
-            // Update image
-            src_dst.data_ptr[idx] = f;
-
-            __syncthreads();
-
-        } // end of multi-resolution loop
-    }
-}
-
-
-//@sect5{Kernel: __sum}
-//@brief Elementwise sum with offset in one array. Writes output to arr1.
-//@param arr1 first input array, output is written here.
-//@param arr2 second input array
-//@param offset offset in rows and columns in arr2 to ignore
-//@param nx width of the image
-//@param ny height of the image
-template<typename T>
-__global__ void
-__sum(T* arr1, T* arr2, int offset, int nx, int ny, int nk) {
-    int i = threadIdx.x + blockIdx.x*blockDim.x;
-    int j = threadIdx.y + blockIdx.y*blockDim.y;
-    int k = threadIdx.z + blockIdx.z*blockDim.z;
-    int ti = i + offset;
-    int tj = j + offset;
-    int tk=0;
-    if ( nk > 1 )
-        tk = k + offset;
-    else
-        tk = 0;
-
-    //Check if offset is larger than image boundaries
-    if ( ti >= nx )
-        ti=ti-nx;
-    if ( tj >= ny )
-        tj=tj-ny;
-    if ( tk >= nk )
-        tk=tk-nk;
-
-    //Do elementwise sum
-    if ( k*nx*ny+i*ny+j < nx*ny*nk )
-        arr1[k*nx*ny+i*ny+j] = arr1[k*nx*ny+i*ny+j] + arr2[tk*nx*ny+ti*ny+tj];
-}
-
-//@sect5{Kernel: __update_lagrangian}
-//@brief Kernel for Lagrangian update
-template<typename T>
-__global__ void
-__update_lagrangian(T* lag1, T* lag2, int offset, int nx, int ny, int nz, T alpha1, T alpha2,
-                    T* e, T* im, T* m1, T* x, T* z) {
-    int i = threadIdx.x + blockIdx.x*blockDim.x;
-    int j = threadIdx.y + blockIdx.y*blockDim.y;
-    int k = threadIdx.z + blockIdx.z*blockDim.z;
-    int ti = i + offset;
-    int tj = j + offset;
-    int tk = k + offset;
-
-    //Check if offset is larger than image boundaries
-    while ( ti >= nx )
-        ti=ti-nx;
-    while ( tj >= ny )
-        tj=tj-ny;
-    while ( tk >= nz )
-        tk=tk-nz;
-    if ( k*nx*ny+i*ny+j < nx*ny*nz )
-    {
-        lag1[k*nx*ny+i*ny+j] += alpha1*(im[k*nx*ny+i*ny+j] - e[k*nx*ny+i*ny+j] - m1[tk*nx*ny+ti*ny+tj]);
-        lag2[k*nx*ny+i*ny+j] += alpha2*(x[k*nx*ny+i*ny+j] - z[k*nx*ny+i*ny+j]);
-    }
-}
-
-template<typename T>
-__global__ void
-__real_part(
-      SciPAL::ShapeData<T> dst,
-    const SciPAL::ShapeData<SciPAL::CudaComplex<T> > src)
-{
-      int i = threadIdx.x + blockIdx.x*blockDim.x;
-      if (i < dst.n_rows)
-          dst.data_ptr[i] = src.data_ptr[i].real();
-}
 
 //@setc5{Kernel: __tv_regularization}
 //@brief kernel for tv regularization
@@ -748,95 +1244,135 @@ __tv_regularization(T* x,T* z,T* lag,T lambda,T rho,int nx,int ny,int nz)
     T tol=1e-5;
     T delta=2.0*tol;
     __abs<T> mabs;
+
+    // FIXME: For convergence control we need global data exchange
+    T __shared__ ps_sum[N_PX_X_2D * N_PX_Y_2D];
+
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int idx = row*blockDim.x + col; // This is for QTCreator's insufficient Intellisense.
+
+    volatile T * m_ps = ps_sum + idx;
+
+    *m_ps = T(0);
+
+    __syncthreads();
+
+    int k_i_j = k*nx*ny+i*ny+j;
+
+    // We need pointers to the pixel (site) this thread is responsible for ...
+    volatile T * z_kij = z + k_i_j; // Ptr to pixel this threads is responsible for.
+
+    // and pointers to the neighbors. We assume that the x axis point from
+    // left to right and the y axis upwards when drawn on paper.
+    // This gives rise to the following notion of east, west, south and north.
+    // For 3D we add bottom (z<0) and top (z>0).
+    volatile T * z_east = z + k_i_j - ny;
+    volatile T * z_west = z + k_i_j + ny;
+
+    volatile T * z_south = z + k_i_j - 1;
+    volatile T * z_north = z + k_i_j + 1;
+
+    volatile T * z_bottom = z + k_i_j - nx*ny;
+    volatile T * z_top = z + k_i_j + nx*ny;
+
+    // The following values do not get changed and thus are loaded only once.
+    T x_kij = x[k_i_j];
+     T lag_kij = lag[k_i_j];
+
     while ( delta > tol && it < maxit )
     {
         delta=0;
         it++;
         T newval;
-        newval=-rho*(x[k*nx*ny+i*ny+j]-z[k*nx*ny+i*ny+j])-lag[k*nx*ny+i*ny+j];
+
+#ifndef USE_OLD_VERSION
+        newval= -rho*(x[k_i_j]-z[k_i_j]) - lag[k_i_j];
         if ( nx > 1 && i < nx-1 )
-            newval=newval-lambda*mysign(z[k*nx*ny+(i+1)*ny+j]-z[k*nx*ny+i*ny+j]);
+            newval=newval-lambda*mysign( z[k*nx*ny+(i+1)*ny+j] - z[k_i_j] ); // west
         if ( nx > 1 && i > 0 )
-            newval=newval-lambda*mysign(z[k*nx*ny+(i-1)*ny+j]-z[k*nx*ny+i*ny+j]);
+            newval=newval-lambda*mysign( z[k*nx*ny+(i-1)*ny+j] - z[k_i_j]); // east
         if ( ny > 1 && j < ny-1 )
-            newval=newval-lambda*mysign(z[k*nx*ny+i*ny+j+1]-z[k*nx*ny+i*ny+j]);
+            newval=newval-lambda*mysign( z[k_i_j+1] - z[k_i_j] ); // north
         if ( ny > 1 && j > 0  )
-            newval=newval-lambda*mysign(z[k*nx*ny+i*ny+j-1]-z[k*nx*ny+i*ny+j]);
+            newval=newval-lambda*mysign( z[k_i_j-1] - z[k_i_j] ); // south
         if ( nz > 1 && k < nz-1 )
-            newval=newval-lambda*mysign(z[(k+1)*nx*ny+i*ny+j]-z[k*nx*ny+i*ny+j]);
+            newval=newval-lambda*mysign( z[(k+1)*nx*ny+i*ny+j] - z[k_i_j] ); // top
         if ( nz > 1 && k > 0 )
-            newval=newval-lambda*mysign(z[(k-1)*nx*ny+i*ny+j]-z[k*nx*ny+i*ny+j]);
-        delta=delta+mabs(newval);
+            newval=newval-lambda*mysign( z[(k-1)*nx*ny+i*ny+j] - z[k_i_j] ); // bottom
+
+
+        // delta=delta+mabs(newval); // convergence control by LJ
+
         __syncthreads();
-        z[k*nx*ny+i*ny+j]=z[k*nx*ny+i*ny+j]-sw*newval;
-        if ( z[k*nx*ny+i*ny+j] < 0 )
-            z[k*nx*ny+i*ny+j]=0;
+        z[k_i_j]=z[k_i_j]-sw*newval;
+        if ( z[k_i_j] < 0 )
+            z[k_i_j]=0;
+        *m_ps = mabs(newval);
         __syncthreads();
-    }
-}
+         delta = L2_norm(ps_sum);
+#else
+        newval = -rho * (x_kij - *z_kij) - lag_kij;
 
-//@sect5{Kernel: __diff}
-//@brief Elementwise substraction with offset in one array. Output is written in arr1.
-//@param arr1 first input array, output is written here.
-//@param arr2 second input array. arr1[i] - arr[j] will be written in arr1.
-//@param offset offset in rows and columns in arr2 to ignore
-//@param nx width of the image
-//@param ny height of the image
-//@param nz number of layers in image stack
-template<typename T>
-__global__ void
-__diff(T* arr1, T* arr2, int offset, int nx, int ny, int nz) {
-    int i = threadIdx.x + blockIdx.x*blockDim.x;
-    int j = threadIdx.y + blockIdx.y*blockDim.y;
-    int k = threadIdx.z + blockIdx.z*blockDim.z;
-    int ti = i + offset;
-    int tj = j + offset;
-    int tk = k + offset;
+        T nn_contrib = 0.;
+        T grad_norm = 0.;
+        // Pixels not on the boundary of the image.
+        if ( nx > 1 && i < nx-1 )
+        {
+            T du =  (*z_west - *z_kij);
+            nn_contrib -= du;
+            grad_norm += du*du;
+        }
+        if ( nx > 1 && i > 0 )
+        {
+             T du =  (*z_east - *z_kij);
+            nn_contrib -= du;
+            grad_norm += du*du;
+        }
+        if ( ny > 1 && j < ny-1 ) {
+            T du =  (*z_north - *z_kij);
+            nn_contrib -= du;
+            grad_norm += du*du;
+        }
+        if ( ny > 1 && j > 0  )
+        {
+          T du =  (*z_south - *z_kij);
+          nn_contrib -= du;
+          grad_norm += du*du;
+      }
+        if ( nz > 1 && k < nz-1 ) {
+             T du =  (*z_top - *z_kij);
+             nn_contrib -= du;
+             grad_norm += du*du;
+         }
+        if ( nz > 1 && k > 0 )
+        {
+          T du = (*z_bottom - *z_kij);
+          nn_contrib -= du;
+          grad_norm += du*du;
+      }
+        grad_norm = sqrt(grad_norm+1e-14);
 
-    // Check if offset is larger than image boundaries
-    while ( ti >= nx )
-        ti=ti-nx;
-    while ( tj >= ny )
-        tj=tj-ny;
-    while ( tk >= nz )
-        tk=tk-nz;
-    if ( k*nx*ny+i*ny+j < nx*ny*nz )
-    {
-        arr1[k*nx*ny+i*ny+j] = arr1[k*nx*ny+i*ny+j] - arr2[tk*nx*ny+ti*ny+tj];
-    }
-}
+        newval += (nn_contrib/grad_norm)*lambda;
 
-//@sect5{Kernel: __prepare_proj}
-//@brief Kernel for Projection preparation
-template<typename T>
-__global__ void
-__prepare_proj(T* e, T* im, T* m1, T* lag, T rho, int sigma, int nx, int ny, int nz) {
-    int i = threadIdx.x + blockIdx.x*blockDim.x;
-    int j = threadIdx.y + blockIdx.y*blockDim.y;
-    int k = threadIdx.z + blockIdx.z*blockDim.z;
-    int ti = i + sigma;
-    int tj = j + sigma;
-    int tk = k + sigma;
+        *m_ps = mabs(newval);
+        __syncthreads();
 
-    // Check if offset is larger than image boundaries
-    while ( ti >= nx )
-        ti=ti-nx;
-    while ( tj >= ny )
-        tj=tj-ny;
-    while ( tk >= nz )
-        tk=tk-nz;
-    if ( k*nx*ny+i*ny+j < nx*ny*nz )
-    {
+        *z_kij -= sw*newval;
+        if (*z_kij < 0 )
+            *z_kij=0;
+        __syncthreads();
 
-        e[k*nx*ny+i*ny+j] = im[k*nx*ny+i*ny+j]-m1[tk*nx*ny+ti*ny+tj];//+lag[k*nx*ny+i*ny+j]/rho;
+        // We only control whether the TV regulrization has
+        // converged within the subset of the image covered by this thread block.
+        delta = L2_norm(ps_sum);
 
-#ifdef DY_DEBUG
-            if ((k*nx*ny+i*ny+j)%8891==0)
-                 printf("e_%d : %f, im_%d : %f, m1_%d : %f |", k*nx*ny+i*ny+j,  e[k*nx*ny+i*ny+j] , k*nx*ny+i*ny+j, im[k*nx*ny+i*ny+j], tk*nx*ny+ti*ny+tj, m1[tk*nx*ny+ti*ny+tj] );
 #endif
-
     }
 }
+
+
+
 
 //@sect5{Kernel: __soft_thresholding}
 //@brief Applies a soft threshold to the 1 Norm of a real vector
@@ -1095,26 +1631,6 @@ void step35::Kernels<T>::dykstra(T *qg, T *A,  int **cinfo, const int * q_offset
     __dykstra<T><<<grid, blocks, 3*numpx*sizeof(T), *mystream>>> (qg, A, cinfo, q_offset, ni, nj);
 }
 
-//@sect5{Function: stoch_dykstra}
-//@brief This is a wrapper for the __stoch_dykstra Kernel function.
-//@param A pointer to the image
-//@param ni height of the image
-//@param nj width of the image
-//@param offseti offset in vertical direction
-//@param offsetj offset in horizontal direction
-//@param smin minimum frame size is $2^{smin}$
-template<typename T>
-void step35::Kernels<T>::stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int im_height, const int im_width, const int nk, const int offsetx, const int offsety, const int offsetk, const int so, const int powerx,const bool both_halving) {
-    int gridsx=im_width/(1<<powerx);
-    int gridsy=im_height/(1<<(10-powerx));
-//    dim3 grid(gridsx,gridsy);
-//    dim3 blocks(1<<powerx,1<<(10-powerx));
-    dim3 grid(gridsx,gridsy);
-    dim3 blocks(1024,1);
-    __stoch_dykstra<T><<<grid,blocks>>> (src_dst, im_height, im_width, nk, offsetx, offsety, offsetk, so,powerx,both_halving);
-    getLastCudaError("__incomplete_dykstra<<<>>> execution failed\n");
-    cudaDeviceSynchronize();
-}
 
 //@sect5{Function: dyadyc_dykstra}
 //@brief This is a wrapper for the __dyadyc_dykstra Kernel function.
@@ -1125,53 +1641,16 @@ void step35::Kernels<T>::stoch_dykstra(SciPAL::ShapeData<T> &src_dst, const int 
 //@param offsetj offset in horizontal direction
 //@param smin minimum frame size is $2^{smin}$
 template<typename T>
-void step35::Kernels<T>::dyadic_dykstra(T *A_image, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int so) {
-    int gridsi=ni/32;
-    int gridsj=nj/32;
+void step35::Kernels<T>::dyadic_dykstra_LJ(T *A_image, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int so) {
+    int gridsi=1; // ni/32;
+    int gridsj=1; // nj/32;
     dim3 grid(gridsi,gridsj);
-    dim3 blocks(1024,1);
-    __incomplete_dykstra<T><<<grid,blocks>>> (A_image, ni, nj, nk, offseti, offsetj, offsetk, so);
+    dim3 blocks(128,1);
+    __incomplete_dykstra_LJ<T><<<grid,blocks>>> (A_image, ni, nj, nk, offseti, offsetj, offsetk, so);
     getLastCudaError("__incomplete_dykstra<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 }
 
-//@sect5{Function: sum}
-//@brief Elementwise sum with offset in one array. Inplace output to arr1.
-//@param arr1 first input array, output is written here.
-//@param arr2 second input array
-//@param offset offset in rows and columns in arr2 to ignore
-//@param ni width of the image
-//@param nj height of the image
-template<typename T>
-void step35::Kernels<T>::sum(T* arr1, T* arr2, int offset, int ni, int nj, int nk) {
-    int gridsi=ni/32;
-    int gridsj=nj/32;
-    int gridsk=nk;//in 2D case defaults to 1
-    dim3 grid(gridsi,gridsj,gridsk);
-    dim3 blocks(32,32,1);
-    __sum<T><<<grid,blocks>>>(arr1, arr2, offset, ni, nj, nk);
-    getLastCudaError("__sum<<<>>> execution failed\n");
-    cudaDeviceSynchronize();
-}
-
-//@sect5{Function: diff}
-//@brief Elementwise substraction with offset in one array. Output is written in arr1.
-//@param arr1 first input array, output is written here.
-//@param arr2 second input array. arr1[i] - arr[j] will be written in arr1.
-//@param offset offset in rows and columns in arr2 to ignore
-//@param width width of the array
-//@param height height of the array
-template<typename T>
-void step35::Kernels<T>::diff(T* arr1, T* arr2, int offset, int width, int height, int depth) {
-    int gridsi=width/32;
-    int gridsj=height/32;
-    int gridsk=depth;
-    dim3 grid(gridsi,gridsj,gridsk);
-    dim3 blocks(32,32,1);
-    __diff<T><<<grid,blocks>>>(arr1, arr2, offset, width, height, depth);
-    getLastCudaError("__diff<<<>>> execution failed\n");
-    cudaDeviceSynchronize();
-}
 
 // @sect5{Function: element_norm_product}
 //@brief Elementwise multiplication of two arrays with complex values and division by the number of elements in each array.
@@ -1195,21 +1674,7 @@ void step35::Kernels<T>::element_norm_product(typename PrecisionTraits<T, gpu_cu
     getLastCudaError("element_norm_product<<<>>> execution failed\n");
 }
 
-//@sect5{Function: mult}
-//@brief Inplace elementwise multiplication with a constant value.
-//@param arr input array
-//@param factor factor for the elementwise multiplication
-//@param size number of elements in the input array
-template<typename T>
-void step35::Kernels<T>::mult(T* arr, T factor, int size) {
-    __mult<T> op(factor);
-#ifndef nUSE_CPP11
-    thrust::device_ptr<T> ptr = thrust::device_pointer_cast(arr);
-    thrust::transform(thrust::device, ptr, ptr + size, ptr, op);
-#endif
-    cudaDeviceSynchronize();
-    getLastCudaError("thrust::transform __mult execution failed\n");
-}
+
 
 //@sect5{Function: reset}
 //@brief Fills input array with zeros
@@ -1240,64 +1705,21 @@ void step35::Kernels<T>::abs(T* arr, int size) {
     getLastCudaError("thrust::transform __abs execution failed\n");
 }
 
-//@sect5{Function: update_lagrangian}
-//@brief Lagrangian Multipliers Update on device
-//@param alpha1 Update step for first constraint
-//@param alpha2 Update step for second constraint
-//@param lag1 Lagrangian for first constraint
-//@param lag2 Lagrangian for second constraint
-//@param sigma half width of psf
-//@param nx width of image
-//@param ny height of image
-//@param nz number of images in case of 3d
-//@param im pointer to noisy image
-//@param m1 estimate convoluted with point spread function
-//@param x current estimate
-//@param z smoothed estimate
-template<typename T>
-void step35::Kernels<T>::update_lagrangian(T* lag1, T* lag2, int sigma, int nx, int ny, int nz,
-                                           T alpha1, T alpha2, T* e, T* im, T* m1, T* x, T* z) {
-    int gridsi=nx/32;
-    int gridsj=ny/32;
-    dim3 grid(gridsi,gridsj);
-    dim3 blocks(32,32);
-    __update_lagrangian<T><<<grid,blocks>>>(lag1, lag2, sigma,nx,ny,nz,alpha1,alpha2,e,im,m1,x,z);
-    cudaDeviceSynchronize();
-    getLastCudaError("__update_lagrangian<<<>>> execution failed\n");
-}
-
-//@sect5{Function: prepare_e}
-//@brief Put the vector to be projected to *e before Dykstra
-//@param rho rho1 from first constraint
-//@param e Field of Residuals
-//@param im Noisy image
-//@param m1 estimate convoluted with psf
-//@param lag Lagrangian
-template<typename T>
-void step35::Kernels<T>::prepare_e(T* e, T* im, T* m1, T* lag, T rho, int sigma, int nx, int ny, int nz) {
-    int gridsi=nx/32;
-    int gridsj=ny/32;
-    int gridsk=nz;
-    dim3 grid(gridsi,gridsj,gridsk);
-    dim3 blocks(32,32,1);
-    __prepare_proj<T><<<grid,blocks>>>(e,im,m1,lag,rho,sigma,nx,ny,nz);
-    cudaDeviceSynchronize();
-    getLastCudaError("__prepare_e<<<>>> execution failed\n");
-}
-
+#ifdef USE_TV_ITER
 //@sect5{Function: tv_regularization}
 //@brief TODO
 template<typename T>
 void step35::Kernels<T>::tv_regularization(T* x, T* z, T* lag, T lambda, T rho, int nx, int ny, int nz) {
-    int gridsi=nx/32;
-    int gridsj=ny/32;
+    int gridsi=nx/N_PX_X_2D;
+    int gridsj=ny/N_PX_Y_2D;
     int gridsk=nz;
     dim3 grid(gridsi,gridsj,gridsk);
-    dim3 blocks(32,32,1);
+    dim3 blocks(N_PX_X_2D, N_PX_Y_2D, 1);
     __tv_regularization<T><<<grid,blocks>>>(x,z,lag,lambda,rho,nx,ny,nz);
     cudaDeviceSynchronize();
     getLastCudaError("__tv_regularization<<<>>> execution failed\n");
 }
+#endif
 
 //@sect5{Function: soft_threshold}
 //@brief Applies a soft threshold. Absolute values smaller than a certain threshold will be to zero,
@@ -1329,21 +1751,6 @@ void step35::Kernels<T>::soft_threshold_complex(typename PrecisionTraits<T, gpu_
     __soft_thresholding_complex<T><<<grid,blocks>>>(arr,threshold,size);
     cudaDeviceSynchronize();
     getLastCudaError("__soft_thresholding_complex<<<>>> execution failed\n");
-}
-
-template<typename T>
-void step35::Kernels<T>::real(SciPAL::ShapeData<T> &dst, const SciPAL::ShapeData<SciPAL::CudaComplex<T> > &src)
-{
-    if (dst.n_rows == src.n_rows) {
-        int grids = (src.n_rows +1023) / 1024;
-
-
-
-        __real_part<T><<< grids,1024 >>> (dst, src);
-
-    } else {
-        printf("Dimensions not the same\n");
-    }
 }
 
 
@@ -1414,3 +1821,8 @@ T step35::Kernels<T>::sum_all(T* arr,int size) {
 // class can be explictly instantiated by the compiler.
 template class step35::Kernels<float>;
 template class step35::Kernels<double>;
+
+//void ImplCUDA<float>::apply<SDf, minus, SDf >(SDf&, SciPAL::DevBinaryExpr<SDf, minus, SDf > const&)", referenced from:
+
+//      void SciPAL::LAOOperations::apply<float, cublas, Vc, BinX<Vcblas, minus, Vcblas > >(Vcblas&, SciPAL::Expr<BinX<Vcblas, minus, Vcblas > > const&)
+

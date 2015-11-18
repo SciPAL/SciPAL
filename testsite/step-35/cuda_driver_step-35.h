@@ -14,11 +14,29 @@
     You should have received a copy of the GNU Lesser General Public License
     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright  Lutz Künneke, Jan Lebert 2014
+Copyright  Lutz Künneke, Jan Lebert, Stephan Kramer, Johannes Hagemann 2014-2015
 */
 
 #ifndef CUDADriver_STEP_35_H
 #define CUDADriver_STEP_35_H
+
+
+
+#define USE_DEBLUR
+
+#define DISABLE_PSF
+#undef DISABLE_PSF
+
+
+#define USE_FFT_CONV
+#undef USE_FFT_CONV
+
+#ifdef USE_FFT_CONV
+#define USE_SHIFT_ARITH
+#define SHIFT_FACTOR 1
+#else
+#define SHIFT_FACTOR 0
+#endif
 
 //std
 #include<iostream>
@@ -32,21 +50,18 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 //SciPAL
 #include <base/PrecisionTraits.h>
-#include <lac/cublas_wrapper.hh>
-#include <lac/cublas_Vector.h>
-#include <lac/VectorCustomOperations.h>
-#include <numerics/FFTWrapper.h>
-
-//deal.II
-#include <deal.II/lac/vector.h>
+#include <lac/release/cublas_wrapper.hh>
+#include <lac/development/cublas_Vector.h>
 
 //Our stuff
 #include "cuda_driver_step-35.hh"
-#include "cuda_kernel_wrapper_step-35.cu.h"
+#include <step-35/cuda_kernel_wrapper_step-35.cu.h>
 #include "patch.h"
 #include "cuda_helper.h"
 #include "preprocessor_directives.h"
 #include "ADMMParams.h"
+
+#include <smre_problem.hh>
 
 #include <csignal>
 
@@ -63,118 +78,6 @@ template<typename Mpatch,typename T,ParallelArch c> struct runStruct;
 //template specialized struct for the constructor and destructor of
 //CUDADriver class based on which Mpatch we're dealing with
 
-//Specialization for cset_dyadic
-template<typename T,ParallelArch c>
-struct constructStruct<cset_dyadic,T,c> {
-    //@sect5{Function: constructFun}
-    //dummy function needed by specialization, don't do anything
-    //@param pt pointer to the friended CUDADriver instance
-    // FIXME: in C++ we use references, not pointers.
-    void constructFun(CUDADriver<cset_dyadic, T, c> *pt) {
-        // FIXME: remove and comment out name of function argument. Then the compiler stops complaining as well.
-        pt = pt; //supress compiler warning
-    }
-
-    //@sect5{Function: destructFun}
-    //dummy function needed by specialization, don't do anything
-    //@param pt pointer to the friended CUDADriver instance
-     // FIXME: in C++ we use references, not pointers.
-    void destructFun(CUDADriver<cset_dyadic, T, c> *pt) {
-          // FIXME: remove and comment out name of function argument. Then the compiler stops complaining as well.
-        pt = pt; //supress compiler warning
-    }
-};
-
-
-//Specialization for cluster<cset_small,T>
-template<typename T,ParallelArch c>
-struct constructStruct<cluster<cset_small,T>,T,c> {
-    //@sect5{Function: constructFun}
-    //Callen when CUDADriver is constructed, start worker threads which do the real work
-    //@param pt pointer to the friended CUDADriver instance
-     // FIXME: in C++ we use references, not pointers.
-    void constructFun(CUDADriver<cluster<cset_small,T>,T,c> *pt) {
-        if (pt->inf->ext_depth > 1) {//TODO 3d
-            std::cerr << "Exact dykstra with 3d images is not yet implemented!" << std::endl;
-            std::abort();
-        }
-        // FIXME: C++ -> std::cout
-        printf("CUDA init...\n");
-
-        //set up worker pool
-        // FIXME: pointer-free solution. Read Scott Meyer's effective C++ series.
-        pt->thread_handles = new std::thread[pt->stream_count];
-
-        //start up threads
-        for (int i = 0; i < pt->stream_count; i++) {
-            pt->thread_handles[i] = std::thread(&CUDADriver<cluster<cset_small,T>,T,c>::stream_handler, pt, i);
-        }
-    }
-
-    //@sect5{Function: destructFun}
-    //Called when CUDADriver is destructed, kill the stuff we've started in constructFun()
-    //@param pt pointer to the friended CUDADriver instance
-    void destructFun(CUDADriver<cluster<cset_small,T>,T,c> *pt) {
-        pt->queue->add(pt->cend);
-        //waits for all threads to end
-        for (int i = 0; i < pt->stream_count; i++) {
-            if (pt->thread_handles[i].joinable()) {
-                pt->thread_handles[i].join();
-            }
-        }
-        delete[] pt->thread_handles;
-    }
-};
-
-//@sect4{Struct: runStruct}
-//template specialized struct for the iterate function of
-//CUDADriver class based on which Mpatch we're dealing with
-template<typename T,ParallelArch c>
-//Specialization for cluster<cset_small, T>
-struct runStruct<cluster<cset_small, T>, T, c > {
-    //@sect5{Function: run_func}
-    //Run function of CUDADriver for cluster<cset_small, T>,
-    //adds cluster<cset_small, T> items to queue
-    //@param pt pointer to the friended CUDADriver instance
-    void run_func(CUDADriver<cluster<cset_small,T>,T, c> *pt) {
-        //First element of linked list
-        cluster<cset_small,T>* cpoint;
-        cpoint=pt->croot;
-
-        //Reset all $q$ values to zero
-        while ( cpoint->next != NULL ) {
-            cpoint->reset();
-            cpoint=cpoint->next;
-        }
-
-        //The number of Iterations is limited, this is to be replaced by a convergence check in the future
-        for (int rep=0; rep<3; rep++) {
-            //Start at first element of linked list
-            cpoint=pt->croot;
-            //Go through linked list to it's end
-            while ( cpoint != NULL ) {
-                //Add element to queue
-                pt->queue->blocking_add(cpoint);
-                //Go to next element
-                cpoint = cpoint->next;
-            }
-        }
-    }
-};
-
-template<typename T,ParallelArch c>
-//Specialization for cset_dyadic
-struct runStruct<cset_dyadic,T,c > {
-    //@sect5{Function: run_func}
-    //@brief Run function of CUDADriver for cset_dyadic, only calls nostream_handler()
-    //@param pt pointer to the friended CUDADriver instance
-    void run_func(CUDADriver<cset_dyadic,T, c> *pt) {
-        if (pt->params->stoch_dyk)
-            pt->nostream_handler2();
-        else
-            pt->nostream_handler();
-    }
-};
 
 // @sect4{Class: CUDADriver}
 //
@@ -188,36 +91,284 @@ class CUDADriver {
     //complex type: double2 for double, float2 for float
     typedef typename PrecisionTraits<Mdouble, c>::ComplexType complex;
 
-    //Thread-safe queue used to distribute work on worker threads
-    wqueue<Mpatch, Mdouble, c> *queue;
+    typedef  SciPAL::Vector<Mdouble,cublas> Vector;
 
-    //Info class instance which contains general information about the image which is currently processed
-    ImageInfo<Mdouble, complex, c> *inf;
 
-    //Pointer to root and current element of patch cluster list
-    Mpatch* croot,*cpoint;
+private:
+    // The data of the SMRE problem stored on the device.
+    Vector __im_d, __e_d;
 
-    //Element used to signal all worker threads to shut down
-    Mpatch* cend;
+public:
+    Vector x_d, z_d, x_old;
 
-    //Temporary fields that need not to be known outside of the driver
-    // FIXME: raw pointers are bad practice, source for constant trouble (e.g. memory leaks) and anyway error-prone.
-    complex *fm1,*fm1_h;
-    //Mdouble *tmp_h; // ,*tmp2_d, *tmp_d,*lag1,*lag2,*tmp_haar2,*tmp_lagr,tmp_haar
-    dealii::Vector<Mdouble> tmp_h;
+    dealii::Vector<Mdouble> x_h, e_h, z_h, im_h, generated_noise;
+
+    // Access to noise contribution.
+    const SciPAL::Vector<Mdouble,cublas> & e_d() const { return __e_d; }
+
+    SciPAL::Vector<Mdouble,cublas> & writeable_e_d() { return __e_d; }
+
+    // The input image should not be touched anywhere in the program. Therefore we only grant read access.
+    const SciPAL::Vector<Mdouble,cublas> & im_d() const { return __im_d; }
+
+    // FIXME: remove:
+    SciPAL::Vector<Mdouble,cublas> & writeable_im_d() { return __im_d; }
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d,lag1,lag2,tmp_haar2,tmp_lagr,tmp_haar;
+    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d, lag1, lag2, tmp_haar2, tmp_lagr, tmp_haar, tmp_lag1, tmp_lag2;
 
-    //simpler parameter handling
-    ADMMParams<Mdouble> *params;
 
-    cufftHandle *plan_fft,*iplan_fft;
 
-    //Number of CUDA streams and worker threads to create
-    int stream_count;
-    //Worker thread handles
-    std::thread* thread_handles;
+    // We put the convolution into a structure such tht we can use as a matrix in iteratuve solvers.
+    struct Convolution {
+
+          int depth, width, height;
+
+        cufftHandle *plan_fft,*iplan_fft;
+
+        // In cases where we only want to denoise
+        // we have to bypass the convolution operation as then the blurrign operator is the identity.
+        bool is_delta_peak;
+
+        ~Convolution() {
+#ifdef USE_FFT_CONV
+            cufftDestroy(*plan_fft);
+            cufftDestroy(*iplan_fft);
+            delete plan_fft;
+            delete iplan_fft;
+#endif
+        }
+
+        Convolution(int d, int w, int h, double fwhm)
+            :
+              depth(d), width(w), height(h),
+              cframesize(/*ext_*/depth*/*ext_*/width*(/*ext_*/height/2+1)/**sizeof(Mcomplex)*/),
+              fm1(/*inf->ext_*/depth*/*inf->ext_*/width*(/*inf->ext_*/height/2+1)),
+              psf_fourier_transform_d(cframesize)
+            , is_delta_peak(false),
+    #ifndef USE_FFT_CONV
+              dof_handler(dealii::Point<3>(width, height, depth))
+    #endif
+        {
+#ifdef USE_FFT_CONV
+            // TO DO: compute psf_h here
+            SciPAL::Vector<Mdouble,cublas> fpsf_tmp_d;
+            fpsf_tmp_d = (psf_h);
+
+
+
+            //Cufft setup
+            //Create cufft plans
+            plan_fft=new cufftHandle();
+            iplan_fft=new cufftHandle();
+    #ifdef DOUBLE_PRECISION
+            cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
+            cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
+    #else
+            cufftPlan3d(plan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_R2C);
+            cufftPlan3d(iplan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_C2R);
+    #endif
+
+
+
+            //Fourier transformation of psf using cuFFT
+            cufftHandle plan;
+#ifdef DOUBLE_PRECISION
+            cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
+            cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
+#else
+            cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
+            cufftExecR2C(plan, fpsf_tmp_d.array().val(), psf_fourier_transform_d.array().val());
+#endif
+            //Cleanup
+            cufftDestroy(plan);
+            getLastCudaError("cufft error!\n");
+
+#else
+            // Compute 1D PSF
+            if (fwhm >0)
+            {
+                cut_off = std::ceil(1.2*fwhm); // corresponds approximately to a cut off radius of 3 std devs
+
+                // In case of a PSF to narrow to be reasonably sampled on the lattice of pixels
+                // we simply assume that it is a delta peak and consider the convolution operator as identity.
+
+                psf_1d.reinit(2*cut_off + 1);
+
+                // The magic number for converting FWHM to a standard deviation is taken
+                // from <a href="http://mathworld.wolfram.com/GaussianFunction.html">wolfram.com</a>.
+                double sigma_psf = std::max(1e-12, fwhm/2.3548);
+                int x_0 = 0;
+                double psf_norm = 0;
+
+                for (int x = -cut_off; x <= cut_off; x++)
+                {
+                    psf_1d(x+cut_off) = exp(-(boost::math::pow<2>(x - x_0)  )/
+                                            (2*boost::math::pow<2>(sigma_psf)));
+                    psf_norm += psf_1d(x+cut_off);
+                }
+                psf_1d /= psf_norm;
+
+                std::cout << psf_1d << std::endl;
+            }
+            else
+                is_delta_peak = true;
+#endif
+
+        }
+        #ifdef USE_FFT_CONV
+#else
+        dealii::Vector<Mdouble> psf_1d;
+        int cut_off;
+        ImageDoFHandler dof_handler;
+#endif
+
+        void vmult(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        {
+           if (is_delta_peak)
+               this->vmult_id(dst, src);
+           else
+               this->vmult_conv(dst, src);
+        }
+
+    private:
+        void vmult_id(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        {
+            dst = src;
+            return;
+        }
+
+        void vmult_conv(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        {
+            // Assert that dst is large enough.
+            // We assume that the image space has
+            // the same dimension as the range space.
+            if (dst.size() == 0)
+                dst.reinit(src.size());
+
+
+#ifdef USE_FFT_CONV
+#ifdef DOUBLE_PRECISION
+        cufftExecD2Z(*plan_fft, in, fm1.array().val());
+#else
+        cufftExecR2C(*plan_fft, const_cast<Mdouble*>(src.array().val()), fm1.array().val());
+#endif
+        checkCudaErrors(cudaDeviceSynchronize());
+
+        //Convolve, multiply in Fourier space
+        step35::Kernels<Mdouble> kernel;
+        kernel.element_norm_product(fm1.array().val(), psf_fourier_transform_d.array().val(),
+                                    /*inf->ext_*/width, /*inf->ext_*/height, /*inf->ext_*/depth);
+
+        //Transform back
+        // FIXME: replace by SciPAL's FFT wrappers
+#ifdef DOUBLE_PRECISION
+        cufftExecZ2D(*iplan_fft, fm1.array().val(), out);
+#else
+        cufftExecC2R(*iplan_fft, fm1.array().val(), dst.array().val());
+#endif
+        checkCudaErrors(cudaDeviceSynchronize());
+        getLastCudaError("cufft error!\n");
+#else
+
+            dealii::Vector<Mdouble> tmp_dst(src.size()), tmp_src(dst.size());
+            src.push_to(tmp_dst);
+
+            // Number of rows before and after the current row
+            // which have to be taken into account.
+            int N = cut_off;
+            for (int k=0; k< depth; k++)
+                for (int i=0; i< width; i++)
+                    for (int j=0; j< height; j++)
+                    {
+                         int xyz_pos = dof_handler.global_index(i, j, k);
+
+                         tmp_src(xyz_pos) = 0.;
+
+                         for (int p = -N; p <= N; p++)
+                        {
+                             if (j+p< 0 || j+p>=height)
+                                 continue;
+                            int xyz_pos_p = dof_handler.global_index(i, j+p, k);
+                            tmp_src(xyz_pos) += psf_1d[p+N]*tmp_dst(xyz_pos_p);
+                        }
+                    }
+
+            // We abuse the host-side source array as a temporary one.
+            // To avoid unphysical oscillations at the boundaries of the image we have to exclude a boundary layer from the convolution.
+            for (int k=0; k< depth; k++)
+                for (int i=N; i< width-N; i++)
+                    for (int j=N; j< height-N; j++)
+                    {
+                         int xyz_pos = dof_handler.global_index(i, j, k);
+                         tmp_dst(xyz_pos) = 0.;
+                         for (int p = -N; p <= N; p++)
+                        {
+                             if (i+p< 0 || i+p>=width)
+                                 continue;
+
+                            int xyz_pos_p = dof_handler.global_index(i+p, j, k);
+                            tmp_dst(xyz_pos) += psf_1d[p+N]*tmp_src(xyz_pos_p);
+                        }
+                    }
+
+            dst = tmp_dst;
+#endif
+        }
+
+    protected:
+        int cframesize;
+        SciPAL::Vector<complex, cublas> fm1;
+
+        //Point spread function on device
+        SciPAL::Vector<complex, cublas> psf_fourier_transform_d;
+
+    };
+
+
+    Convolution convolution;
+
+    // Compute the residual $I - \epsilon - A * x$. To be put into an expression.
+    void residual(SciPAL::Vector<Mdouble, cublas> & res,
+                  const SciPAL::Vector<Mdouble, cublas> & im,
+                  const SciPAL::Vector<Mdouble, cublas> & noise,
+                  const SciPAL::Vector<Mdouble, cublas> & est_im)
+    {
+
+        // A * x
+        convolution.vmult(res, est_im);
+
+#ifndef nFMM_VERSION
+        // A * x + eps
+        res += noise;
+        // A * x + eps -I
+        res -= im;
+
+        // I - eps - A * x
+        res *= -1;
+#else
+        res -= this->lag2; // noise;
+
+
+#endif
+
+    }
+
+
+    ImageDoFHandler dof_handler;
+
+    const int n_max_dykstra_steps;
+
+    const Mdouble dykstra_Tol;
+
+    const Mdouble sigma_noise;
+
+    const int dim;
+
+    Mdouble inv_gamma;
+
+    regularisationType regType;
+
 
 #ifdef TIME_KERNELS
     // Total GPU time for dykstra kernels in ms
@@ -227,81 +378,41 @@ class CUDADriver {
 #endif
 
     // @sect5{Constructor: CUDADriver}
-    // @param mcroot start object of the linked list
-    // @param im image
-    // @param fpsf psf function
+    //
     // @param cs_h array of $c_s$
-    // @param nx width of the image
-    // @param ny height of the image
-    // @param n maximum frame size
-    // @param gamma regularization parameter w.r.t. x
-    // @param sigma estimated gauss variance
-    // @param newreg regularisation Method
-    // @param dim dimension of the images (if TIFF-stack process each slice individually if dim = 2)
+    // @param dofs DoFHandler, provides information about image size.
+    // @param params the list of runtime parameters
     // FIXME: cs_h must some a reference to some decent type not a raw pointer
-    CUDADriver(Mpatch* mcroot, std::vector<Mdouble> &input_image, std::vector<Mdouble> &fpsf, Mdouble* cs_h,
+    CUDADriver(std::vector<Mdouble> & cs_h,
                // FIXME: use ImageStack class developed for SOFI and ask that for nx, ny, nz, if needed
-               const int nx, const int ny, const int nz, const int n, Mdouble gamma, int sigma,
-               regularisationType regType, const int dim,ADMMParams<Mdouble> * param)
+               const ImageDoFHandler& dofs,
+               const ADMMParams& params)
         :
-          // FIXED: use RAII
-          inf(new ImageInfo<Mdouble, complex, c>(input_image, fpsf, cs_h, nx, ny, nz, n,
-                                            gamma, sigma, regType, dim)),
-    // FIXME: more vector instantiations go here
-          tmp_d(inf->ext_num_pix),tmp2_d(inf->ext_num_pix),lag1(inf->ext_num_pix),lag2(inf->ext_num_pix),
-          tmp_haar2(inf->ext_num_pix),tmp_haar(inf->ext_num_pix),tmp_lagr(inf->ext_num_pix),
-          tmp_h(inf->ext_num_pix),params(param)
+          x_h(dofs.n_dofs()),
+          e_h(dofs.n_dofs()),
+          z_h(dofs.n_dofs()),
+          im_h(dofs.n_dofs()),
+          __e_d(dofs.n_dofs()),
+          x_d(dofs.n_dofs()),
+          z_d(dofs.n_dofs()),
+          __im_d(dofs.n_dofs()),
+        //
+          dof_handler(dofs),
+          tmp_d(dofs.n_dofs()),
+          tmp2_d(  dofs.n_dofs()),
+          lag1(  dofs.n_dofs()),
+          lag2(  dofs.n_dofs()),
+          tmp_haar2(  dofs.n_dofs()),
+          tmp_haar(  dofs.n_dofs()),
+          tmp_lagr(  dofs.n_dofs()),
+          convolution(dofs.pdepth(),  dofs.pwidth(),  dofs.pheight(), params.psf_fwhm),
+          n_max_dykstra_steps(params.n_max_dykstra_steps),
+          dykstra_Tol(params.dykstra_Tol),
+          sigma_noise(params.gnoise),
+          dim(params.dim),
+          inv_gamma(params.inv_gamma),
+          regType(params.regType)
     {
-        getLastCudaError("CUDA in error state while driver init\n");
-        //Number of CUDA streams (and thus std::threads) to use, 5 seems to be
-        //reasonable as we don't want worker threads to fight for work load and
-        //the PCIe bus is the bottelneck to the GPU
-        stream_count = 5;
-
-        //Root element of linked list
-        croot=mcroot;
-
-        //Wait for async memcpys
-        cudaDeviceSynchronize();
-
-        //Calculate reasonable maximum queue length
-        unsigned int queue_len=(unsigned int) (ny/(n))*(nx/(n));
-        //Set up queue
-        queue=new wqueue<Mpatch,Mdouble, c>(queue_len);
-
-        //Cufft setup
-        int fm1_size=inf->ext_depth*inf->ext_width*(inf->ext_height/2+1)*sizeof(complex);
-        fm1_h=new complex[inf->ext_depth*inf->ext_width*(inf->ext_height/2+1)];
-        //Create cufft plans
-        plan_fft=new cufftHandle();
-        iplan_fft=new cufftHandle();
-#ifdef DOUBLE_PRECISION
-        cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
-        cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
-#else
-        cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_R2C);
-        cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_C2R);
-#endif
-
-        //Allocate space on device
-        // FIXME: device mem alloc has to be done in the CTor call of the SciPAL::Vector objects and this has to happen in the initializer list of the CTor of this class as is good an common practice in C++ to guarantee a defined state of a class attribute right from the start.
-        checkCudaErrors(cudaMalloc((void **)&fm1, fm1_size));
-        // checkCudaErrors(cudaMalloc((void **)&tmp_d, inf->n_bytes_per_frame));
-        // FIXME: why is there host allocation when device arrays are alloc'd?
-        //tmp_h=new Mdouble[inf->ext_num_pix];
-        //checkCudaErrors(cudaMalloc((void **)&tmp2_d, inf->n_bytes_per_frame));
-        //checkCudaErrors(cudaMalloc((void **)&lag1, inf->n_bytes_per_frame));
-        //checkCudaErrors(cudaMalloc((void **)&lag2, inf->n_bytes_per_frame));
-        //checkCudaErrors(cudaMalloc((void **)&tmp_haar, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
-        //checkCudaErrors(cudaMalloc((void **)&tmp_lagr, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
-        //checkCudaErrors(cudaMalloc((void **)&tmp_haar2, inf->nx2*inf->ny2*sizeof(Mdouble))); //TODO 3d
-
-        //Init the lagrangian fields
-        //step35::Kernels<Mdouble> kernel;
-        //kernel.reset(lag1, inf->ext_num_pix);
-        //kernel.reset(lag2, inf->ext_num_pix);
-        //Generate Mpatch element used to signal threads to shut down
-        cend=new Mpatch(0);
 
 #ifdef TIME_KERNELS
         kernel_time = 0;
@@ -309,23 +420,14 @@ class CUDADriver {
         out_time.open("kernel_time");
 #endif
 
-        //Create specialized constructStruct which does specialized setup based
-        //on which Mpatch we're dealing with
-        constructStruct<Mpatch, Mdouble, c > rs;
-        rs.constructFun(this);
+
     }
 
     //@sect5{Destructor: CUDADriver}
     //Signal all threads to end, calls queue destructor
     ~CUDADriver () {
 
-        //Create specialized constructStruct which does specialized destruction based
-        //on which Mpatch we're dealing with
-        constructStruct<Mpatch, Mdouble, c > rs;
-        rs.destructFun(this);
 
-        //Kill queue, it should be empty now, all worker threads are dead
-        delete queue;
 
 #ifdef TIME_KERNELS
         //Write total dykstra kernel execution time at shutdown to file "kernel_time"
@@ -334,20 +436,11 @@ class CUDADriver {
         out_time.close();
 #endif
 
-        //Cleanup
-        delete[] fm1_h;
-        //delete[] tmp_h;
-        cufftDestroy(*plan_fft);
-        cufftDestroy(*iplan_fft);
-        delete plan_fft;
-        delete iplan_fft;
-        delete cend;
-        delete inf;
     }
 
     //@sect5{Function: nostream_handler}
     //@brief Wrapper if we use the dyadyc_dykstra Kernel.
-    void nostream_handler() {
+    void iterate() {
 #ifdef TIME_KERNELS
         cudaEvent_t start, stop;
         float time;
@@ -359,18 +452,28 @@ class CUDADriver {
 
         step35::Kernels<Mdouble> kernels;
 
-        if (inf->dim == 2) {
+        if (this->dim == 2) {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
-            for (int so=0; so<5; so++) {
-                for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d.array().val(),inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+           for (int so=0; so< 1 // 5
+                ; so++)
+            {
+                for (int z=0; z< dof_handler.pdepth(); z++) {
+                    kernels.dyadic_dykstra(this->writeable_e_d().array().val(),
+                                           this->im_d().array().val(),
+                                           this->sigma_noise,
+                                           dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
+                                           n_max_dykstra_steps, dykstra_Tol);
                 }
+              //  if (so == 1) AssertThrow(false, dealii::ExcInternalError());
             }
         }
         else { //TODO 3d
             for (int so=0; so<5; so++) {
-                for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
+                for (int z=0; z< dof_handler.pdepth(); z++) {
+                    kernels.dyadic_dykstra(this->writeable_e_d().array().val(),
+                                           this->im_d().array().val(),
+                                           this->sigma_noise,
+                                           dof_handler.pwidth(),  dof_handler.pheight(),  dof_handler.pdepth(), n_max_dykstra_steps, dykstra_Tol);
                 }
             }
         }
@@ -381,250 +484,8 @@ class CUDADriver {
         cudaEventElapsedTime(&time, start, stop);
         kernel_time += time;
 #endif
-    }
 
 
-    //@sect5{Function: nostream_handler2}
-    //@brief Wrapper if we use the stoch_dykstra Kernel.
-    void nostream_handler2() {
-        int randomPower;
-        if (params->power_x < 0)
-            randomPower = rand() % 11;
-        else
-            randomPower = params->power_x;
-        int resol;
-        if (params->resol < 0)
-            resol = rand()%std::max(randomPower,10-randomPower)+1;
-        else
-            resol = params->resol;
-
-        step35::Kernels<Mdouble> kernels;
-            std::cout << "random number:" << randomPower << std::endl;
-
-        if (inf->dim == 2) {
-//            for(int i = 50000;i<1024+50000;i++)
-//                std::cout << inf->e_d(i)<< " " ;
-            //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
-            for (int so=-1; so<std::min(randomPower,10-randomPower); so++) {
-                for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.stoch_dykstra(inf->e_d,inf->ext_height, inf->ext_width, inf->ext_depth, (so<0)? 0: (1 << so), (so<0)? 0: (1 << so), z,resol, randomPower,params->both_halving);
-                }
-            }
-        }
-        else { //TODO 3d
-            for (int so=0; so<5; so++) {
-                for (int z=0; z<inf->ext_depth; z++) {
-                    kernels.dyadic_dykstra(inf->e_d.array().val(), inf->ext_width, inf->ext_height, inf->ext_depth, 1 << so, 1 << so, z, so);
-                }
-            }
-        }
-    }
-
-    //@sect5{Function: stream_handler}
-    //@brief Handles one cuda stream if we use cluster<cset_small>, queue worker thread.
-    //This function is executed by `stream_count` threads in parallel, each creates an cuda
-    //stream and coordinates the work done on that stream. It removes items from the queue
-    //and processes. End thread when terminate item is recieved from the queue.
-    //@param rank dummy threadid used for debugging
-    void stream_handler(int rank) {
-        printf("Hello from worker thread %ld \n", (long int)rank); //for debug
-
-        //CUDA device id has to be set for each thread
-        checkCudaErrors(cudaSetDevice(inf->device_id));
-        checkCudaErrors(cudaDeviceSynchronize());
-
-        //Create CUDA stream
-        cudaStream_t mystream;
-        checkCudaErrors(cudaStreamCreate(&mystream));
-
-        std::list<Mpatch*> cluster_vec;
-        //Maximum number of elements we try to get from queue in one call
-        const int max_num_cluster = 128;
-        //Minimum number of elements we try to get from queue in one call, not guaranteed
-        const int min_num_cluster = 12;
-
-        //Allocate the maximum needed memory on host and device for
-        //cluster information and q_offset
-
-        //Array of device pointers which contains the information of the clusters
-        int **cluster_info; //=new int*[4*max_num_cluster];
-        int **cluster_info_d;
-        checkCudaErrors(cudaHostAlloc((void **)&cluster_info, 4*max_num_cluster*sizeof(int*), cudaHostAllocWriteCombined));
-        checkCudaErrors(cudaMalloc((void **)&cluster_info_d, 4*max_num_cluster*sizeof(int*)));
-
-        //Where to find the $q$ values for eauch cluster
-        int *q_offset; //=new int[max_num_cluster];
-        int *q_offset_d;
-        checkCudaErrors(cudaHostAlloc((void **)&q_offset, max_num_cluster*sizeof(int), cudaHostAllocWriteCombined));
-        checkCudaErrors(cudaMalloc((void **)&q_offset_d, max_num_cluster*sizeof(int)));
-
-        //All $q$ values
-        Mdouble* d_q;
-        checkCudaErrors(cudaMalloc((void **)&d_q, 1024*max_num_cluster*sizeof(Mdouble)));
-
-        step35::Kernels<Mdouble> kernels;
-
-#ifdef TIME_KERNELS
-        //Collect GPU dykstra kernel total execution time
-        cudaEvent_t start, stop;
-        float time, total_time;
-#endif
-
-        //Get a list of min_num_cluster to max_num_cluster clusters
-        cluster_vec = queue->get(min_num_cluster, max_num_cluster);
-        //queue->get(min, max) has a timeout, check if we actually received something
-        while ( !cluster_vec.size() ) {
-            cluster_vec = queue->get(min_num_cluster, max_num_cluster);
-        }
-
-        //Big while loop until terminate signal is received
-        while ( cluster_vec.front()->size != 0 ) {
-#ifdef TIME_KERNELS
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
-#endif
-            //Number of elements we received
-            int num_of_cluster=cluster_vec.size();
-
-            //In the big $q$ array, where can I find the $q$ for the first pixel of my cluster?
-            int offset=0;
-
-            //Only used in the following for loop
-            int k=0;
-            //Fill array of device pointers
-            for (auto it=cluster_vec.begin(), end=cluster_vec.end(); it!=end; ++it, k++) {
-                //In the big $q$ array, where can I find the $q$ value for the first pixel of my cluster?
-                q_offset[k]=offset;
-                //Create an array of device pointers \n
-                //First device pointer points to the array containing the edge lengths of the cset_small
-                cluster_info[4*k]=(*it)->nvec_d;
-                //Second the pointer to the horizontal start pixel positions
-                cluster_info[4*k+1]=(*it)->ivec_d;
-                //Third the pointer to the vertical start pixel positions
-                cluster_info[4*k+2]=(*it)->jvec_d;
-                //Fourth the pointer to the number of cset_small in one cluster
-                cluster_info[4*k+3]=(*it)->pnum_d;
-
-                offset+=(*it)->size;
-            }
-
-            //Copy $q$ for all frames to device
-            offset=0;
-            for (auto it=cluster_vec.begin(), end=cluster_vec.end(); it!=end; ++it) {
-                checkCudaErrors(cudaMemcpyAsync(&(d_q[offset]), (*it)->qmat, (*it)->size*sizeof(Mdouble), cudaMemcpyHostToDevice, mystream));
-                offset+=(*it)->size;
-            }
-
-            //Copy cluster_info to device
-            checkCudaErrors(cudaMemcpyAsync(cluster_info_d, cluster_info, 4*num_of_cluster*sizeof(int*), cudaMemcpyHostToDevice, mystream));
-            //Copy q_offset to device
-            checkCudaErrors(cudaMemcpyAsync(q_offset_d, q_offset, num_of_cluster*sizeof(int), cudaMemcpyHostToDevice, mystream));
-
-#ifdef TIME_KERNELS
-            cudaEventRecord(start, mystream);
-#endif
-            //Calculate Dykstra's algorithm on all frames in the list of clusters we recieved
-            kernels.dykstra(d_q,inf->e_d.array().val(), cluster_info_d, q_offset_d, num_of_cluster, inf->width, inf->height, 1024, &mystream);
-
-#ifdef TIME_KERNELS
-            cudaEventRecord(stop, mystream);
-#endif
-
-            //Copy $q$ back
-            offset=0;
-            for (typename std::list<Mpatch*>::iterator it=cluster_vec.begin(), end=cluster_vec.end(); it!=end; ++it) {
-                checkCudaErrors(cudaMemcpyAsync( (*it)->qmat, &(d_q[offset]), (*it)->size*sizeof(Mdouble), cudaMemcpyDeviceToHost, mystream));
-                offset+=(*it)->size;
-            }
-
-            //Blocks until stream has completed all operations
-            cudaStreamSynchronize(mystream);
-            getLastCudaError("__dysktra<<<>>> execution failed\n");
-
-#ifdef TIME_KERNELS
-            cudaEventElapsedTime(&time, start, stop);
-            total_time += time;
-#endif
-            //Signal queue that task is done
-            queue->task_done(cluster_vec);
-
-            //Get a list of min_num_cluster to max_num_cluster clusters
-            cluster_vec = queue->get(min_num_cluster, max_num_cluster);
-            while ( !cluster_vec.size() ) {
-                cluster_vec = queue->get(min_num_cluster, max_num_cluster);
-            }
-        } //End big while loop
-
-        //Worker thread shutdown cleanup
-        std::cout << "All done! Goodbye from thread " << rank << std::endl;
-
-#ifdef TIME_KERNELS
-        out_time << total_time << std::endl;
-#endif
-
-        //Insert terminate signal back to queue
-        queue->add(cend);
-        //Destroy stream
-        cudaStreamDestroy(mystream);
-        //Free allocated memory
-        cudaFree(d_q);
-        cudaFree(cluster_info_d);
-        cudaFree(q_offset_d);
-        cudaFreeHost(cluster_info);
-        cudaFreeHost(q_offset);
-    }
-
-    //@sect5{Function: conv2}
-    //@brief Cyclic convolution, based on FFT
-    //@param in input array
-    //@param out output array
-      void conv2(Mdouble *in, Mdouble *out) {
-
-#ifdef DOUBLE_PRECISION
-        cufftExecD2Z(*plan_fft, in, fm1);
-#else
-        cufftExecR2C(*plan_fft, in, fm1);
-#endif
-        checkCudaErrors(cudaDeviceSynchronize());
-
-        //Convolve, multiply in Fourier space
-        step35::Kernels<Mdouble> kernel;
-        kernel.element_norm_product(fm1, inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        //Transform back
-        // FIXME: replace by SciPAL's FFT wrappers
-#ifdef DOUBLE_PRECISION
-        cufftExecZ2D(*iplan_fft, fm1, out);
-#else
-        cufftExecC2R(*iplan_fft, fm1, out);
-#endif
-        checkCudaErrors(cudaDeviceSynchronize());
-        getLastCudaError("cufft error!\n");
-    }
-
-    //@sect5{Function: conv2}
-    //@brief Cyclic convolution, based on FFT
-    //@param in input array
-    //@param out output array
-
-    void conv2_ET(SciPAL::Vector<Mdouble,cublas> &in, SciPAL::Vector<Mdouble,cublas> &out) {
-       //SciPAL FFT
-        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas> tmpfft_d(inf->ext_num_pix);
-       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_R2C,gpu_cuda>
-               cuda_fft(inf->ext_height,inf->ext_width,tmpfft_d,in);
-
-        SciPAL::Vector<SciPAL::CudaComplex<Mdouble>,cublas> tmpifft_d(inf->ext_num_pix);
-       SciPAL::CUDAFFT<Mdouble,2,SciPAL::TransformType<Mdouble>::FFTType_C2C,gpu_cuda>
-               cuda_ifft(inf->ext_height,inf->ext_width,tmpifft_d/*out*/,tmpfft_d);
-
-        cuda_fft(tmpfft_d,in,FORWARD);
-        //Convolve, multiply in Fourier space
-        step35::Kernels<Mdouble> kernel;
-        kernel.element_norm_product(tmpfft_d.array().val(), inf->fpsf_d, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        cuda_ifft(tmpifft_d/*out*/,tmpfft_d,BACKWARD);
-
-        kernel.real(out, tmpifft_d);
     }
 
     //@sect5{Function: projection_gauss}
@@ -675,133 +536,288 @@ class CUDADriver {
         }
     }
 
-    //@sect5{Function: iterate}
-    //@brief Initiate Dykstra's algothrim once for all frames
-    void iterate() {
-        runStruct<Mpatch, Mdouble, c > rs;
-        //The specialized runStruct does the actuall work
-        rs.run_func(this);
-    }
+
 
     //@sect5{Function: push_data}
     //@brief Push all data from host to device
     void push_data() {
-        inf->im_d = inf->im_h;
-        inf->x_d = inf->x_h;
-        inf->z_d = inf->z_h;
-        inf->e_d = inf->e_h;
-        tmp_d = tmp_h;
+        this->writeable_im_d() = this->im_h;
+        this->x_d = this->x_h;
+        this->z_d = this->z_h;
+        this->writeable_e_d() = this->e_h;
 
-//        checkCudaErrors(cudaMemcpy(inf->im_d.array().val(), &(inf->im_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-//        checkCudaErrors(cudaMemcpy(inf->x_d.array().val(), &(inf->x_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-//        checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), &(inf->z_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-//        checkCudaErrors(cudaMemcpy(inf->e_d.array().val(), &(inf->e_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
-//        checkCudaErrors(cudaMemcpy(tmp_d.array().val(), &(tmp_h[0]), inf->n_bytes_per_frame, cudaMemcpyHostToDevice));
     }
 
     //@sect5{Function: get_data}
     //@brief Pull all data from device to host
     void get_data() {
-        inf->im_d.push_to(inf->im_h);
-        inf->x_d.push_to(inf->x_h);
-        inf->z_d.push_to(inf->z_h);
-        inf->e_d.push_to(inf->e_h);
-        tmp_d.push_to(tmp_h);
-//        checkCudaErrors(cudaMemcpy(&(inf->im_h[0]), inf->im_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-//        checkCudaErrors(cudaMemcpy(&(inf->x_h[0]), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-//        checkCudaErrors(cudaMemcpy(&(inf->z_h[0]), inf->z_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-//        checkCudaErrors(cudaMemcpy(&(inf->e_h[0]), inf->e_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
-//        checkCudaErrors(cudaMemcpy(&(tmp_h[0]), tmp_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToHost));
+        this->im_d().push_to(this->im_h);
+        this->x_d.push_to(this->x_h);
+        this->z_d.push_to(this->z_h);
+        this->e_d().push_to(this->e_h);
+
     }
 
-    // FIXME: use SciPAl vectors and ETs!!!
+    // Evaluation of the Euler-Lagrange equation for the minimization w.r.t.
+    // to the primal variable, that is the image we want to reconstruct.
+    // The mathematical expression is
+    // \f{eqnarray}{ \text{dst}
+    //                 & = &
+    //                        A^T*\left\lbrack     \rho_1 \left(I-e-A*x\right) +\Upsilon_1      \right\rbrack
+    //                        -
+    //                        \rho_2 \frac{\delta J}{\delta x}(x_{old}) \,.
+    //             \f}
+    void argmin_x_rhs(SciPAL::Vector<Mdouble, cublas> & dst,
+                      const SciPAL::Vector<Mdouble, cublas> & x_old,
+                      const SciPAL::Vector<Mdouble, cublas> & lag_1,
+                      ADMMParams& params)
+    {
+            const Mdouble rho1 = params.rho1;
+
+            const Mdouble reg_strength = params.reg_strength;
+
+
+            // the residual
+            // $\text{tmp}_d=I-e-A*x$
+            this->residual(this->tmp2_d, this->im_d(), this->e_d(), x_old);
+
+            // $\text{tmp}_d=A*\left(\left(I-e-A*x\right) \rho_1+\Upsilon_1\right)$
+#ifndef nFMM_VERSION
+            dst = rho1 * this->tmp2_d + lag_1;
+#else
+            dst =  Mdouble(1./params.inv_gamma) * lag_1 + this->tmp2_d;
+            dst /= 0.99;
+#endif
+            convolution.vmult(dst, dst);
+
+            // Add regularization
+            step35::Kernels<Mdouble> kernel;
+            kernel.tv_derivative(this->tmp2_d.array().val(), x_old.array().val(),
+                                 this->im_d().array().val(),
+                     #ifndef nFMM_VERSION
+                                 reg_strength
+                     #else
+                                 reg_strength / 0.99
+                     #endif
+                                 ,
+                                 dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
+
+            #ifndef nFMM_VERSION
+                        this->tmp2_d *= params.rho2;
+#else
+              this->tmp2_d *= Mdouble((1./params.inv_gamma) / 0.99);
+#endif
+            dst -= this->tmp2_d;
+
+            // For LJs's version:
+            // 2nd constraint
+            //            {
+            //                  tmp2_d = this->z_d - this->x_old;
+            //                  tmp2_d *= Mdouble(params.rho2);
+            //                  tmp2_d += tmp_d;
+            //                  tmp_d  = tmp2_d - lag2;
+            //            }
+
+            // test, whether sign reversal stems from here:
+#ifdef nFMM_VERSION
+            // It seems that we have to reverse the sign of the rhs for the FMM version to get convergence.
+            dst *= -1;
+#endif
+    }
+
+
+    void x_step_adaptive(ADMMParams & params)
+    {
+
+        const Mdouble rho1 = params.rho1;
+
+        const Mdouble reg_strength = params.reg_strength;
+
+        const Mdouble Tol = 1e-2;
+        const int max_dt_iter = 10;
+
+        SciPAL::Vector<Mdouble, cublas> & x_tmp = this->tmp_lag2;
+
+        SciPAL::Vector<Mdouble, cublas> & k_1 = this->tmp_haar;
+        SciPAL::Vector<Mdouble, cublas> & k_2 = this->tmp_haar2;
+
+        SciPAL::Vector<Mdouble, cublas> & sol_diff = this->tmp_lagr;
+
+        Mdouble err = 2*Tol;
+        int n_max_admm_iter = 1000;
+        int n_err_iter = 0;
+        // For a given Lagrange parameter @p lag1 and a given estimate of the noise we compute
+        // a new estimate for how the reconstructed image should look like.
+        while (err > Tol)
+        {
+            // Save old solution.
+            this->x_old = this->x_d;
+
+            Mdouble Delta = 2*Tol;
+
+            // Evaluate rhs of Euler-Lagrange for explicit Euler step.
+            // This does not change over the course of the timestep adaption.
+            // Hence, we have to compute it only once.
+            argmin_x_rhs(k_1, this->x_old, this->lag1, params);
+
+
+            int dt_iter = 1;
+            Mdouble delta_t;
+            // Th einne rloop does the time-step adaption.
+            for (; dt_iter <= max_dt_iter; dt_iter++)
+            {
+                delta_t = 1./params.inv_gamma;
+
+                // Euler step for intermediate solution.
+                x_tmp = delta_t * k_1 + x_old;          // for reconstructing LJ: replace delta_t by Mdouble(1./delta_t)
+
+                // For LJ:
+                //this->x_d = x_tmp;
+                //return;
+
+
+                  // Evaluate rhs of Euler-Lagrange
+                argmin_x_rhs(k_2, x_tmp, this->lag1, params);
+
+                // The difference of the two solutions is given by the differnce of the derivatives
+                // and serves the timestep adaption.
+                sol_diff = k_2;
+                sol_diff -= k_1;
+                sol_diff *= 0.5*delta_t;
+
+                // Heun step
+                k_2 += k_1;
+                this->x_d = Mdouble(0.5*delta_t) * k_2 + x_old;
+
+                // this->z_d = this->x_d;
+
+                Delta = sol_diff.l2_norm()/std::sqrt(sol_diff.size());
+
+                Mdouble new_dt = 0.9 * Tol / Delta;
+
+                // To avoid excessive oscillations we limit the increase of the timestep.
+                if (Delta < Tol) {
+                    if (new_dt > 2*delta_t)
+                        new_dt = 2*delta_t;
+                }
+                else
+                    new_dt = 0.707 * delta_t;
+
+
+                delta_t = params.inv_gamma = 1./(new_dt);
+
+                if (Delta <= Tol)
+                    break;
+            }
+            //  std::cout << "             n dt adaptions : " << dt_iter << ", new timestep : " << 1./params.inv_gamma << ", Delta : " << Delta << std::endl;
+
+            // Convergence control for the outer iteration.
+            tmp2_d = this->x_d;
+            tmp2_d -= this->x_old;
+            err = tmp2_d.l2_norm()/std::sqrt(tmp2_d.size());
+            n_err_iter++;
+            if (n_err_iter > n_max_admm_iter)
+                break;
+        }
+        std::cout << "    n ADMM steps : " << n_err_iter << std::endl;
+
+
+        this->z_d = this->x_d;
+    }
+
+
+    // FIXME: use SciPAL vectors and ETs!!!
     //@sect5{Function: x_step}
     //@brief Performs approximative argmin with respect to $x$
-    void x_step(const Mdouble rho1,const Mdouble rho2) {
+    // FIXME: component wise
+    void x_step(const Mdouble rho1,const Mdouble rho2)
+    {
         step35::Kernels<Mdouble> kernel;
         //$\text{tmp}_d=I$tmp2
-        kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // // // kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
+        // // // kernel.sum(tmp_d.array().val(), this->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
         //$\text{tmp}_d=I-e$
-        kernel.diff(tmp_d.array().val(), inf->e_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        conv2(inf->x_d.array().val(), tmp2_d.array().val());
+        // kernel.diff(tmp_d.array().val(), this->e_d().array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        // conv2(this->x_d.array().val(), tmp2_d.array().val()); // args: in, out
+
+        // the residual
         //$\text{tmp}_d=I-e-A*x$
-        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+#ifdef USE_SHIFT_ARITH
+        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(),
+                    SHIFT_FACTOR * inf->sigma,
+                    inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
+#else
 
+#endif
+        // Test x -y
+        {
+            //            tmp2_d = Mdouble(-1.) * this->x_d + this->z_d;
+            //            tmp_d =  this->z_d - this->x_d;
+            //            tmp2_d -= tmp_d;
+            //            std::cout << "tmp2_d.l2_norm : 0 =?= " << tmp2_d.l2_norm() << std::endl;
+        }
 
+        this->residual(tmp2_d, this->im_d(), this->e_d(), this->x_d);
 
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
-        kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
-        //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-        kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
 
+        //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
+        // kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        conv2(tmp_d.array().val(), tmp_d.array().val());
+        tmp_d = rho1 * tmp2_d + lag1;
+
+        // conv2(tmp_d.array().val(), tmp_d.array().val());
+        // FIXME: inplace works?
+        convolution.vmult(tmp_d, tmp_d);
 
         //$\text{tmp2}_d=z$
-        kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp2_d.array().val(), inf->z_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //$\text{tmp2}_d=z-x$ 
+        // kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
+        // kernel.sum(tmp2_d.array().val(), this->z_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
-        kernel.diff(tmp2_d.array().val(), inf->x_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+
         //$\text{tmp2}_d=z-x$
+
+        // kernel.diff(tmp2_d.array().val(), this->x_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // tmp2_d -= this->x_d;
+
+        //$\text{tmp2}_d=z-x$
+        tmp2_d = this->z_d - this->x_d;
+
 
 
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
-
-
-        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
-
-        //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        kernel.sum(inf->x_d.array().val(), tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-
-    }
-    // FIXME: use SciPAl vectors and ETs!!!
-    //@sect5{Function: x_step}
-    //@brief Performs approximative argmin with respect to $x$
-    void x_step_ET(const Mdouble rho1,const Mdouble rho2) {
-        step35::Kernels<Mdouble> kernel;
-
-        //$\text{tmp}_d=I-e$
-        tmp_d = inf->im_d - inf->e_d;
-
-        conv2(inf->x_d.array().val(), tmp2_d.array().val());
-        //$\text{tmp}_d=I-e-A*x$
-        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        //$\text{tmp}_d=\left((I-e-A*x\right)*\rho_1+\Upsilon_1$
-        tmp_d = lag1 + (rho1*tmp_d); //but tmp_d = (rho1*tmp_d)+lag1: Does NOT work!!!
-
-        //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        conv2_ET(tmp_d, tmp_d);
-
-        //$\text{tmp2}_d=z-x$
-        tmp2_d = inf->z_d - inf->x_d;
-
-        //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
+        // kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
         tmp2_d *= rho2;
 
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
+#ifdef USE_SHIFT_ARITH
+        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(),
+                   SHIFT_FACTOR * inf->sigma,
+                   inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
+#else
+        tmp2_d += tmp_d;
+#endif
 
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
+        // kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         tmp2_d -= lag2;
 
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        tmp2_d *= inf->gamma;
+        // kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
 
+        // tmp2_d *= inf->gamma;
+
+
+        // THE FOLLOWING DOC EQ APPLIES TO HAVING DONE BEFORE : tmp2_d *= inf->gamma;
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        inf->x_d += tmp2_d;
+        //kernel.sum(this->x_d.array().val(), tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //  this->x_d += tmp2_d;
+        this->x_d = this->inv_gamma * tmp2_d + this->x_d;
 
     }
 
@@ -811,83 +827,263 @@ class CUDADriver {
     //$\Upsilon_2^{r+1} = \Upsilon_2^r + \alpha_2 \left( x - z \right) $
     void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
         step35::Kernels<Mdouble> kernel;
-        kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        kernel.sum(tmp_d.array().val(), inf->x_d.array().val(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        conv2(tmp_d.array().val(), tmp_d.array().val());
+
+        // kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
+        // kernel.sum(tmp_d.array().val(), this->x_d.array().val(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
+
+        //  conv2(tmp_d.array().val(), tmp_d.array().val());
         //Update the lagrangian estimates
-        kernel.update_lagrangian(lag1.array().val(), lag2.array().val(), inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth,
-                                 alpha1, alpha2, inf->e_d.array().val(), inf->im_d.array().val(),tmp_d.array().val(), inf->x_d.array().val(), inf->z_d.array().val());
+#ifdef USE_SHIFT_ARITH
+        kernel.update_lagrangian(lag1.array().val(), lag2.array().val(),
+                                 SHIFT_FACTOR *  inf->sigma,
+                                 inf->ext_width(),  inf->ext_height(),  inf->ext_depth(),
+                                 alpha1, alpha2, this->e_d().array().val(), inf->writeable_im_d().array().val(),tmp_d.array().val(), this->x_d.array().val(), this->z_d.array().val());
+#else
+
+
+        // lag1 += alpha1 * (this->im_d() - this->e_d() - tmp_d);
+        residual(tmp_lag1, this->im_d(), this->e_d(), this->x_d);
+        lag1 =  alpha1 * tmp_lag1 + lag1;
+
+#ifndef nFMM_VERSION
+
+        // lag2 += alpha2 * (this->x_d - this->z_d);
+
+        tmp_lag2 = this->x_d - this->z_d;
+        lag2  = alpha2 * tmp_lag2 + lag2;
+#endif
+#endif
     }
 
     //@sect5{Function: dykstra_gauss}
     //@brief Wrapper around the whole projection procedure
     //@param rho parameter for the first constraint
-    void dykstra_gauss(const Mdouble rho) {
-        conv2(inf->x_d.array().val(),tmp_d.array().val());
+    void dykstra_gauss(const Mdouble rho)
+    {
+
+#ifdef USE_SHIFT_ARITH
+        convolution.vmult(tmp_d, this->x_d); // conv2(this->x_d.array().val(),tmp_d.array().val());
+
+
         step35::Kernels<Mdouble> kernel;
         //the value to be projected is copied into e_d
-        kernel.prepare_e(inf->e_d.array().val(), inf->im_d.array().val(), tmp_d.array().val(), lag1.array().val(), rho, inf->sigma, inf->ext_width, inf->ext_height, inf->ext_depth);
-        //Perform the Dykstra Algotithm
-        iterate();
+
+        kernel.prepare_e(inf->writeable_e_d().array().val(), this->im_d().array().val(), tmp_d.array().val(), lag1.array().val(), rho,
+                         SHIFT_FACTOR * inf->sigma,
+                         inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
+#else
+
+#ifndef nFMM_VERSION
+        dykstra_gauss_LNCS(rho);
+#else
+        dykstra_gauss_FMM(rho);
+#endif
+        // Will the generated noise be transformed?
+        // this->writeable_e_d() = this->generated_noise;
+
+#endif
+
+
+
+
     }
+
+
+
+
+    void dykstra_gauss_LNCS(const Mdouble rho)
+    {
+        // $A * x_{k}$
+        convolution.vmult(tmp_d, this->x_d);
+
+        // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
+        this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
+        this->writeable_e_d() -= tmp_d;
+
+        //Perform the Dykstra Algorithm
+        iterate();
+
+    }
+
+
+    void dykstra_gauss_FMM(const Mdouble rho)
+    {
+        // $A * x_{k-1}$
+        convolution.vmult(tmp_d, this->x_d);
+
+        // $\epsilon = dt \cdot \Upsilon_1 + A * x_{k-1} $
+        this->writeable_e_d() = Mdouble(1./this->inv_gamma) * lag1 + tmp_d;
+
+        //Perform the Dykstra Algorithm
+        this->iterate();
+
+        // After the Dykstra iteration @p e_d contains the slack variable $v$ for the constraint $A * x - v = 0$
+        this->lag2 = this->e_d();
+
+        // compute noise contribution
+        this->writeable_e_d() -= this->im_d();
+    }
+
+
+    void dykstra_gauss_global_mem(const Mdouble rho)
+    {
+        convolution.vmult(tmp_d, this->x_d);
+
+        // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
+        this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
+        this->writeable_e_d() -= tmp_d;
+
+        static const int n_scales = 10;
+        static const int min_scale = 0;
+
+        typedef SciPAL::Vector<Mdouble, cublas> Vc;
+
+        std::vector<Vc> h(n_scales+1, Vc(this->e_d().size())), Q(n_scales, Vc(this->e_d().size()));
+
+        h[0] = this->e_d();
+
+        for (int j = min_scale + 1; j <= n_scales; j++)
+             Q[j-1] = 0;
+
+        int iter = 0;
+        bool iterate = true;
+        while (iterate)
+        {
+
+            for (int j = 1; j <= n_scales; j++)         // loop over subsets
+            {
+                 h[j-1] -= Q[j-1];
+
+                 // ------
+//                 sum_of_squares_on_2D_subsets(j-1, ps_sum);
+
+//                 T weight =  // 0.25*
+//                         ICD_weights[j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+
+//                 int s_x = n_scales - j;
+//                 int s_y = s_x;
+
+//                 h[j]   = project(s_x, //j-1 /* s_x*/,
+//                                  s_y, // j-1 /* s_y */,
+//                                  ps_sum, h[j-1], m_data, g_noise, weight);
+                 // ------
+                  Q[j-1] = h[j] - h[j-1];
+            }
+
+
+//            tmp_d = h[n_scales] - h[0];
+//            Mdouble norm = L2_norm(tmp_d);
+
+//            iterate = ( norm > Tol &&
+//                       iter < n_max_steps);
+//            iterate ?  h[0] = h[n_scales] : *m_px = h[n_scales];
+            iter++;
+        }
+    }
+
 
     //@sect5{Function: m_smoothing}
     //@brief Smoothing step
     //@param gamma Strength of the regularization, small choices render the algorithm unstable
     //TODO rho2
-    void m_smoothing(Mdouble gamma, Mdouble rho2) {
+    void m_smoothing(Mdouble reg_strength, Mdouble rho2) {
         step35::Kernels<Mdouble> kernel;
         //Regularization by Haar Wavelet Coefficient sparsity
-        if ( inf->regType == haar ) {
-            if (inf->ext_depth > 1) {//TODO 3d
+        if ( this->regType == haar ) {
+            if ( dof_handler.pdepth() > 1) {//TODO 3d
                 std::cerr << "Haar regularisation with 3d images is not yet implemented!" << std::endl;
                 std::abort();
             }
-            //kernel.reset(tmp_haar,inf->nx2*inf->ny2);
-            tmp_haar = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
-            tmp_lagr = SciPAL::Vector<Mdouble,cublas>(inf->nx2*inf->ny2);
 
-            //kernel.reset(tmp_lagr,inf->nx2*inf->ny2);
+            int nx2 = dof_handler.n_dofs_x_padded();
+            int ny2 = dof_handler.n_dofs_y_padded();
+            //kernel.reset(tmp_haar,inf->nx2*inf->ny2);
+            tmp_haar = SciPAL::Vector<Mdouble,cublas>( nx2 * ny2);
+            tmp_lagr = SciPAL::Vector<Mdouble,cublas>( tmp_haar.size());
 
             //Copy $x$ into the bigger temp variable while conserving its shape
-            for (int i=0; i<inf->nx2; i++) {
-                if ( i < inf->ext_height) {
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i*inf->ny2]), &(inf->x_d.array().val()[i*inf->ext_height]),
-                                                    inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i*inf->ny2]), &(lag2.array().val()[i*inf->ext_height]),
-                                                    inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
+            for (int i=0; i< nx2; i++) {
+                if ( i <  dof_handler.pheight()) {
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i* ny2]), &(this->x_d.array().val()[i* dof_handler.pheight()]),
+                                                     dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
+
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i* ny2]), &(lag2.array().val()[i* dof_handler.pheight()]),
+                                                     dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                 }
             }
             checkCudaErrors(cudaDeviceSynchronize());
 
             //Forward 2D Haar Wavelet transform
-            kernel.haar(tmp_haar.array().val(),tmp_haar2.array().val(),inf->ny2);
-            kernel.haar(tmp_lagr.array().val(),tmp_haar2.array().val(),inf->ny2);
-            kernel.soft_threshold(tmp_haar.array().val(),lag2.array().val(),tmp_haar.array().val(),rho2,gamma,inf->nx2*inf->ny2);
+            kernel.haar(tmp_haar.array().val(), tmp_haar2.array().val(), ny2);
+            kernel.haar(tmp_lagr.array().val(), tmp_haar2.array().val(), ny2);
+            kernel.soft_threshold(tmp_haar.array().val(), lag2.array().val(), tmp_haar.array().val(), rho2, reg_strength, nx2* ny2);
             //Backward 2D Haar Wavelet transform
-            kernel.inverse_haar(tmp_haar.array().val(),tmp_haar2.array().val(),inf->ny2);
+            kernel.inverse_haar(tmp_haar.array().val(), tmp_haar2.array().val(), ny2);
 
             //Copy back, pay attention not to mess up the shape
-            for (int i=0; i<inf->nx2; i++) {
-                if ( i < inf->ext_width )
-                    checkCudaErrors(cudaMemcpyAsync(&(inf->z_d.array().val()[i*inf->ext_height]), &(tmp_haar.array().val()[i*inf->ny2]),
-                                                    inf->ext_width*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
+            for (int i=0; i< nx2; i++) {
+                if ( i <  dof_handler.pwidth() )
+                    checkCudaErrors(cudaMemcpyAsync(&(this->z_d.array().val()[i* dof_handler.pheight()]), &(tmp_haar.array().val()[i* ny2]),
+                                                     dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
             }
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
         //Regularization by direct space sparsity
-        if ( inf->regType == sparse ) {
-            //checkCudaErrors(cudaMemcpy(inf->z_d, inf->x_d, inf->framesize, cudaMemcpyDeviceToDevice));
-            kernel.soft_threshold(inf->z_d.array().val(),lag2.array().val(),inf->x_d.array().val(), rho2, gamma, inf->ext_num_pix);
-            //kernel.tv_regularization(inf->x_d,inf->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
+        if ( this->regType == sparse ) {
+            this->z_d = this->x_d;
+            kernel.soft_threshold(this->z_d.array().val(),lag2.array().val(),this->x_d.array().val(), rho2, reg_strength,   dof_handler.n_dofs());
+            //kernel.tv_regularization(this->x_d,this->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
         }
         //Regularization by Fourier Space L_2 Norm
-        if ( inf->regType == quadratic ) {
-            checkCudaErrors(cudaMemcpy(inf->z_d.array().val(), inf->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
+        if ( this->regType == quadratic ) {
+            this->z_d = this->x_d;
             //the solution with smallest L_2 Norm is obtained, this corresponds to the pseudoinverse
-            kernel.pseudo_inverse(inf->z_d.array().val(),lag2.array().val(),rho2,gamma,inf->ext_num_pix);
+            kernel.pseudo_inverse(this->z_d.array().val(), lag2.array().val(), rho2, reg_strength, dof_handler.n_dofs());
         }
+
+
+        //Regularization by Fourier Space L_2 Norm
+        if ( this->regType == TV ) {
+            this->z_d = this->x_d;
+            //checkCudaErrors(cudaMemcpy(this->z_d.array().val(), this->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
+            if (true)
+                kernel.tv_regularization(this->x_d.array().val(), this->z_d.array().val(),
+                                         lag2.array().val(), reg_strength, rho2,
+                                         dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
+            else
+            {
+                Mdouble dt = 1e-1;
+
+                Mdouble Tol = 1e-4 * std::sqrt(tmp2_d.size()) / dt;
+                int n_max_iter = 100;
+                int n_iter = 0;
+                Mdouble err = 2*Tol;
+
+                while (err > Tol)
+                {
+                    kernel.tv_derivative(tmp2_d.array().val(), z_d.array().val(),
+                                         this->im_d().array().val(),
+                                         reg_strength,
+                                         dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
+
+                    tmp_d = rho2 * x_d + lag2;
+                    tmp_d = (-rho2) * z_d + tmp_d;
+                    tmp_d -= tmp2_d;
+
+                    z_d = dt * tmp_d + z_d;
+
+                    err = tmp_d.l2_norm();
+                    n_iter++;
+                    if (n_iter > n_max_iter)
+                        break;
+
+                }
+
+                std::cout << "n iter in Reg term : " << n_iter << ", final error : " << (err / ( std::sqrt(tmp2_d.size()) / dt )) << std::endl;
+            }
+        }
+
     }
 };
 } // namespace step35 END

@@ -28,6 +28,9 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include<cmath>
 #include <time.h>
 
+// deal.II
+#include <deal.II/lac/solver.h>
+#include <deal.II/lac/solver_control.h>
 
 //Boost used for Noise simulation
 #include <boost/random/variate_generator.hpp>
@@ -44,6 +47,8 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <cuda_driver_step-35.h>
 #include <cuda_driver_step-35.hh>
 
+#include <smre_problem.hh>
+
 // SciPal includes
 //
 // This is an auxiliary structure which collects data related to the GPUs
@@ -56,6 +61,273 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <chrono>
 
 namespace step35 {
+
+// @sect4{Class: ImageIO}
+//
+// The input and output of the raw data and the results is managed by a separate class.
+// Although this program is primarily used for image processing
+// encapsulating the I/O in a class of its own allows to add further types of usages
+// while leaving the actual solver untouched.
+class ImageIO {
+
+public:
+    template<typename T>
+    void read_image(std::vector<T> &input_image,
+                    std::vector<T> &image_as_read,
+                    ImageDoFHandler & dof_handler,
+                    const std::string path,
+                    const double gnoise,
+                    bool use_anscombe=false);
+
+    template<typename PixelDataType>
+    void write_image(std::string path,
+                     dealii::Vector<PixelDataType> & in,
+                     const ImageDoFHandler & dof_handler,
+                     double gnoise,
+                     bool use_anscombe=false);
+
+// protected:
+    //TIFF options, will be saved to make the output identical to the input
+    int sampleperpixel, width, height, photom, bps, depth;
+
+    //Input buffer for uint16 tiff image
+    uint16* buf_in;
+    //pwidth: width after convolution with point spread function
+    //pwidth0: width after padding on next multiple of 32
+    // FIXME : pwidth0, pheight0 never got padded. This is in ImageInfo, cf. ext_*
+
+    //int pwidth; // , pwidth0;
+
+    //pheight: height after convolution with point spread function
+    //pheight0: height after padding on next multiple of 32
+
+    // int pheight; //, pheight0;
+
+    //pdepth: depth after convolution with psf
+    //pdepth0: depth after padding on next multiple of 32
+
+    // int pdepth; // , pdepth0;
+
+    int default_strip_size;
+
+    void print() const
+    {
+        std::cout << "state of ImageIO:\n"
+                  << "--------------------"
+                  << "samples per pixel : " << sampleperpixel << " \n"
+                  << "width : " << width << "\n"
+                  // << "pwidth : " << pwidth << "\n"
+                 //  << "pwidth0 : " << pwidth0 << "\n"
+                  << "height : "<< height <<"\n"
+                //  << "pheight : "<< pheight <<"\n"
+                 //  << "pheight0 : "<< pheight0 <<"\n"
+                  << "default_strip_size : " << default_strip_size <<"\n" << std::endl;
+    }
+
+};
+
+//@sect5{Function: read_image}
+//
+// Since the image defines the computational domain we also pass in the dof_handler and initialize it there.
+// @brief Read tiff directory as 2D or 3D image
+// @param path: path to the tiff directory
+// @param gnoise standard deviation of Gaussian noise
+template<typename T>
+void step35::ImageIO::read_image(std::vector<T> & input_image,
+                                 std::vector<T> & image_as_read,
+                                 ImageDoFHandler & dof_handler,
+                                 const std::string input_file, const double gnoise,  bool use_anscombe)
+{
+    std::cout << "Reading in image : " << input_file.c_str() << std::endl;
+
+    // The first we need for reading a tif file is a TIFF object.
+    // Since the TIFF library is implemented in plain C we have to declare a
+    // raw pointer to it ...
+    TIFF *tif_in;
+
+    // and instantiate the object by opening the path to the tif file.
+    tif_in=TIFFOpen(input_file.c_str(), "r");
+
+    // Then, we have to get the information about the amount of data to read.
+    TIFFGetField(tif_in,TIFFTAG_SAMPLESPERPIXEL,&sampleperpixel);
+    TIFFGetField(tif_in,TIFFTAG_IMAGEWIDTH,&width);
+    TIFFGetField(tif_in,TIFFTAG_IMAGELENGTH,&height);
+    TIFFGetField(tif_in,TIFFTAG_PHOTOMETRIC,&photom);
+    TIFFGetField(tif_in,TIFFTAG_BITSPERSAMPLE,&bps);
+
+    // By looking up the number of entries in the tif directory we get the depth
+    depth=0;
+    do
+    {
+        depth++;
+    }
+    while ( TIFFReadDirectory(tif_in) );
+
+
+    // pdepth=depth;
+    // pdepth0=depth;
+   // pwidth=width;
+   // pheight=height;
+    // pwidth0=pwidth;
+    // pheight0=pheight;
+
+    default_strip_size = TIFFDefaultStripSize(tif_in, /*p*/width /*mwidth*/ *sampleperpixel);
+
+    // FIXME: is this stil true? Is Haar really only for squares?
+    // Since our Haar wavelet implementation only works on quadratic images we need a computatonal domain which is quadratic.
+    // pwidth=std::max(pwidth, pheight);
+    // pheight=std::max(pwidth, pheight);
+
+    // Immediately after reading the dimensions of the image stack we can initialize the @p dof_handler;
+    dealii::Point<3> bounding_box( width, height, depth);
+    int padding_multiplier = 32;
+    dof_handler.reinit(bounding_box, padding_multiplier);
+
+
+
+
+    //reinit the tif
+    tif_in=TIFFOpen(input_file.c_str(), "r");
+    buf_in=(uint16*)_TIFFmalloc(sizeof(uint16)*width);
+
+    // FIXME: use math-aware Vectors not containers
+#ifdef nUSE_DOF_HANDLER
+    input_image.resize(pwidth * pheight * pdepth, T(0));
+#else
+    input_image.resize(dof_handler.n_dofs() /*reinit to padded size*/);
+#endif
+
+    image_as_read.resize(input_image.size(), T(0));
+
+    std::cout << "Image sizes right after reading : \n";
+    this->print();
+    int dd=0;
+    do
+    {
+        for (int y=0; y<height; y++) {
+            if(TIFFReadScanline(tif_in,buf_in,y,0) < 0) {
+                std::cerr << "reading error\n";
+                return;
+            }
+            for (int x=0; x<width; x++) {
+#ifdef nUSE_DOF_HANDLER
+                int xyz_pos = dd*pwidth*pheight+x*pheight+y;
+#else
+                int global_index = dof_handler.global_index(x, y, dd);
+                int xyz_pos = global_index;
+#endif
+                std::ostringstream message("index mismatch; ");
+                        message << xyz_pos << " != " << global_index << std::ends;
+//                AssertThrow(xyz_pos == global_index, dealii::ExcMessage(
+//                                message.str().c_str()
+//                                ) );
+
+                // FIXME: Anscombe trafo is not an IO operation. Move somewher else.
+                if (use_anscombe)
+                {
+                    //Do the anscombe transformation
+                    input_image[xyz_pos]=sqrt(buf_in[x]+3.0/8.0)*gnoise;
+                }
+                else {
+                    input_image[xyz_pos]=buf_in[x];
+                }
+#ifdef READ_IMG_DEBUG
+                if (x%465==0)
+                    printf("I(%d, %d, %d) : %f, buf: %d", x, y, dd, image[xyz_pos], buf_in[x]);
+#endif
+            }
+        }
+        std::cout << "Reading tiff layer " << dd << std::endl;
+        dd++;
+    } while ( TIFFReadDirectory(tif_in) );
+
+      TIFFClose(tif_in);
+}
+
+
+//@sect5{Function: write_image}
+//@brief write image to a .tif file
+//@param path path to image includign filename
+//@param in what to read with dimensions pheight, pwidth
+//@param mheight output height
+//@param mwidth output width
+//@param mdepth number of layers in image stack
+//@param gnoise standard deviation of Gaussian noise
+template<typename PixelDataType>
+void step35::ImageIO::write_image(std::string path, dealii::Vector<PixelDataType> &in,
+                                  const ImageDoFHandler &dof_handler, double gnoise,  bool use_anscombe)
+{
+    int mwidth = dof_handler.n_dofs_x();
+
+    int mheight = dof_handler.n_dofs_y();
+
+    int mdepth = dof_handler.n_dofs_z();
+
+    uint16* pbuf=(uint16*)_TIFFmalloc(sizeof(uint16)*mwidth);
+    TIFF *imout=TIFFOpen(path.c_str(),"w");
+    bps=16;
+
+    TIFFSetField(imout, TIFFTAG_ROWSPERSTRIP, default_strip_size);
+    TIFFSetField(imout, TIFFTAG_IMAGEWIDTH, mwidth);  // set the width of the image
+    TIFFSetField(imout, TIFFTAG_IMAGELENGTH, mheight);    // set the height of the image
+    TIFFSetField(imout, TIFFTAG_SAMPLESPERPIXEL, sampleperpixel);   // set number of channels per pixel
+    TIFFSetField(imout, TIFFTAG_BITSPERSAMPLE, bps);    // set the size of the channels
+    TIFFSetField(imout, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image->
+    TIFFSetField(imout, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+    TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, photom);
+    TIFFSetField(imout, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+    TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+
+    for (int z=0; z<mdepth; z++)
+    {
+        for (int y=0; y<mheight; y++)
+        {
+            for (int x=0; x<mwidth; x++)
+            {
+                #ifdef nUSE_DOF_HANDLER
+                int xyz_pos = z*pheight*pwidth+x*pheight+y;
+#else
+                int xyz_pos = dof_handler.global_index(x, y, z);
+#endif
+                PixelDataType intensity_value_xyz = in[xyz_pos];
+                if ( intensity_value_xyz > 0 )
+                {    // FIXME: reenable Anscombe trafo
+                    if (use_anscombe)
+                    {
+                        // Inverse anscombe transformation
+                        pbuf[x]= (uint16) round((intensity_value_xyz
+                                               *intensity_value_xyz)/gnoise);
+                    }
+                    else
+                        pbuf[x]= (uint16)round(intensity_value_xyz);
+                }
+                else
+                    pbuf[x]=0;
+            }
+            if (TIFFWriteScanline(imout, pbuf, y, 1) < 0) {
+                std::cerr << "writing error" << std::endl;
+                break;
+            }
+        }
+        if ( z < mdepth-1 ) {
+            // Prepare next layer
+            TIFFWriteDirectory(imout);
+            TIFFSetField(imout, TIFFTAG_ROWSPERSTRIP, default_strip_size); // TIFFDefaultStripSize(tif, mwidth*sampleperpixel));
+            TIFFSetField(imout, TIFFTAG_IMAGEWIDTH, mwidth);  // set the width of the image
+            TIFFSetField(imout, TIFFTAG_IMAGELENGTH, mheight);    // set the height of the image
+            TIFFSetField(imout, TIFFTAG_SAMPLESPERPIXEL, sampleperpixel);   // set number of channels per pixel
+            TIFFSetField(imout, TIFFTAG_BITSPERSAMPLE, bps);    // set the size of the channels
+            TIFFSetField(imout, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image->
+            TIFFSetField(imout, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+            TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, photom);
+            TIFFSetField(imout, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+            TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+        }
+    }
+    TIFFClose(imout);
+    _TIFFfree(pbuf);
+}
+
 
 //@sect4{Class: ADMM}
 //
@@ -74,36 +346,46 @@ public:
 
     T _psf(T x, T y, T z, T sigma);
     void create_psf();
-    void read_image(std::string path, double gnoise);
-    template<typename Q>
-    void write_image(std::string path, std::vector<Q> & in, int mheight, int mwidth, int mdepth,double gnoise);
+
     template<typename Mpatch>
-    void add_gaussian_noise(step35::CUDADriver<Mpatch, T, gpu_cuda> &driver);
+    void add_blur_and_gaussian_noise(step35::CUDADriver<Mpatch, T, gpu_cuda> &driver);
+
+    // The ADMM algoritmh is put into a separate class which inherits from deal.II's base class
+    // for iterative solvers. The advantage of this is, that we do not have to explain the design in detail
+    // as this is already done in the deal.II doc.
+    class ADMMSolver : public dealii::Solver<SciPAL::Vector<T, cublas> > {
+
+        typedef SciPAL::Vector<T, cublas> VECTOR;
+
+        typedef dealii::Solver< > Base;
+
+    public:
+        ADMMSolver (dealii::SolverControl & solver_control) : Base(solver_control) {}
+
+        template<class MATRIX , class PRECONDITIONER >
+        void 	solve (const MATRIX &A, VECTOR &x, const VECTOR &b, const PRECONDITIONER &precondition)
+        {
+
+        }
+
+    protected:
+        std::vector<T> prev_image; // (input_image.size(), T(0));
+
+    };
+
 
 private:
     SciPAL::GPUInfo & gpuinfo;
-    //TIFF object used for IO
-    TIFF *tif;
-    //TIFF options, will be saved to make the output identical to the input
-    int sampleperpixel, width, height, photom, bps, depth;
-    //Input buffer for uint16 tiff image
-    uint16* buf_in;
-    //pwidth: width after convolution with point spread function
-    //pwidth0: width after padding on next multiple of 32
-    int pwidth, pwidth0;
-    //pheight: height after convolution with point spread function
-    //pheight0: height after padding on next multiple of 32
-    int pheight, pheight0;
-    //pdepth: depth after convolution with psf
-    //pdepth0: depth after padding on next multiple of 32
-    int pdepth, pdepth0;
+
+    ImageDoFHandler dof_handler;
+
     //Array holding the signal
     // FIXME: store images in QImage. Applies to other attributes as well.
     std::vector<T> input_image;
     //Array holding the signal as read from the tif
     std::vector<T> image_as_read;
     //Array holding the point spread function
-    std::vector<T> psf;
+    dealii::Vector<T> psf;
 
     //DEBUG
     std::chrono::high_resolution_clock::time_point clock1;
@@ -112,8 +394,13 @@ private:
     template<typename field_patch, typename driver_patch>
     void __run(extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> &field, step35::CUDADriver<driver_patch, T, gpu_cuda> &driver);
 
+    ImageIO image_io;
 protected:
-    ADMMParams<T> params;
+    SimParams params;
+
+
+    template<typename Driver>
+    void set_initial_condition(Driver &driver, ParallelArch arch);
 };
 }
 
@@ -135,7 +422,7 @@ step35::ADMM<T>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
     // to be ".prm". What has been read will be dumped into a log file.
     dealii::ParameterHandler prm_handler;
 
-    ADMMParams<T>::declare(prm_handler);
+    SimParams::declare(prm_handler);
 
     // Get the current working directory ...
     QDir cwd = QDir::current();
@@ -243,203 +530,63 @@ step35::ADMM<T>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
     // At this point the toplevel run dir must exist.
     // Thus, we can change to it without any further sanity test.
     QDir::setCurrent(this->params.run_dir.absolutePath());
-
-
-    //Create log file
-
-//    prm_filename += ".log";
-//    std::ofstream log_out_text(("./" + QString(prm_filename.c_str()).split("/").last()).toStdString().c_str());
-//    prm_handler.print_parameters (log_out_text,
-//                                  dealii::ParameterHandler::Text);
 }
 
-//@sect5{Function: create_psf}
-//@brief Creates point spread function
+
+// @sect5{Function: set_initial_condition}
+//
+//
 template<typename T>
-void step35::ADMM<T>::create_psf() {
-    // psf=new T[pwidth*pheight*pdepth]; // there is no corresponding call to delete in this function. Hence this may be the origin of a memory leak.
-    this->psf.resize(pwidth*pheight*pdepth, T(0));
-    T psf_norm=0;
-     // FIXME: use scipal::Vector and write psf_norm = psf.l1_norm or psf.l2_norm, std::accumulate is also possible
-    for (int z=0; z<pdepth; z++ ) {
-        for (int x=0; x<pwidth; x++) {
-            for (int y=0; y<pheight; y++) {
-                psf[z*pheight*pwidth+x*pheight+y] = _psf((T)x,(T)y,(T)z,params.sigmaf);
-                psf_norm += psf[z*pheight*pwidth+x*pheight+y];
+template<typename Driver>
+void step35::ADMM<T>::set_initial_condition(Driver &driver, ParallelArch arch)
+{
+    int depth = dof_handler.n_dofs_z();
+
+    int width = dof_handler.n_dofs_x();
+
+    int height = dof_handler.n_dofs_y();
+
+
+    int __ext_width = dof_handler.n_dofs_x_padded();
+    int __ext_height = dof_handler.n_dofs_y_padded();
+
+
+    // FIXME: I do not want this written in components
+    for (int z=0; z<depth; z++) {
+        for (int x=0; x<width; x++) {
+            for (int y=0; y<height; y++) {
+                if ( z < depth && x < width && y < height )
+                    driver.im_h[z*__ext_width*__ext_height + x*__ext_height + y] =
+                            input_image[z*width*height + x*height + y];
             }
         }
     }
-    // FIXME: use scipal::Vector and write psf *= 1./psf_norm
-    for (int x=0; x<pwidth; x++) {
-        for (int y=0; y<pheight; y++) {
-            for (int z=0; z<pdepth; z++ ) {
-                psf[z*pheight*pwidth+x*pheight+y] = psf[z*pheight*pwidth+x*pheight+y]/psf_norm;
-            }
-        }
+
+    driver.x_h = driver.im_h;
+
+    if ( arch == gpu_cuda ) {
+
+        driver.writeable_im_d() = driver.im_h;
+        driver.x_d = driver.x_h;
+        driver.z_d = driver.z_h;
+        driver.writeable_e_d() = driver.e_h;
+
+//        cs_d = cs_vec;
+//        //Copy $c_s$ to constant CUDA memory
+//        step35::Kernels<Mdouble> kernel;
+//        kernel.set_cs(const_cast<Mdouble*>(&cs_vec[0]), cs_n);
+
+//        std::cout << "weights c_s : \n";
+//        cs_d.print();
+
+     //   checkCudaErrors(cudaDeviceSynchronize());
     }
+
 }
-
-//@sect5{Function: _psf}
-//@brief Returns a 2D gaussian convolution kernel in direct space
-template<typename T>
-T step35::ADMM<T>::_psf(T x,T y,T z,T sigma) {
-
-    if ( params.dim == 2 )
-    {
-        if ( z < 0.5 )//float conditional to distinguish z=0 vs. z=1
-        {
-            if ( abs(x-sigma) <= std::ceil(sigma )&& abs(y-sigma) <= std::ceil(sigma))
-            {
-                return exp(-(boost::math::pow<2>(x - sigma) + boost::math::pow<2>(y - sigma))/
-                           (TWO*boost::math::pow<2>(HALF*sigma)));
-            }
-            else
-                return 0;
-        }
-        else
-            return 0;
-    }
-    else
-    {
-        if ( abs(x-sigma) <= sigma && abs(y-sigma) <= sigma && abs(z-sigma) <= sigma )
-        {
-            return exp(-(boost::math::pow<2>(x - sigma) + boost::math::pow<2>(y - sigma) +
-                         boost::math::pow<2>(z - sigma))/(TWO*boost::math::pow<2>(HALF*sigma)));
-        }
-        else
-            return 0;
-    }
-}
-
-//@sect5{Function: read_image}
-//@brief Read tiff directory as 2D or 3D image
-//@param path path to the tiff directory
-//@param gnoise standard deviation of Gaussian noise
-template<typename T>
-void step35::ADMM<T>::read_image(std::string path, double gnoise) {
-    std::cout << "Reading in image : " << path.c_str() << std::endl;
-    tif=TIFFOpen(path.c_str(), "r");
-    TIFFGetField(tif,TIFFTAG_SAMPLESPERPIXEL,&sampleperpixel);
-    TIFFGetField(tif,TIFFTAG_IMAGEWIDTH,&width);
-    TIFFGetField(tif,TIFFTAG_IMAGELENGTH,&height);
-    TIFFGetField(tif,TIFFTAG_PHOTOMETRIC,&photom);
-    TIFFGetField(tif,TIFFTAG_BITSPERSAMPLE,&bps);
-    //get the depth
-    depth=0;
-    do
-    {
-        depth++;
-    } while ( TIFFReadDirectory(tif) );
-    pdepth=depth;
-    pdepth0=depth;
-    pwidth=width;
-    pheight=height;
-    pwidth0=pwidth;
-    pheight0=pheight;
-    //We use a Haar Wavelet implementation which works on quadratic images
-    pwidth=std::max(pwidth,pheight);
-    pheight=std::max(pwidth,pheight);
-    //reinit the tif
-    tif=TIFFOpen(path.c_str(), "r");
-    buf_in=(uint16*)_TIFFmalloc(sizeof(uint16)*width);
-
-    // FIXME: use math-aware Vectors not containers
-    input_image.resize(pwidth*pheight*pdepth, T(0));
-    image_as_read.resize(input_image.size(), T(0));
-
-    int dd=0;
-    do
-    {
-        for (int y=0; y<height; y++) {
-            if(TIFFReadScanline(tif,buf_in,y,0) < 0) {
-                std::cerr << "reading error\n";
-                return;
-            }
-            for (int x=0; x<width; x++) {
-                if (params.anscombe) {
-                    //Do the anscombe transformation
-                    input_image[dd*pwidth*pheight+x*pheight+y]=sqrt(buf_in[x]+3.0/8.0)*gnoise;
-                }
-                else {
-                    input_image[dd*pwidth*pheight+x*pheight+y]=buf_in[x];
-                }
-#ifdef READ_IMG_DEBUG
-                if (x%465==0)
-                    printf("I(%d, %d, %d) : %f, buf: %d", x, y, dd, image[dd*pwidth*pheight+x*pheight+y], buf_in[x]);
-#endif
-            }
-        }
-        std::cout << "Reading tiff layer " << dd << std::endl;
-        dd++;
-    } while ( TIFFReadDirectory(tif) );
-}
-
-
-//@sect5{Function: write_image}
-//@brief write image to a .tif file
-//@param path path to image
-//@param in what to read with dimensions pheight, pwidth
-//@param mheight output height
-//@param mwidth output width
-//@param mdepth number of layers in image stack
-//@param gnoise standard deviation of Gaussian noise
-template<typename T> template<typename Q>
-void step35::ADMM<T>::write_image(std::string path, std::vector<Q> &in, int mheight, int mwidth, int mdepth, double gnoise) {
-    uint16* pbuf=(uint16*)_TIFFmalloc(sizeof(uint16)*mwidth);
-    TIFF *imout=TIFFOpen(path.c_str(),"w");
-    bps=16;
-    TIFFSetField(imout, TIFFTAG_ROWSPERSTRIP,TIFFDefaultStripSize(tif, mwidth*sampleperpixel));
-    TIFFSetField(imout, TIFFTAG_IMAGEWIDTH, mwidth);  // set the width of the image
-    TIFFSetField(imout, TIFFTAG_IMAGELENGTH, mheight);    // set the height of the image
-    TIFFSetField(imout, TIFFTAG_SAMPLESPERPIXEL, sampleperpixel);   // set number of channels per pixel
-    TIFFSetField(imout, TIFFTAG_BITSPERSAMPLE, bps);    // set the size of the channels
-    TIFFSetField(imout, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image->
-    TIFFSetField(imout, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-    TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, photom);
-    TIFFSetField(imout, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-    TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-    for (int z=0; z<mdepth; z++) {
-        for (int y=0; y<mheight; y++) {
-            for (int x=0; x<mwidth; x++) {
-                if ( in[z*pheight*pwidth+x*pheight+y] > 0 )
-                    if (params.anscombe) {
-                        // Inverse anscombe transformation
-                        pbuf[x]=(uint16)round((in[z*pheight*pwidth+x*pheight+y]
-                                               *in[z*pheight*pwidth+x*pheight+y])/gnoise);
-                    }
-                    else
-                        pbuf[x]=(uint16)round(in[z*pheight*pwidth+x*pheight+y]);
-                else
-                    pbuf[x]=0;
-            }
-            if (TIFFWriteScanline(imout, pbuf, y, 1) < 0) {
-                std::cerr << "writing error" << std::endl;
-                break;
-            }
-        }
-        if ( z < mdepth-1 ) {
-            // Prepare next layer
-            TIFFWriteDirectory(imout);
-            TIFFSetField(imout, TIFFTAG_ROWSPERSTRIP,TIFFDefaultStripSize(tif, mwidth*sampleperpixel));
-            TIFFSetField(imout, TIFFTAG_IMAGEWIDTH, mwidth);  // set the width of the image
-            TIFFSetField(imout, TIFFTAG_IMAGELENGTH, mheight);    // set the height of the image
-            TIFFSetField(imout, TIFFTAG_SAMPLESPERPIXEL, sampleperpixel);   // set number of channels per pixel
-            TIFFSetField(imout, TIFFTAG_BITSPERSAMPLE, bps);    // set the size of the channels
-            TIFFSetField(imout, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image->
-            TIFFSetField(imout, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-            TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, photom);
-            TIFFSetField(imout, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-            TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-        }
-    }
-    TIFFClose(imout);
-    _TIFFfree(pbuf);
-}
-
 //@sect5{Function: add_gaussian_noise}
 //@brief Simulates dataset by adding gaussian noise, the whole driver is given to used on device convolution
 template<typename T> template<typename Mpatch>
-void step35::ADMM<T>::add_gaussian_noise (step35::CUDADriver<Mpatch, T, gpu_cuda> &driver) {
+void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<Mpatch, T, gpu_cuda> &driver) {
     //Constant seed to get reproducable tests
     boost::mt19937 rng;
     //Seed rng
@@ -449,26 +596,63 @@ void step35::ADMM<T>::add_gaussian_noise (step35::CUDADriver<Mpatch, T, gpu_cuda
     boost::normal_distribution<> nd(0.0, params.gnoise);
     boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_nor(rng, nd);
 
-    driver.conv2(driver.inf->im_d.array().val(), driver.inf->im_d.array().val());
+
+   driver.convolution.vmult(driver.writeable_im_d(), driver.writeable_im_d() ); // conv2(driver.im_d.array().val(), driver.im_d.array().val());
     //Push data from device to host
     driver.get_data();
+
+    driver.generated_noise.reinit(driver.im_h);
+
+    dealii::Vector<T> gn_offset(driver.generated_noise.size());
+    gn_offset = 0.;
+
+    driver.generated_noise = 0.;
     //Now add gaussian noise
-    for (int z=0; z<pdepth; z++) {
-        for (int x=0; x<pwidth; x++) {
-            for (int y=0; y<pheight; y++) {
-                driver.inf->im_h[z*pwidth*pheight+x*pheight+y] += var_nor();
+#ifdef nUSE_DOF_HANDLER
+    for (int z=0; z<image_io.pdepth; z++) {
+        for (int x=0; x<image_io.pwidth; x++) {
+            for (int y=0; y<image_io.pheight; y++) {
+                int xyz_pos = z*image_io.pwidth*image_io.pheight + x*image_io.pheight + y;
+#else
+    for (int z=0; z<dof_handler.n_dofs_z(); z++ ) {
+        for (int x=0; x<dof_handler.n_dofs_x_padded(); x++) {
+            for (int y=0; y<dof_handler.n_dofs_y_padded(); y++)
+            {
+                int xyz_pos = dof_handler.global_index(x, y, z);
+#endif
+
+
+              driver.generated_noise[xyz_pos] = var_nor();
+               driver.im_h[xyz_pos] += driver.generated_noise[xyz_pos];
+               gn_offset[xyz_pos] = 200 + driver.generated_noise[xyz_pos];
+               // Add offset so that we something when plotting the noise component alone.
+
                 //The simulated data is meant to represent a noisy image, which is naturally non-negative everywhere
-                if (driver.inf->im_h[z*pwidth*pheight + x*pheight + y] < 0)
-                    driver.inf->im_h[z*pwidth*pheight + x*pheight + y] = 0;
+                if (  driver.im_h[xyz_pos] < 0)
+                   driver.im_h[xyz_pos] = 0;
             }
         }
     }
+
     //Push data from host to device
     driver.push_data();
 
     //Write the noisy image for control reasons
-    write_image("noise.tif", driver.inf->im_h, pheight, pwidth, pdepth, params.gnoise);
+    image_io.write_image("noise.tif", driver.im_h,
+                         // image_io.pheight, image_io.pwidth, image_io.pdepth,
+                         dof_handler,
+                         params.gnoise, params.anscombe);
+
+    image_io.write_image("noise_component.tif", gn_offset,
+                         // image_io.pheight, image_io.pwidth, image_io.pdepth,
+                         dof_handler,
+                         params.gnoise, false/*params.anscombe*/);
+
+
     std::cout << "noise written" << std::endl;
+
+    // Set the initial value of x to the simulated input.
+    // driver.x_d = driver.im_d();
 }
 
 // @sect5{Function: run}
@@ -477,21 +661,20 @@ void step35::ADMM<T>::add_gaussian_noise (step35::CUDADriver<Mpatch, T, gpu_cuda
 template<typename T>
 void step35::ADMM<T>::run() {
     std::cout << "Starting run" << std::endl;
+
     //Quantile of the extreme value statistics in (0,1). The larger the smoother the result
-    // FIXME: why is this not a runtime parameter accessible from the parameter file?
-    const T alpha_quant=0.9;
-    //Inverse stabilization factor of linearized ADMM.
-    //The smaller the slower and more stable the ADMM
-     // FIXME: why is this not a runtime parameter accessible from the parameter file?
-    T gamma_fac=0.1;
+    const T alpha_quant = this->params.alpha_quantile;
+
 
     //Read in the image
-    read_image(params.imagename, params.gnoise);
+    image_io.read_image(this->input_image, this->image_as_read, dof_handler, params.input_image, params.gnoise, params.anscombe);
 
-    //Create the psf
-    create_psf();
+    // Debugging info about image sizes.
+    image_io.print();
 
-    T *cs,*qalpha_ret;
+
+    std::vector<T> cs;
+    T *qalpha_ret;
     //A reusable part of the statics generation will be stored here and written to disk
     qalpha_ret = new T[1];
 
@@ -511,46 +694,49 @@ void step35::ADMM<T>::run() {
         //* Generates the patches and puts them in clusters if needed \n
         //* Calculates the weights $c_s$
         std::cout << "Creating field\n";
-        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(pwidth, pheight, pdepth,  input_image, params.sigma, params.step, 1024);//only kept for statitics generation atm
+        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(
+            #ifdef nUSE_DOF_HANDLER
+                    image_io.pwidth, image_io.pheight, image_io.pdepth,
+            #else
+                    dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
+            #endif
+                    input_image,
+                    params.psf_fwhm,
+                    params.step, 1024);//only kept for statitics generation atm
 
         std::cout << "Getting quantile\n";
-        cs = field.get_quantile_gauss(params.gnoise, alpha_quant, params.step, pwidth, pheight, pdepth, qalpha_ret);
+        field.get_quantile_gauss(cs, params.gnoise, alpha_quant, params.step,
+                         #ifdef nUSE_DOF_HANDLER
+                                 image_io.pwidth, image_io.pheight, image_io.pdepth,
+                         #else
+                                 dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
+                         #endif
+                                 qalpha_ret);
 
         //Prepare the driver
         std::cout << "Setting up driver\n";
-        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.croot, input_image, psf, cs, pwidth, pheight, pdepth,
-                                                             params.step, gamma_fac, params.sigma, params.regType,
-                                                             params.dim,&params);
+        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(cs,
+                                                     #ifdef nUSE_DOF_HANDLER
+                                                             image_io.pwidth, image_io.pheight, image_io.pdepth,
+                                                     #else
+                                                             dof_handler,
+                                                     #endif
+                                                             params);
+
+
+
+        this->set_initial_condition(driver, gpu_cuda);
+
+
         //This function templates to whatever Dykstra Flavour we have chosen
         std::cout << "Starting run\n";
         __run<field_patch, driver_patch>(field, driver);
     }
     //Exact algorithm
     else {
-#define USE_EXACT
-#ifdef USE_EXACT
-        typedef cset_small field_patch;
-        typedef cluster<cset_small, T> driver_patch;
 
-        //Get an instance of the extremeValueStatisticsGenerator class \n
-        //* Generates the patches and puts them in clusters if needed \n
-        //* Calculates the weights $c_s$
-        std::cout << "Creating field\n";
-        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(pwidth, pheight, pdepth, input_image, params.sigma, params.step, 1024);//only kept for statitics generation atm
+        AssertThrow(false, dealii::ExcNotImplemented());
 
-        std::cout << "Getting quantile\n";
-        cs = field.get_quantile_gauss(params.gnoise, alpha_quant, params.step, pwidth, pheight, pdepth, qalpha_ret);
-
-        //Prepare the driver
-        std::cout << "Setting up driver\n";
-        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(field.cluster_root, input_image, psf, cs, pwidth, pheight, pdepth,
-                                                             params.step, gamma_fac, params.sigma, params.regType,
-                                                             params.dim,&params);
-        //This function templates to whatever Dykstra Flavour we have chosen
-        __run<field_patch, driver_patch>(field, driver);
-#else
-       AssertThrow(false, dealii::ExcNotImplemented());
-#endif
     }
 }
 
@@ -575,28 +761,27 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
     //@param pwidth width as padded by the driver
     //@param pheight height as padded by the driver
     //@param pdepth depth as padded by the driver
-    pwidth  = driver.inf->ext_width;
-    pheight = driver.inf->ext_height;
-    pdepth  = driver.inf->ext_depth;
+#ifdef nUSE_DOF_HANDLER
+    image_io.pwidth  = driver.ext_width();
+    image_io.pheight = driver.ext_height();
+    image_io.pdepth  = driver.ext_depth();
+#endif
+
 
     driver.get_data();
     //Simulates dataset by adding gaussian noise
     if( params.simulate ) {
-        add_gaussian_noise<driver_patch>(driver);
+        add_blur_and_gaussian_noise<driver_patch>(driver);
     }
 
     //Copy to determine relative change in each iteration
-    std::vector<T> prev_image(input_image.size(), T(0));
-   // T *prev=new T[pwidth*pheight*pdepth];
-//    for (int k=0;k<depth;k++)   {
-//        for (int i=0; i<pwidth; i++) {
-//            for (int j=0; j<pheight; j++) {
-//                prev[k*pwidth*pheight+i*pheight+j]=0;
-//            }
-//        }
-//    }
+    dealii::Vector<T> prev_image(input_image.size());
+    prev_image = 0;
+
+    SciPAL::Vector<T, cublas> res_tmp1, res_tmp2;
+
     //Residual of the current step, initialize as residual>tolerance
-    T res=TWO*params.tol;
+    T res=TWO*params.solver_control.tolerance();
 
     //Log file
     std::ofstream gain_out("gain.txt");
@@ -610,85 +795,247 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
 
     //Main loop of the ADMM Algorithm
     //Iteration counter
-    int iter=1;
+    int iter = 0;
     //Will be used to store the constraint violations
-    T c1,c2=0;
-    while (  ( /*res > params.tol &&*/ iter < params.max_it) || iter < 5 ) {
+    T c1 = 0, c2 = 0;
+
+    {
+        std::vector<T> zero_init(driver.x_d.size(), 0);
+        driver.x_d = zero_init;
+        driver.z_d = zero_init;
+    }
+
+    // set initial conditions
+    driver.lag2 = driver.im_h;
+
+    // FIXME: unsatisfying solution to disable the checking of the residual in the sc
+    params.solver_control.clear_failure_criterion();
+    while (  // ( /*res > params.tol &&*/ iter < params.max_it) || iter < 5
+             iter < params.solver_control.max_steps()
+    //       params.solver_control.check(iter, res) == dealii::SolverControl::iterate
+             )
+    {
+        // std::cout << "entering step " << iter << std::endl;
+
+
+#ifdef USE_TV_ITER
         //Argmin w.r.t. x
+     // driver.x_step_adaptive(params); //
         driver.x_step(params.rho1, params.rho2);
-        //driver.x_step_ET(params.rho1, params.rho2);
+
 
         //Argmin w.r.t. z
-        driver.m_smoothing(params.regInt, params.rho2);
+       driver.m_smoothing(params.reg_strength, params.rho2);
+#else
+   driver.x_step_adaptive(params);
 
-        //Argmin w.r.t. e, is equivalent to a projection
+#endif
+
+        //Argmin w.r.t. e, is equivalent to a projection   
         if ( params.gnoise > 0 )
             driver.dykstra_gauss(params.rho1);
 
-        //Update the lagrange Multipliers
-        driver.update_lagrangian(params.alpha1, params.alpha2);
+        //Update the Lagrange Multipliers
+
+#ifdef USE_TV_ITER
+        driver.update_lagrangian(alpha1
+                                 ,
+                                 params.alpha2);
+#else
+         #ifndef nFMM_VERSION
+        driver.update_lagrangian(
+                    1./
+                                 params.inv_gamma
+                                 ,
+                                 params.alpha2);
+
+
+#else
+        // $p_k = p_{k-1} + \frac{1}{\lambda} (Ku -v_k)$
+        driver.residual(driver.tmp_lag1, driver.im_d(), driver.e_d(), driver.x_d);
+        driver.lag1 =  T(// 1./
+                         params.inv_gamma) * driver.tmp_lag1 + driver.lag1;
+#endif
+
+
+#endif
+
 
         //Report progress
-        if ( iter >= next_report ) {
+        // iter = params.solver_control.last_step();
+        if ( iter <3 || (iter+1) % params.report_interval == 0 )
+        {
             //Calculate the change in this step and check the constraints
             res = 0;
             c1 = 0;
             c2 = 0;
-            driver.conv2(driver.inf->x_d.array().val(), driver.tmp_d.array().val());
+            driver.convolution.vmult(driver.tmp_d, driver.x_d); // conv2(driver.x_d.array().val(), driver.tmp_d.array().val());
             driver.get_data();
             //Calculate the change w.r.t. the last reported result
             //Calculate the violation of constraints
-            for (int i=0; i<pwidth; i++) {
-                for (int j=0; j<pheight; j++) {
-                    for (int k=0; k<pdepth; k++) {
+#ifdef USE_FFT_CONV
+            for (int i=0; i< image_io./*p*/width; i++) {
+                for (int j=0; j< image_io./*p*/height; j++) {
+                    for (int k=0; k< image_io./*p*/depth; k++) {
                         //The image shifts by sigma during the convolution
                         //therefore access it shifted
-                        ti = i+params.sigma;
-                        tj = j+params.sigma;
-                        tk = k+params.sigma;
-                        while ( ti >= pwidth )
-                            ti=ti-pwidth;
-                        while ( tj >= pheight )
-                            tj=tj-pheight;
-                        while ( tk >= pdepth )
-                            tk = tk-pdepth;
-                        //Violation of data constraint
-                        //if (i < 50)
-                          //  if (j < 20)
-                        // std::cout << driver.inf->im_h[i*pheight+j] << " " << driver.inf->e_h[i*pheight+j] << " " << driver.tmp_h[ti*pheight+tj] << " " << i << " " << j << std::endl;
-                        c1 += boost::math::pow<2>(driver.inf->im_h[k*pwidth*pheight+i*pheight+j]  - driver.inf->e_h[k*pwidth*pheight+i*pheight+j]
-                                                  - driver.tmp_h[tk*pwidth*pheight+ti*pheight+tj]);
+                        ti = i + params.sigma;
+                        tj = j + params.sigma;
+                        tk = k + params.sigma;
+#ifdef nUSE_DOF_HANDLER
+                        while ( ti >= image_io.pwidth )
+                            ti=ti- image_io.pwidth;
+
+                        while ( tj >= image_io.pheight )
+                            tj=tj- image_io.pheight;
+
+                        while ( tk >= image_io.pdepth )
+                            tk = tk- image_io.pdepth;
+
+                        int xyz_pos = k*image_io.pwidth*image_io.pheight + i*image_io.pheight + j;
+                        // std::cout << driver.im_h[i*pheight+j] << " " << driver.e_h[i*pheight+j] << " " << driver.tmp_h[ti*pheight+tj] << " " << i << " " << j << std::endl;
+                        c1 += boost::math::pow<2>(driver.im_h[xyz_pos]  - driver.e_h[xyz_pos]
+                                                  - driver.tmp_h[tk*image_io.pwidth*image_io.pheight+ti*image_io.pheight+tj]);
+#else
+                        while ( ti >= dof_handler.pwidth() )
+                            ti=ti- dof_handler.pwidth();
+
+                        while ( tj >= dof_handler.pheight() )
+                            tj=tj- dof_handler.pheight();
+
+                        while ( tk >= dof_handler.pdepth() )
+                            tk = tk- dof_handler.pdepth();
+
+                          int xyz_pos = dof_handler.global_index(i, j, k);
+                          // std::cout << driver.im_h[i*pheight+j] << " " << driver.e_h[i*pheight+j] << " " << driver.tmp_h[ti*pheight+tj] << " " << i << " " << j << std::endl;
+                          c1 += boost::math::pow<2>(driver.im_h[xyz_pos]  - driver.e_h[xyz_pos]
+                                                    - driver.tmp_h[tk*dof_handler.pwidth()*dof_handler.pheight()+ti*dof_handler.pheight()+tj]);
+#endif
+                        // Violation of data constraint
+                        // if (i < 50)
+                          // if (j < 20)
+
+
                         //Violation of smoothness constraint
-                        //std::cout << driver.inf->z_h[i*pheight+j] << " " << driver.inf->x_h[i*pheight+j] << " " << i << " " << j << endl;
-                        c2 += boost::math::pow<2>(driver.inf->z_h[k*pwidth*pheight+i*pheight+j] - driver.inf->x_h[k*pwidth*pheight+i*pheight+j]);
-                        //Residual towards last reported image
-                        res+= boost::math::pow<2>(driver.inf->x_h[k*pwidth*pheight+i*pheight+j] - prev_image[k*pwidth*pheight+i*pheight+j]);
+                        //std::cout << driver.z_h[i*pheight+j] << " " << driver.x_h[i*pheight+j] << " " << i << " " << j << endl;
+                        c2 += boost::math::pow<2>(driver.z_h[xyz_pos] - driver.x_h[xyz_pos]);
+                        //Residual with respect to last reported image
+                        res+= boost::math::pow<2>(driver.x_h[xyz_pos] - prev_image[xyz_pos]);
                     }
                 }
             }
-            c1 = c1/((T)(pwidth*pheight*pdepth));
-            c2 = c2/((T)(pwidth*pheight*pdepth));
-            res=res/((T)(pwidth*pheight*pdepth))+c1;
+
+            c1 = c1/( (T)(driver.ext_num_pix()) );
+            c2 = c2/( (T)(driver.ext_num_pix()) );
+            res=res/( (T)(driver.ext_num_pix()) ) + c1;
+#else
+ // driver.im_d - driver.e_d - driver.tmp_d
+            // c1  = L2_norm (driver.im_h - driver.e_h - driver.tmp_h);
+
+            driver.residual(res_tmp1, driver.im_d(), driver.e_d(), driver.x_d);
+
+            c1 = res_tmp1.l2_norm();
+
+            // c2  = L2_norm (driver.z_h - driver.x_h);
+            res_tmp2 = driver.z_d;
+            res_tmp2 -= driver.x_d;
+            c2 = res_tmp2.l2_norm();
+
+            // res = L2_norm (driver.x_h - prev_image);
+            res_tmp1 = driver.x_d;
+            res_tmp2 = prev_image;
+            res_tmp1 -= res_tmp2;
+            res = res_tmp1.l2_norm();
+
+            c1 = c1/std::sqrt( (T)(dof_handler.n_dofs()) );
+            c2 = c2/std::sqrt( (T)(dof_handler.n_dofs()) );
+            res=res/std::sqrt( (T)(dof_handler.n_dofs()) ) + c1;
+
+            res_tmp1 = driver.generated_noise;
+            res_tmp1 -= driver.e_d();
+            T c3 = res_tmp1.l2_norm()/std::sqrt( (T)(dof_handler.n_dofs()) );
+#endif
+
             // FIXME: vectors in drif.inf
-            std::copy(&(driver.inf->x_h[0]), &(driver.inf->x_h[pwidth*pheight*pdepth]), &prev_image[0]);
+
+            // std::copy(driver.x_h.begin(), driver.x_h.end(), prev_image.begin() );
+            driver.x_d.push_to(prev_image);
             gain_out << iter << " " << c1 << " " << c2 << " " <<  std::endl;
-            std::cout << "Iteration: " << iter << " | Constraint1: " << c1 << " | Constraint2: "
-                      << c2 << " MR-level " << field.split << std::endl;
-            next_report = iter + params.report_interval;
+            std::cout << "Iteration: " << iter << " | Constraint1 ||im - e - tmp||_2   : " << c1 << " | Constraint2 : ||x - z||_2  : "
+                      << c2 << ", L2-distance to generated noise : " << c3 << ", MR-level " << field.split << std::endl;
+
 
             //Print the current estimate to a tiff file
             if (params.do_control)
             {
-                QString img_out (QString(params.out_imagename.c_str()).replace(".", QString("-" + QString::number(iter))+"."));
+                // As name for the intermediate result we use what was given in the parameter file and append the zero-padded iteration counter.
+                QString img_out (QString(params.out_imagename.c_str()).replace(".", QString("-" +
+                                                                                            QString("%1").arg(iter, 6, 10, QChar('0'))
+                                                                                                      )+"."));
 
-                write_image<T>(img_out.toStdString(), driver.inf->z_h, pheight0, pwidth0, pdepth0, 1.0);//params.gnoise);
+                // FMM version gives the wrong sign, hence : driver.z_h *= -1;
+                image_io.write_image(img_out.toStdString(), driver.z_h,
+                                     dof_handler, // image_io.pheight0, image_io.pwidth0, image_io.pdepth0,
+                                     1.0,//params.gnoise
+                                     params.anscombe);
 
+
+
+#ifdef X_STEP_DEBUG
+        // print contents of x_d and x_h before step
+
+
+        {
+            QString x_d_fname = QString ("im_d-%1d.tif").arg(iter);
+
+            dealii::Vector<T> x_d_tmp(driver.im_d().size());
+            driver.im_d().push_to(x_d_tmp);
+            image_io.write_image(x_d_fname.toStdString(), x_d_tmp, dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
+        }
+#else
+
+        {
+            if (false)
+            {
+                QString x_d_fname = QString ("x_d-%1d.tif").arg(iter);
+
+                dealii::Vector<T> x_d_tmp(driver.x_d.size());
+                driver.x_d.push_to(x_d_tmp);
+                image_io.write_image(x_d_fname.toStdString(), x_d_tmp, dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
+            }
+
+            if (false)
+            {
+                QString x_d_fname = QString ("z_d-%1d.tif").arg(iter);
+
+                dealii::Vector<T> x_d_tmp(driver.z_d.size());
+                driver.z_d.push_to(x_d_tmp);
+                image_io.write_image(x_d_fname.toStdString(), x_d_tmp, dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
+            }
+
+              if (true)
+            {
+                QString x_d_fname = QString ("e_d-%1d.tif").arg(iter);
+
+                dealii::Vector<T> x_d_tmp(driver.e_d().size());
+                driver.e_d().push_to(x_d_tmp);
+                image_io.write_image(x_d_fname.toStdString(), x_d_tmp
+                                     , dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
             }
         }
-        iter=iter+1;
+#endif
+
+
+
+        }
+        }
+        iter++;
     } // End of main loop
 
-    write_image<T>(params.out_imagename, driver.inf->z_h, pheight0, pwidth0, pdepth0, params.gnoise);
+       image_io.write_image("final-" + params.out_imagename, driver.z_h,
+                            dof_handler,
+                            // image_io.pheight0, image_io.pwidth0, image_io.pdepth0,
+                            params.gnoise, params.anscombe);
     std::cout << "Done." << std::endl;
 }
 

@@ -161,8 +161,7 @@ HEADERS += \
     preprocessor_directives.h \
     extremeValueStatisticsGenerator.h \
     step-35.hh \
-    *.h #\
-    #ImageDecomposition.h
+    smre_problem.hh
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator
    # which are not subject to compilation.

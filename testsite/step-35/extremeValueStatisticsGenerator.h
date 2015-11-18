@@ -207,14 +207,14 @@ struct constructStruct<cset_dyadic,T> {
 //@sect4{Class: extremeValueStatisticsGenerator}
 //@brief Generates the patches and puts them in clusters if needed,
 //       calculates the weights $c_s$
-template<typename T,typename Q, ParallelArch c>
+template<typename T,typename NumberType, ParallelArch c>
 //T patch type \n
 //Q number type \n
 //c gpu_cuda or cpu \n
 class extremeValueStatisticsGenerator {
   public:
-    Q *imageXY;
-    Q nsize;
+    NumberType *imageXY;
+    NumberType nsize;
 
     //For T=cset_dyadic \n
     //First element in linear list of patches
@@ -224,7 +224,7 @@ class extremeValueStatisticsGenerator {
 
     //For T=cluster<cset_small, Q> \n
     //First element in linear list of cluster
-    cluster<T,Q> *cluster_root;
+    cluster<T,NumberType> *cluster_root;
     //Array of image dimensions
     int *n2;
     //Width of psf
@@ -254,7 +254,7 @@ class extremeValueStatisticsGenerator {
     //@param new_sigma width of psf
     //@param new_step step to be used
     //@param max_size maximum patch edge length
-    extremeValueStatisticsGenerator(int nnx, int nny,int nnz, std::vector<Q> & imnew, int new_sigma, int new_step, int max_size) {
+    extremeValueStatisticsGenerator(int nnx, int nny,int nnz, std::vector<NumberType> & imnew, int new_sigma, int new_step, int max_size) {
         sigma=new_sigma;
         split=1;
         nx=nnx;
@@ -270,7 +270,7 @@ class extremeValueStatisticsGenerator {
         imageXY=&imnew[0];
 
         //Set up the convex sets
-        constructStruct<T,Q> cs;
+        constructStruct<T,NumberType> cs;
         cluster_root=cs.construct(new_step,max_size,nx,ny,nz);
         croot=cluster_root->patches.front();
     }
@@ -281,8 +281,8 @@ class extremeValueStatisticsGenerator {
     //@param sigma gaussian noise standard deviation
     //@param indexlist list of positions to evaluate
     //@param size size of e
-    Q tsg(Q *e,const Q sigma,int* indexlist,const Q size) {
-        Q t=0;
+    NumberType tsg(NumberType *e,const NumberType sigma,int* indexlist,const NumberType size) {
+        NumberType t=0;
         for (int i=0; i<size; i++) {
             t=t+boost::math::pow<2>(e[indexlist[i]]);
         }
@@ -299,34 +299,35 @@ class extremeValueStatisticsGenerator {
     //@param nx width
     //@param ny height
     //@param qalpha_ret pointer to store quantile in
-    Q* get_quantile_gauss(const Q si, const Q alpha, const int mr, const int nx, const int ny, /*const*/ int nz, Q* qalpha_ret) {
+    void get_quantile_gauss(std::vector<NumberType> & cs_h, const NumberType si, const NumberType alpha,
+                            const int mr, const int nx, const int ny, /*const*/ int nz, NumberType* q_alpha_ret)
+    {
         nz = nz; // Supress compiler warning
 
-        Q *cs_h=new Q[mr];
-        Q mrreal;
+        cs_h.resize(mr);
+        NumberType mrreal;
         if ( alpha < 0 || alpha > ONE || si < 0) {
-            std::cerr << "Invalid input to distribution simulation" << std::endl;
-            return NULL;
+            AssertThrow(false, dealii::ExcMessage("Invalid input to distribution simulation") );
         }
         //First check if the needed value is already written down in the bibfile in the working directory
-        std::ifstream bibfile("/home/neal.hermer/Desktop/cuda_prakt_2015/SciPAL/testsite/build-step-35-Desktop-Release/bibfile_gauss.txt");
+        std::ifstream bibfile("bibfile_gauss.txt");
         if ( bibfile ) {
             int tmr,tnx,tny;
-            Q talpha,tres,tsi;
+            NumberType talpha,tres,tsi;
             while ( !bibfile.eof() ) {
                 bibfile >> tsi >> tmr >> tnx >> tny >> talpha >> tres;
                 if ( !bibfile.eof() ) {
                     if ( si == tsi && tmr == mr && tnx == nx && tny == ny && talpha == alpha ) {
-                        Q sigmas,mus;
-                        qalpha_ret[0]=tres;
+                        NumberType sigma_s,mu_s;
+                        q_alpha_ret[0]=tres;
                         for (int i=0; i<mr; i++) {
                             mrreal=pow(2,i);
                             //calculate the weights
-                            sigmas=ONE/(EIGHT*sqrt((Q)((mrreal+1)*(mrreal+1))));
-                            mus=sqrt(sqrt((Q)((mrreal+1)*(mrreal+1))-HALF));
-                            cs_h[i]=ONE/boost::math::pow<4>(tres*sigmas+mus);
+                            sigma_s=ONE/(EIGHT*sqrt((NumberType)((mrreal+1)*(mrreal+1))));
+                            mu_s=sqrt(sqrt((NumberType)((mrreal+1)*(mrreal+1))-HALF));
+                            cs_h[i]=ONE/boost::math::pow<4>(tres*sigma_s + mu_s);
                         }
-                        return cs_h;
+
                     }
                 }
             }
@@ -334,7 +335,7 @@ class extremeValueStatisticsGenerator {
         bibfile.close();
 
         //Since the necessary value is not in the bibfile start the calculations
-        const int max_samples=1000;
+        const int max_samples=100;
         boost::mt19937 rng;
         boost::normal_distribution<> nd(0.0, si);
         boost::variate_generator<boost::mt19937&,
@@ -342,12 +343,13 @@ class extremeValueStatisticsGenerator {
         int w=nx-2*sigma;
         int h=ny-2*sigma;
         int samples=std::min(max_samples,w*h);
-        Q *e=new Q[nx*ny];
-        Q *k=new Q[w*h];
-        Q tmp;
-        Q qalpha=0;
-        Q max=0;
-        int steps=100;//a histogram with this detail is produced
+        std::vector<NumberType> noise_field (nx*ny);
+        std::vector<NumberType> k_field (w*h);
+        NumberType tmp;
+        NumberType q_alpha=0;
+        NumberType max=0;
+        // FIXME: make runtime prm
+        int steps=300;//a histogram with this detail is produced
 
         std::ofstream out("histogram_gauss.txt");
         //By default widht*height simulations of the statistics, in 3D case take only the first layer
@@ -357,10 +359,10 @@ class extremeValueStatisticsGenerator {
                 for (int ii=0; ii<nx; ii++) {
                     for (int jj=0; jj<ny; jj++) {
                         //simulate iid normal data
-                        e[ii*ny+jj]=var_nor();
+                        noise_field[ii*ny+jj]=var_nor();
                     }
                 }
-                k[scount]=0;
+                k_field[scount]=0;
                 cpoint=croot;
 #ifdef USE_OMP
                 #pragma omp parallel
@@ -383,14 +385,14 @@ class extremeValueStatisticsGenerator {
                             break;
                     }
                     while ( mycp != NULL ) {
-                        tmp=tsg(e,sigma,mycp->indexes,mycp->size);
+                        tmp=tsg(&noise_field[0], sigma, mycp->indexes, mycp->size);
                         //Synch with other threads
 #ifdef USE_OMP
                         #pragma omp critical
 #endif
                         {
-                            if ( tmp > k[i*h+j] )
-                                k[scount]=tmp;
+                            if ( tmp > k_field[i*h+j] )
+                                k_field[scount]=tmp;
                         }
                         mycp=mycp->next;
                         //Calculate offset in working queue for this thread
@@ -402,8 +404,9 @@ class extremeValueStatisticsGenerator {
                         }
                     }
                 }
-                if ( k[scount] > max )
-                    max=k[scount];
+                if ( k_field[scount] > max )
+                    max=k_field[scount];
+                if (scount % 10 == 0)
                 std::cout << "Calculating samples " << scount << "/" << samples << std::endl;
                 scount++;
                 if ( scount >= samples )
@@ -414,38 +417,38 @@ class extremeValueStatisticsGenerator {
         }
 
         //Statistics ready, produce an output and evaluate the quantile
-        Q *stat=new Q[steps];
-        Q dk=max/((Q)steps);
+        std::vector<NumberType> stat (steps);
+        NumberType dk=max/((NumberType)steps);
         int counted=0;
-        int limit=(int)round(alpha*((Q)(samples)));
+        int limit=(int)round(alpha*((NumberType)(samples)));
         for (int i=0; i<steps; i++) {
+
+            if (i % (steps/10) == 0)
             std::cout << "Calculating Histogram " << i << "/" << steps << std::endl;
             stat[i]=0;
             for (int ii=0; ii<samples; ii++) {
-                if ( k[ii] >= dk*((Q)i) && k[ii] < dk*((Q)(i+1)) ) {
+                if ( k_field[ii] >= dk*((NumberType)i) && k_field[ii] < dk*((NumberType)(i+1)) ) {
                     stat[i]++;
                     counted++;
-                    if ( counted >= limit && qalpha == 0 )
-                        qalpha=k[ii];
+                    if ( counted >= limit && q_alpha == 0 )
+                        q_alpha=k_field[ii];
                 }
 
             }
-            out << dk*(HALF+(Q)i) << " " << stat[i] << std::endl;
+            out << dk*(HALF+(NumberType)i) << " " << stat[i] << std::endl;
         }
 
         //Since the result is not in the bib file write it there
         std::ofstream bib_out("bibfile_gauss.txt",std::ofstream::app);
-        bib_out << si << " " <<  mr << " " << nx << " " << ny << " " << alpha << " " << qalpha << std::endl;
-        Q sigmas,mus;
-        qalpha_ret[0]=qalpha;
+        bib_out << si << " " <<  mr << " " << nx << " " << ny << " " << alpha << " " << q_alpha << std::endl;
+        NumberType sigmas,mus;
+        q_alpha_ret[0]=q_alpha;
         for (int i=0; i<mr; i++) {
             mrreal=pow(2,i);
-            sigmas=ONE/(EIGHT*sqrt((Q)((mrreal+1)*(mrreal+1))));
-            mus=sqrt(sqrt((Q)((mrreal+1)*(mrreal+1))-HALF));
-            cs_h[i]=ONE/boost::math::pow<4>(qalpha*sigmas+mus);
+            sigmas=ONE/(EIGHT*sqrt((NumberType)((mrreal+1)*(mrreal+1))));
+            mus=sqrt(sqrt((NumberType)((mrreal+1)*(mrreal+1))-HALF));
+            cs_h[i]=ONE/boost::math::pow<4>(q_alpha*sigmas+mus);
         }
-
-        return cs_h;
     }
 };
 #endif /* EXTREMVALSTATGEN_H_ */

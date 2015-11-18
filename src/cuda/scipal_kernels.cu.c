@@ -1,6 +1,7 @@
 // Header-files of CUDA utility-library
 //Header for referencing CUDA based part
 #include <lac/scipal_kernels_wrapper.cu.h>
+#include <lac/ShapeData.h>
 #include <base/CUDA_error_check.h>
 
 

@@ -24,6 +24,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/expression_templates_host.h>
 
 #include <base/ForewardDeclarations.h>
+#include <lac/OperandInfo.h>
 
 namespace SciPAL {
 
@@ -47,30 +48,30 @@ struct BlasMatExp/*MatrixExpressions*/
 
     typedef Literal<T, BW> Lit;
 
-    template<EType ET, typename T2>
-    struct traverse_tree;
+//    template<EType ET, typename T2>
+//    struct traverse_tree;
 
-    template< typename T2>
-    struct traverse_tree<leafE, T2>
-    {
-        typedef typename T2::Type Type;
-    };
+//    template< typename T2>
+//    struct traverse_tree<leafE, T2>
+//    {
+//        typedef typename T2::Type Type;
+//    };
 
-    template<EType ET, typename T2>
-    struct traverse_tree
-    {
-        typedef typename ExprChooser<ET, T2>::HostEType Type;
-    };
+//    template<EType ET, typename T2>
+//    struct traverse_tree
+//    {
+//        typedef typename ExprChooser<ET, T2>::HostEType Type;
+//    };
 
-    template <typename X>
-    struct generic_gemm
-    {
-        typedef typename
-        SciPAL::BinaryExpr<typename traverse_tree< X::L::I_am,
-                                         typename X::L::Type >::Type,
-        typename X::Operation,
-        typename traverse_tree< X::R::I_am,typename X::L>::Type> Type;
-    };
+//    template <typename X>
+//    struct generic_gemm
+//    {
+//        typedef typename
+//        SciPAL::BinaryExpr<typename traverse_tree< X::L::I_am,
+//                                         typename X::L::Type >::Type,
+//        typename X::Operation,
+//        typename traverse_tree< X::R::I_am,typename X::L>::Type> Type;
+//    };
 
     //scaled Matrix
     typedef typename SciPAL::BinaryExpr<Lit,  mult, Mtx> scaledM;

@@ -24,10 +24,11 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #endif
 //SciPAL includes
 #include <base/ForewardDeclarations.h>
+#include <lac/expression_templates_device.h>
 #include <base/PrecisionTraits.h>
 #include <base/CudaComplex.h>
-#include <lac/expression_templates_device.h>
-#include <lac/UnaryFunctions.h>
+#include <lac/OperandInfo.h>
+
 
 
 #include <iostream>

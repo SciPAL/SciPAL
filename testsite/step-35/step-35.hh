@@ -42,8 +42,8 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include<tiffio.h>
 
 //Our stuff
-#include "extremeValueStatisticsGenerator.h"
-#include "ADMMParams.h"
+#include <extremeValueStatisticsGenerator.h>
+#include <ADMMParams.h>
 #include <cuda_driver_step-35.h>
 #include <cuda_driver_step-35.hh>
 

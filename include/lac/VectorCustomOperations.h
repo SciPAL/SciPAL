@@ -21,6 +21,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define VECTORCUSTOMOPERATIONS_H
 
 #include <lac/expression_templates_host.h>
+#include <lac/expression_templates_device.h>
 
 #include <lac/scipal_kernels_wrapper.cu.h>
 #include <lac/UnaryFunctions.h>

@@ -50,8 +50,8 @@ Copyright  Lutz Künneke, Jan Lebert, Stephan Kramer, Johannes Hagemann 2014-201
 
 //SciPAL
 #include <base/PrecisionTraits.h>
-#include <lac/release/cublas_wrapper.hh>
-#include <lac/development/cublas_Vector.h>
+#include <lac/cublas_wrapper.hh>
+#include <lac/cublas_Vector.h>
 
 //Our stuff
 #include "cuda_driver_step-35.hh"
@@ -178,7 +178,7 @@ public:
             cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
 #else
             cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
-            cufftExecR2C(plan, fpsf_tmp_d.array().val(), psf_fourier_transform_d.array().val());
+            cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
 #endif
             //Cleanup
             cufftDestroy(plan);
@@ -249,23 +249,23 @@ public:
 
 #ifdef USE_FFT_CONV
 #ifdef DOUBLE_PRECISION
-        cufftExecD2Z(*plan_fft, in, fm1.array().val());
+        cufftExecD2Z(*plan_fft, in, fm1.data());
 #else
-        cufftExecR2C(*plan_fft, const_cast<Mdouble*>(src.array().val()), fm1.array().val());
+        cufftExecR2C(*plan_fft, const_cast<Mdouble*>(src.data()), fm1.data());
 #endif
         checkCudaErrors(cudaDeviceSynchronize());
 
         //Convolve, multiply in Fourier space
         step35::Kernels<Mdouble> kernel;
-        kernel.element_norm_product(fm1.array().val(), psf_fourier_transform_d.array().val(),
+        kernel.element_norm_product(fm1.data(), psf_fourier_transform_d.data(),
                                     /*inf->ext_*/width, /*inf->ext_*/height, /*inf->ext_*/depth);
 
         //Transform back
         // FIXME: replace by SciPAL's FFT wrappers
 #ifdef DOUBLE_PRECISION
-        cufftExecZ2D(*iplan_fft, fm1.array().val(), out);
+        cufftExecZ2D(*iplan_fft, fm1.data(), out);
 #else
-        cufftExecC2R(*iplan_fft, fm1.array().val(), dst.array().val());
+        cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
 #endif
         checkCudaErrors(cudaDeviceSynchronize());
         getLastCudaError("cufft error!\n");
@@ -458,8 +458,8 @@ public:
                 ; so++)
             {
                 for (int z=0; z< dof_handler.pdepth(); z++) {
-                    kernels.dyadic_dykstra(this->writeable_e_d().array().val(),
-                                           this->im_d().array().val(),
+                    kernels.dyadic_dykstra(this->writeable_e_d().data(),
+                                           this->im_d().data(),
                                            this->sigma_noise,
                                            dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
                                            n_max_dykstra_steps, dykstra_Tol);
@@ -470,8 +470,8 @@ public:
         else { //TODO 3d
             for (int so=0; so<5; so++) {
                 for (int z=0; z< dof_handler.pdepth(); z++) {
-                    kernels.dyadic_dykstra(this->writeable_e_d().array().val(),
-                                           this->im_d().array().val(),
+                    kernels.dyadic_dykstra(this->writeable_e_d().data(),
+                                           this->im_d().data(),
                                            this->sigma_noise,
                                            dof_handler.pwidth(),  dof_handler.pheight(),  dof_handler.pdepth(), n_max_dykstra_steps, dykstra_Tol);
                 }
@@ -592,8 +592,8 @@ public:
 
             // Add regularization
             step35::Kernels<Mdouble> kernel;
-            kernel.tv_derivative(this->tmp2_d.array().val(), x_old.array().val(),
-                                 this->im_d().array().val(),
+            kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
+                                 this->im_d().data(),
                      #ifndef nFMM_VERSION
                                  reg_strength
                      #else
@@ -734,18 +734,18 @@ public:
     {
         step35::Kernels<Mdouble> kernel;
         //$\text{tmp}_d=I$tmp2
-        // // // kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        // // // kernel.sum(tmp_d.array().val(), this->im_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // // // kernel.reset(tmp_d.data(), inf->ext_num_pix);
+        // // // kernel.sum(tmp_d.data(), this->im_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
         //$\text{tmp}_d=I-e$
-        // kernel.diff(tmp_d.array().val(), this->e_d().array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.diff(tmp_d.data(), this->e_d().data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
-        // conv2(this->x_d.array().val(), tmp2_d.array().val()); // args: in, out
+        // conv2(this->x_d.data(), tmp2_d.data()); // args: in, out
 
         // the residual
         //$\text{tmp}_d=I-e-A*x$
 #ifdef USE_SHIFT_ARITH
-        kernel.diff(tmp_d.array().val(), tmp2_d.array().val(),
+        kernel.diff(tmp_d.data(), tmp2_d.data(),
                     SHIFT_FACTOR * inf->sigma,
                     inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
 #else
@@ -762,27 +762,27 @@ public:
         this->residual(tmp2_d, this->im_d(), this->e_d(), this->x_d);
 
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
-        // kernel.mult(tmp_d.array().val(), rho1, inf->ext_num_pix);
+        // kernel.mult(tmp_d.data(), rho1, inf->ext_num_pix);
 
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-        // kernel.sum(tmp_d.array().val(), lag1.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.sum(tmp_d.data(), lag1.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         tmp_d = rho1 * tmp2_d + lag1;
 
-        // conv2(tmp_d.array().val(), tmp_d.array().val());
+        // conv2(tmp_d.data(), tmp_d.data());
         // FIXME: inplace works?
         convolution.vmult(tmp_d, tmp_d);
 
         //$\text{tmp2}_d=z$
-        // kernel.reset(tmp2_d.array().val(), inf->ext_num_pix);
-        // kernel.sum(tmp2_d.array().val(), this->z_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.reset(tmp2_d.data(), inf->ext_num_pix);
+        // kernel.sum(tmp2_d.data(), this->z_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
 
 
         //$\text{tmp2}_d=z-x$
 
-        // kernel.diff(tmp2_d.array().val(), this->x_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.diff(tmp2_d.data(), this->x_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         // tmp2_d -= this->x_d;
 
         //$\text{tmp2}_d=z-x$
@@ -791,12 +791,12 @@ public:
 
 
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        // kernel.mult(tmp2_d.array().val(), rho2, inf->ext_num_pix);
+        // kernel.mult(tmp2_d.data(), rho2, inf->ext_num_pix);
         tmp2_d *= rho2;
 
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
 #ifdef USE_SHIFT_ARITH
-        kernel.sum(tmp2_d.array().val(), tmp_d.array().val(),
+        kernel.sum(tmp2_d.data(), tmp_d.data(),
                    SHIFT_FACTOR * inf->sigma,
                    inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
 #else
@@ -804,18 +804,18 @@ public:
 #endif
 
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        // kernel.diff(tmp2_d.array().val(), lag2.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.diff(tmp2_d.data(), lag2.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         tmp2_d -= lag2;
 
         //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        // kernel.mult(tmp2_d.array().val(), inf->gamma, inf->ext_num_pix);
+        // kernel.mult(tmp2_d.data(), inf->gamma, inf->ext_num_pix);
 
         // tmp2_d *= inf->gamma;
 
 
         // THE FOLLOWING DOC EQ APPLIES TO HAVING DONE BEFORE : tmp2_d *= inf->gamma;
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        //kernel.sum(this->x_d.array().val(), tmp2_d.array().val(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        //kernel.sum(this->x_d.data(), tmp2_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //  this->x_d += tmp2_d;
         this->x_d = this->inv_gamma * tmp2_d + this->x_d;
 
@@ -828,16 +828,16 @@ public:
     void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
         step35::Kernels<Mdouble> kernel;
 
-        // kernel.reset(tmp_d.array().val(), inf->ext_num_pix);
-        // kernel.sum(tmp_d.array().val(), this->x_d.array().val(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
+        // kernel.reset(tmp_d.data(), inf->ext_num_pix);
+        // kernel.sum(tmp_d.data(), this->x_d.data(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
-        //  conv2(tmp_d.array().val(), tmp_d.array().val());
+        //  conv2(tmp_d.data(), tmp_d.data());
         //Update the lagrangian estimates
 #ifdef USE_SHIFT_ARITH
-        kernel.update_lagrangian(lag1.array().val(), lag2.array().val(),
+        kernel.update_lagrangian(lag1.data(), lag2.data(),
                                  SHIFT_FACTOR *  inf->sigma,
                                  inf->ext_width(),  inf->ext_height(),  inf->ext_depth(),
-                                 alpha1, alpha2, this->e_d().array().val(), inf->writeable_im_d().array().val(),tmp_d.array().val(), this->x_d.array().val(), this->z_d.array().val());
+                                 alpha1, alpha2, this->e_d().data(), inf->writeable_im_d().data(),tmp_d.data(), this->x_d.data(), this->z_d.data());
 #else
 
 
@@ -862,13 +862,13 @@ public:
     {
 
 #ifdef USE_SHIFT_ARITH
-        convolution.vmult(tmp_d, this->x_d); // conv2(this->x_d.array().val(),tmp_d.array().val());
+        convolution.vmult(tmp_d, this->x_d); // conv2(this->x_d.data(),tmp_d.data());
 
 
         step35::Kernels<Mdouble> kernel;
         //the value to be projected is copied into e_d
 
-        kernel.prepare_e(inf->writeable_e_d().array().val(), this->im_d().array().val(), tmp_d.array().val(), lag1.array().val(), rho,
+        kernel.prepare_e(inf->writeable_e_d().data(), this->im_d().data(), tmp_d.data(), lag1.data(), rho,
                          SHIFT_FACTOR * inf->sigma,
                          inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
 #else
@@ -1004,26 +1004,26 @@ public:
             //Copy $x$ into the bigger temp variable while conserving its shape
             for (int i=0; i< nx2; i++) {
                 if ( i <  dof_handler.pheight()) {
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.array().val()[i* ny2]), &(this->x_d.array().val()[i* dof_handler.pheight()]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.data()[i* ny2]), &(this->x_d.data()[i* dof_handler.pheight()]),
                                                      dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
 
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.array().val()[i* ny2]), &(lag2.array().val()[i* dof_handler.pheight()]),
+                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.data()[i* ny2]), &(lag2.data()[i* dof_handler.pheight()]),
                                                      dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                 }
             }
             checkCudaErrors(cudaDeviceSynchronize());
 
             //Forward 2D Haar Wavelet transform
-            kernel.haar(tmp_haar.array().val(), tmp_haar2.array().val(), ny2);
-            kernel.haar(tmp_lagr.array().val(), tmp_haar2.array().val(), ny2);
-            kernel.soft_threshold(tmp_haar.array().val(), lag2.array().val(), tmp_haar.array().val(), rho2, reg_strength, nx2* ny2);
+            kernel.haar(tmp_haar.data(), tmp_haar2.data(), ny2);
+            kernel.haar(tmp_lagr.data(), tmp_haar2.data(), ny2);
+            kernel.soft_threshold(tmp_haar.data(), lag2.data(), tmp_haar.data(), rho2, reg_strength, nx2* ny2);
             //Backward 2D Haar Wavelet transform
-            kernel.inverse_haar(tmp_haar.array().val(), tmp_haar2.array().val(), ny2);
+            kernel.inverse_haar(tmp_haar.data(), tmp_haar2.data(), ny2);
 
             //Copy back, pay attention not to mess up the shape
             for (int i=0; i< nx2; i++) {
                 if ( i <  dof_handler.pwidth() )
-                    checkCudaErrors(cudaMemcpyAsync(&(this->z_d.array().val()[i* dof_handler.pheight()]), &(tmp_haar.array().val()[i* ny2]),
+                    checkCudaErrors(cudaMemcpyAsync(&(this->z_d.data()[i* dof_handler.pheight()]), &(tmp_haar.data()[i* ny2]),
                                                      dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
             }
             checkCudaErrors(cudaDeviceSynchronize());
@@ -1032,24 +1032,24 @@ public:
         //Regularization by direct space sparsity
         if ( this->regType == sparse ) {
             this->z_d = this->x_d;
-            kernel.soft_threshold(this->z_d.array().val(),lag2.array().val(),this->x_d.array().val(), rho2, reg_strength,   dof_handler.n_dofs());
+            kernel.soft_threshold(this->z_d.data(),lag2.data(),this->x_d.data(), rho2, reg_strength,   dof_handler.n_dofs());
             //kernel.tv_regularization(this->x_d,this->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
         }
         //Regularization by Fourier Space L_2 Norm
         if ( this->regType == quadratic ) {
             this->z_d = this->x_d;
             //the solution with smallest L_2 Norm is obtained, this corresponds to the pseudoinverse
-            kernel.pseudo_inverse(this->z_d.array().val(), lag2.array().val(), rho2, reg_strength, dof_handler.n_dofs());
+            kernel.pseudo_inverse(this->z_d.data(), lag2.data(), rho2, reg_strength, dof_handler.n_dofs());
         }
 
 
         //Regularization by Fourier Space L_2 Norm
         if ( this->regType == TV ) {
             this->z_d = this->x_d;
-            //checkCudaErrors(cudaMemcpy(this->z_d.array().val(), this->x_d.array().val(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
+            //checkCudaErrors(cudaMemcpy(this->z_d.data(), this->x_d.data(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
             if (true)
-                kernel.tv_regularization(this->x_d.array().val(), this->z_d.array().val(),
-                                         lag2.array().val(), reg_strength, rho2,
+                kernel.tv_regularization(this->x_d.data(), this->z_d.data(),
+                                         lag2.data(), reg_strength, rho2,
                                          dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
             else
             {
@@ -1062,8 +1062,8 @@ public:
 
                 while (err > Tol)
                 {
-                    kernel.tv_derivative(tmp2_d.array().val(), z_d.array().val(),
-                                         this->im_d().array().val(),
+                    kernel.tv_derivative(tmp2_d.data(), z_d.data(),
+                                         this->im_d().data(),
                                          reg_strength,
                                          dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
 

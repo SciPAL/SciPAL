@@ -67,7 +67,7 @@ struct BlasVecExp/*VectorExpressions*/
 
     // $ y = \alpha A \cdot x + \beta y$
     typedef typename SciPAL::BinaryExpr<sMV, plus, scaledV>
-    sMVaV;
+    sMVasV;
 
     // $ y = \alpha x + y$
     typedef typename SciPAL::BinaryExpr<scaledV, plus, Vtr>
@@ -255,7 +255,7 @@ static void apply(Vector<T, BW> &result,
 
 template <typename T, typename BW>
 static void apply(Vector<T, BW> &result,
-                  const typename BlasVecExp<T, BW>::sMVaV& expr)
+                  const typename BlasVecExp<T, BW>::sMVasV& expr)
 {
 
     typedef ::SciPAL::Matrix<T, BW> Mtx;

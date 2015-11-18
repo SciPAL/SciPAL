@@ -57,9 +57,10 @@ DEFINES += USE_CPP11
 
     HOME = $$(HOME) # your home directory
     PRAK = $$_PRO_FILE_PWD_/../../ #$$HOME/cuda-2014/Praktikum_2013 # path to your copy of the lab course folder. Typically, this 2 levels above the source folder of your step-
-    SciPAL_DIR = $$PRAK/
+    SciPAL_DIR = $$PRAK
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/..
     STEP_DIR = $$_PRO_FILE_PWD_/
+    DEALHOME = /usr/local/dealii
 
 message("SciPALs home :" $$SciPAL_DIR)
 message("step home :" $$STEP_DIR)
@@ -98,7 +99,7 @@ message("step home :" $$STEP_DIR)
 
 
     # and here for the gcc
-INCLUDEPATH += ..
+INCLUDEPATH += .. .
 #INCLUDEPATH += /scratch/step-35/lib/include
 
 #put here your non-standard libs
@@ -111,7 +112,7 @@ LIBS += /opt/local/lib/libtiff.dylib
 
 } else {
 DEFINES += USE_OMP
-INCLUDEPATH += /usr/local/dealII-8.0/include
+INCLUDEPATH += /usr/local/dealii/include
 INCLUDEPATH += /usr/include/x86_64-linux-gnu
 
 
@@ -147,8 +148,8 @@ message("Load deal.II MPI config")
 # Enter project specific source and header files here
 SOURCES += \
     step-35.cpp \
-    cuda_kernel_step-35.cu \
-    $$SciPAL_DIR/include/numerics/propagation_kernels.cu
+    cuda_kernel_step-35.cu #\
+    #$$SciPAL_DIR/include/numerics/propagation_kernels.cu
 
 HEADERS += \
     cuda_driver_step-35.h \
@@ -161,7 +162,9 @@ HEADERS += \
     preprocessor_directives.h \
     extremeValueStatisticsGenerator.h \
     step-35.hh \
-    smre_problem.hh
+    smre_problem.hh \
+    *.h* \
+    *.cu.c
 
    # the following variable contains files which should appear in the Projects view on the left of QtCreator
    # which are not subject to compilation.

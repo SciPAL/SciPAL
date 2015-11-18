@@ -21,7 +21,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #define DEVICEEXPR_H
 
 #include <lac/OperandInfo.h>
-#include <lac/expression_templates_host.h>
 
 #include <lac/DevLiteral.h>
 #include <base/CudaComplex.h>

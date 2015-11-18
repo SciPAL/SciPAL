@@ -38,7 +38,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/Shape.h>
 #include <base/ArchTraits.h>
 #include <base/CUDA_error_check.h>
-
+#include <base/Zero_One_Traits.h>
 #include <base/ForewardDeclarations.h>
 
 

@@ -28,6 +28,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 // Base class for expressions
 #include <lac/Expr.h>
 #include <base/ForewardDeclarations.h>
+#include <lac/cublas_Matrix.h>
 #include <lac/ShapeData.h>
 #include <lac/Literal.h>
 

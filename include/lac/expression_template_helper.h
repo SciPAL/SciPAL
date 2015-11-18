@@ -1,6 +1,7 @@
 #ifndef EXPRESSION_TEMPLATE_HELPER_H
 #define EXPRESSION_TEMPLATE_HELPER_H
 
+#include <lac/Expr.h>
 #include <base/ForewardDeclarations.h>
 #include <base/print_info.h>
 

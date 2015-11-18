@@ -42,10 +42,10 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include <base/ParallelArch.h>
 
 //Our stuff
-#include "cuda_driver_step-35.h"
-#include "haar.hpp"
-#include "patch.h"
-#include "preprocessor_directives.h" // for DOUBLE_PRECISION
+#include <cuda_driver_step-35.h>
+#include <haar.hpp>
+#include <patch.h>
+#include <preprocessor_directives.h> // for DOUBLE_PRECISION
 
 #ifdef DOUBLE_PRECISION
 const double HALF=0.5;

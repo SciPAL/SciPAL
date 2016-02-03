@@ -1,0 +1,98 @@
+mu_S(S) = (S -.5)**.25
+
+sigma_S(S) = sqrt(1./(8 * sqrt(S)))
+
+q(a,S) = sqrt(2)*inverf(a**(1./S))
+
+c_S(a, n_sets, S) = (q(a,n_sets) * sigma_S(S) + mu_S(S))**(-4)
+
+n_subsets(n_px, level, dim) = n_px * ((2.**-dim)**(level+1)-1.)/((2.**-dim) - 1.)
+
+n_subsets_1D(n_px, level) = n_subsets(n_px, level, 1)
+n_subsets_2D(n_px, level) = n_subsets(n_px, level, 2)
+n_subsets_3D(n_px, level) = n_subsets(n_px, level, 3)
+
+
+
+Lx=1024; Ly=1024; 
+alpha = 0.1; 
+max_level = 10; 
+ns = n_subsets_2D(Lx*Ly,max_level); 
+
+print gprintf("Lx : %.0f", Lx)
+print gprintf("Ly : %.0f", Lx)
+print gprintf("alpha : %f", alpha)
+
+print "n subsets on level\t c_S\t\t c_Ss\t\t 1/(s*c_S)\t 1/(s*c_Ss)"
+do for [k=0:max_level] {
+	s=4**k 
+	ns_s = Lx*Ly/s
+
+	a1 = c_S(alpha, ns, s)
+	a2 = 1./(s*c_S(alpha, ns, s)) 
+	a3 = c_S(alpha, ns_s, s)
+	a4 = 1./(s*c_S(alpha, ns_s, s)) 
+	print sprintf("\t%.0f\t\t %g\t %g\t %f\t %f", ns_s, a1, a3, a2, a4)
+}
+
+
+
+
+
+
+Lx=512; 
+Ly=512; 
+alpha = 0.1; 
+max_level = 9; 
+ns = n_subsets_2D(Lx*Ly,max_level); 
+
+print gprintf("Lx : %.0f", Lx)
+print gprintf("Ly : %.0f", Lx)
+print gprintf("alpha : %f", alpha)
+
+print "n subsets on level\t c_S\t\t c_Ss\t\t 1/(s*c_S)\t 1/(s*c_Ss)"
+do for [k=0:max_level] {
+	s=4**k 
+	ns_s = Lx*Ly/s
+
+	a1 = c_S(alpha, ns, s)
+	a2 = 1./(s*c_S(alpha, ns, s)) 
+	a3 = c_S(alpha, ns_s, s)
+	a4 = 1./(s*c_S(alpha, ns_s, s)) 
+	print sprintf("\t%.0f\t\t %g\t %g\t %f\t %f", ns_s, a1, a3, a2, a4)
+}
+
+
+
+
+
+Lx=1024; Ly=1024; 
+max_level = 10; 
+
+#Lx=512; Ly=512; max_level = 9; 
+
+ns = n_subsets_2D(Lx*Ly,max_level); 
+
+print gprintf("Lx : %.0f", Lx)
+print gprintf("Ly : %.0f", Lx)
+
+
+print "c_S : weights using total number of subsets as exponent of alpha, Values of alpha given in header line of table"
+print "c_Ss : weights using number of subsets on a level as exponent of alpha"
+
+print "n subsets on level\t c_S(0.1)\t c_S(0.5)\t c_S(0.9)\t c_Ss(0.1)\t c_Ss(0.5)\t c_Ss(0.9)\t\t 1/(s*c_S(0.9))\t 1/(s*c_Ss(0.9))"
+do for [k=0:max_level] {
+	s=4**k 
+	ns_s = Lx*Ly/s
+
+	a1(alpha) = c_S(alpha, ns, s)
+	a2(alpha) = 1./(s*c_S(alpha, ns, s)) 
+	a3(alpha) = c_S(alpha, ns_s, s)
+	a4(alpha) = 1./(s*c_S(alpha, ns_s, s)) 
+	print sprintf("\t%.0f\t\t %g\t %g\t %g\t %g\t %g\t %g\t %f\t %f", ns_s, a1(0.1), a1(0.5), a1(0.9), a3(0.1), a3(0.5), a3(0.9), a2(0.9), a4(0.9))
+}
+
+
+
+
+

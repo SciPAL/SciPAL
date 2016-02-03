@@ -48,6 +48,14 @@ struct Kernels {
                         const T g_noise, // dto.
                         const int ni, const int nj, const int nk, const int n_max_steps, const T Tol);
 
+    void dyadic_dykstra_fine_scale_part(
+            T* h_iter, T* h_old, T* Q_full,
+            T *A_image,
+            // const T * data, // new argument w.r.t. LJ
+            const T g_noise, // dto.
+            const int ni, const int nj, const int nk, const int n_max_steps, const T Tol);
+
+
     void dyadic_dykstra_LJ(T *A, const int ni, const int nj, const int nk, const int offseti, const int offsetj, const int offsetk, const int so);
 
     void element_norm_product(typename PrecisionTraits<T, gpu_cuda>::ComplexType *arr1, typename PrecisionTraits<T, gpu_cuda>::ComplexType *arr2, int width, int height, int depth);

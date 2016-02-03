@@ -1001,7 +1001,7 @@ public:
 #else
 
 #ifndef nFMM_VERSION
-        dykstra_gauss_LNCS(rho);
+       dykstra_gauss_global_mem(rho); // dykstra_gauss_LNCS(rho);
 #else
         dykstra_gauss_FMM(rho);
 #endif
@@ -1065,47 +1065,70 @@ public:
 
         typedef SciPAL::Vector<Mdouble, cublas> Vc;
 
-        std::vector<Vc> h(n_scales+1, Vc(this->e_d().size())), Q(n_scales, Vc(this->e_d().size()));
+        std::vector<Mdouble> zero_init(this->e_d().size());
 
-        h[0] = this->e_d();
+        Vc h_iter (this->e_d().size()); h_iter = zero_init;
 
-        for (int j = min_scale + 1; j <= n_scales; j++)
-            Q[j-1] = 0;
+        Vc h_old (this->e_d().size()); h_old = zero_init;
+
+        Vc h_init (this->e_d().size()); h_init = zero_init;
+
+        Vc Q_full (this->e_d().size()); Q_full = zero_init;
+        Vc Q_M (this->e_d().size()); Q_M = zero_init;
+
+        // $h_0 = h$;
+        h_init = this->e_d();
+        h_old = h_init;
+
+        Mdouble cs_weight = 1e-5; // FIXME: this is a educated guess. Lookup exact value
 
         int iter = 0;
         bool iterate = true;
+
+         step35::Kernels<Mdouble> kernel;
+
         while (iterate)
         {
 
-            for (int j = 1; j <= n_scales; j++)         // loop over subsets
+            // Start with estimator for whole image
+            h_old -= Q_full;
+            h_init = h_old;
+            h_iter = h_old;
+            // assume single subset for a moment
+            Mdouble L2_norm = h_old.l2_norm(); // i.e. sqrt(sum_of_squares)
+
+            // project
+            h_iter *= this->sigma_noise/(L2_norm * std::sqrt(cs_weight) );
+
+            Q_full = h_iter - h_old;
+            h_old = h_iter;
+
+            // Q_0 <- Q_full
+            // initialize : d.h_init with global h_init
+
+             // loop over subsets
+            kernel.dyadic_dykstra_fine_scale_part(h_iter.array().val(), h_old.array().val(),
+                                     Q_full.array().val(),
+                                                  this->writeable_e_d().array().val(),
+                                                                                         //    this->im_d().array().val(),
+                                                                                             this->sigma_noise,
+                                                                                             dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
+                                                                                             n_max_dykstra_steps, dykstra_Tol
+                                     );
+
+
+            // Convergence control.
             {
-                h[j-1] -= Q[j-1];
+                h_init -= h_iter;
+               Mdouble norm = h_init.l2_norm();
 
-                // ------
-                //                 sum_of_squares_on_2D_subsets(j-1, ps_sum);
+                iterate = ( norm > dykstra_Tol &&
+                            iter < n_max_dykstra_steps);
 
-                //                 T weight =  // 0.25*
-                //                         ICD_weights[j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
-
-                //                 int s_x = n_scales - j;
-                //                 int s_y = s_x;
-
-                //                 h[j]   = project(s_x, //j-1 /* s_x*/,
-                //                                  s_y, // j-1 /* s_y */,
-                //                                  ps_sum, h[j-1], m_data, g_noise, weight);
-                // ------
-                Q[j-1] = h[j] - h[j-1];
-            }
-
-
-            //            tmp_d = h[n_scales] - h[0];
-            //            Mdouble norm = L2_norm(tmp_d);
-
-            //            iterate = ( norm > Tol &&
-            //                       iter < n_max_steps);
-            //            iterate ?  h[0] = h[n_scales] : *m_px = h[n_scales];
+                iterate ? h_init = h_iter : this->writeable_e_d() = h_iter;
             iter++;
         }
+    }
     }
 
 

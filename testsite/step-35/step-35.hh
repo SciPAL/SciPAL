@@ -57,6 +57,8 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 // the CUDA reference manual.
 #include <base/GPUInfo.h>
 
+// for shifting of fft
+#include <cufftShift/Src/cufftShiftInterface.h>
 //DEBUG
 #include <chrono>
 
@@ -647,6 +649,22 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<Mpatch, T,
                          // image_io.pheight, image_io.pwidth, image_io.pdepth,
                          dof_handler,
                          params.gnoise, false/*params.anscombe*/);
+
+    image_io.write_image("psf.tif", driver.convolution.psf_h,
+                         // image_io.pheight, image_io.pwidth, image_io.pdepth,
+                         dof_handler,
+                         params.gnoise, params.anscombe);
+
+    SciPAL::Vector<float, cublas> tmp(driver.im_h.size());
+    tmp = SciPAL::abs(driver.convolution.psf_fourier_transform_d);
+    dealii::Vector<float> tmp2;
+    tmp.push_to(tmp2);
+
+    image_io.write_image("mtf.tif", tmp2,
+                         // image_io.pheight, image_io.pwidth, image_io.pdepth,
+                         dof_handler,
+                         params.gnoise, params.anscombe);
+
 
 
     std::cout << "noise written" << std::endl;

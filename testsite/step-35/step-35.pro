@@ -59,7 +59,7 @@ DEFINES += USE_CPP11
     PRAK = $$_PRO_FILE_PWD_/../../ #$$HOME/cuda-2014/Praktikum_2013 # path to your copy of the lab course folder. Typically, this 2 levels above the source folder of your step-
     SciPAL_DIR = $$PRAK
     STEP_PARENT_DIR = $$_PRO_FILE_PWD_/..
-    STEP_DIR = $$_PRO_FILE_PWD_/
+    STEP_DIR = $$_PRO_FILE_PWD_
     DEALHOME = /usr/local/dealii
 
 message("SciPALs home :" $$SciPAL_DIR)
@@ -85,7 +85,8 @@ message("step home :" $$STEP_DIR)
      #
      # build-step-2/Debug/Desktop_Qt_5_2_1_clang64/
      #
-        CUDA_INCLUDES = -I$$STEP_PARENT_DIR
+        CUDA_INCLUDES += -I$$STEP_PARENT_DIR \
+                        -I$$STEP_DIR/cufftShift/Src/
 
 
         CUDA_INCLUDES +=-I$$SciPAL_DIR/include
@@ -99,7 +100,8 @@ message("step home :" $$STEP_DIR)
 
 
     # and here for the gcc
-INCLUDEPATH += .. .
+INCLUDEPATH += .. . \
+                ./cufftShift/Src/
 #INCLUDEPATH += /scratch/step-35/lib/include
 
 #put here your non-standard libs
@@ -148,7 +150,25 @@ message("Load deal.II MPI config")
 # Enter project specific source and header files here
 SOURCES += \
     step-35.cpp \
-    cuda_kernel_step-35.cu #\
+    cuda_kernel_step-35.cu \
+    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_1D_IP_impl.cu \
+    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_1D_IP.cu \
+    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_2D_IP_impl.cu \
+    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_2D_IP.cu \
+    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_3D_IP_impl.cu \
+    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_3D_IP.cu \
+    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_1D_OP_impl.cu \
+    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_1D_OP.cu \
+    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_2D_OP_impl.cu \
+    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_2D_OP.cu \
+    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_3D_OP_impl.cu \
+    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_3D_OP.cu \
+    ./cufftShift/Src/CXX/cufftShift_1D.cpp \
+    ./cufftShift/Src/CXX/cufftShift_2D.cpp\
+    ./cufftShift/Src/CXX/cufftShift_3D.cpp\
+    ./cufftShift/Src/cuUtils/configGPU.cpp\
+    ./cufftShift/Src/cxxUtils/PrintMemory.cpp
+ #\
     #$$SciPAL_DIR/include/numerics/propagation_kernels.cu
 
 HEADERS += \

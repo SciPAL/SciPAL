@@ -48,6 +48,9 @@ Copyright  Lutz Künneke, Jan Lebert, Stephan Kramer, Johannes Hagemann 2014-201
 //CUDA cufft
 #include <cufft.h>
 
+//shift for fft
+#include <cufftShiftInterface.h>
+
 //SciPAL
 #include <base/PrecisionTraits.h>
 #include <lac/cublas_wrapper.hh>
@@ -87,9 +90,10 @@ template<typename Mpatch,typename T,ParallelArch c> struct runStruct;
 template<typename Mpatch,typename Mdouble, ParallelArch c>
 class CUDADriver {
     friend  struct runStruct<Mpatch,Mdouble,c>;
-  public:
+public:
     //complex type: double2 for double, float2 for float
-    typedef typename PrecisionTraits<Mdouble, c>::ComplexType complex;
+    //    typedef typename PrecisionTraits<Mdouble, c>::ComplexType complex;
+    typedef CudaComplex<Mdouble> complex;
 
     typedef  SciPAL::Vector<Mdouble,cublas> Vector;
 
@@ -122,34 +126,94 @@ public:
     // We put the convolution into a structure such tht we can use as a matrix in iteratuve solvers.
     struct Convolution {
 
-          int depth, width, height;
+        int depth, width, height;
+        int cframesize; // image size for r2c images
 
         cufftHandle *plan_fft,*iplan_fft;
+
+        SciPAL::Vector<complex, cublas> fm1;
+        //Point spread function on device
+        SciPAL::Vector<complex, cublas> psf_fourier_transform_d;
+
+        dealii::Vector<Mdouble> psf_h;
 
         // In cases where we only want to denoise
         // we have to bypass the convolution operation as then the blurrign operator is the identity.
         bool is_delta_peak;
 
+
         ~Convolution() {
-#ifdef USE_FFT_CONV
+            //#ifdef USE_FFT_CONV
             cufftDestroy(*plan_fft);
             cufftDestroy(*iplan_fft);
             delete plan_fft;
             delete iplan_fft;
-#endif
+            //#endif
         }
 
         Convolution(int d, int w, int h, double fwhm)
             :
               depth(d), width(w), height(h),
               cframesize(/*ext_*/depth*/*ext_*/width*(/*ext_*/height/2+1)/**sizeof(Mcomplex)*/),
-              fm1(/*inf->ext_*/depth*/*inf->ext_*/width*(/*inf->ext_*/height/2+1)),
-              psf_fourier_transform_d(cframesize)
-            , is_delta_peak(false),
-    #ifndef USE_FFT_CONV
+              fm1(cframesize),
+              psf_fourier_transform_d(fm1.size()),
+              psf_h(width*height),
+              is_delta_peak(false),
+      #ifndef USE_FFT_CONV
               dof_handler(dealii::Point<3>(width, height, depth))
     #endif
         {
+            {
+                // TO DO: compute psf_h here
+
+                SciPAL::Vector<Mdouble,cublas> fpsf_tmp_d(psf_h.size());
+
+                Mdouble psf_norm=0;
+
+                for (int z=0; z<depth; z++ ) {
+                    for (int x=0; x<width; x++) {
+                        for (int y=0; y<height; y++) {
+                            psf_h(z*height*width+x*height+y) = _psf(Mdouble(x), Mdouble(y), Mdouble(z), fwhm );
+                            psf_norm += psf_h[z*height*width+x*height+y];
+                        }
+                    }
+                }
+
+                //norm
+                psf_h *= 1. / psf_norm;
+//                                psf_h *= 65535;
+                fpsf_tmp_d = psf_h;
+//                cufftShift_2D_impl(fpsf_tmp_d.data(), width, height);
+                //Cufft setup
+                //Create cufft plans
+                plan_fft=new cufftHandle();
+                iplan_fft=new cufftHandle();
+#ifdef DOUBLE_PRECISION
+                cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
+                cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
+#else
+                cufftPlan3d(plan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_R2C);
+                cufftPlan3d(iplan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_C2R);
+#endif
+
+
+
+                //Fourier transformation of psf using cuFFT
+                cufftHandle plan;
+#ifdef DOUBLE_PRECISION
+                cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
+                cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
+#else
+                cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
+                cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
+#endif
+                //Cleanup
+                cufftDestroy(plan);
+                getLastCudaError("cufft error!\n");
+
+
+            }
+
 #ifdef USE_FFT_CONV
             // TO DO: compute psf_h here
             SciPAL::Vector<Mdouble,cublas> fpsf_tmp_d;
@@ -161,13 +225,13 @@ public:
             //Create cufft plans
             plan_fft=new cufftHandle();
             iplan_fft=new cufftHandle();
-    #ifdef DOUBLE_PRECISION
+#ifdef DOUBLE_PRECISION
             cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
             cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
-    #else
+#else
             cufftPlan3d(plan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_R2C);
-            cufftPlan3d(iplan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_C2R);
-    #endif
+            cufftPlan3d(iplan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_C2C);
+#endif
 
 
 
@@ -216,7 +280,7 @@ public:
 #endif
 
         }
-        #ifdef USE_FFT_CONV
+#ifdef USE_FFT_CONV
 #else
         dealii::Vector<Mdouble> psf_1d;
         int cut_off;
@@ -225,13 +289,13 @@ public:
 
         void vmult(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
         {
-           if (is_delta_peak)
-               this->vmult_id(dst, src);
-           else
-               this->vmult_conv(dst, src);
+            if (is_delta_peak)
+                this->vmult_id(dst, src);
+            else
+                this->vmult_FFT(dst, src);
         }
 
-    private:
+        //    private:
         void vmult_id(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
         {
             dst = src;
@@ -249,26 +313,26 @@ public:
 
 #ifdef USE_FFT_CONV
 #ifdef DOUBLE_PRECISION
-        cufftExecD2Z(*plan_fft, in, fm1.data());
+            cufftExecD2Z(*plan_fft, in, fm1.data());
 #else
-        cufftExecR2C(*plan_fft, const_cast<Mdouble*>(src.data()), fm1.data());
+            cufftExecR2C(*plan_fft, const_cast<Mdouble*>(src.data()), fm1.data());
 #endif
-        checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(cudaDeviceSynchronize());
 
-        //Convolve, multiply in Fourier space
-        step35::Kernels<Mdouble> kernel;
-        kernel.element_norm_product(fm1.data(), psf_fourier_transform_d.data(),
-                                    /*inf->ext_*/width, /*inf->ext_*/height, /*inf->ext_*/depth);
+            //Convolve, multiply in Fourier space
+            step35::Kernels<Mdouble> kernel;
+            kernel.element_norm_product(fm1.data(), psf_fourier_transform_d.data(),
+                                        /*inf->ext_*/width, /*inf->ext_*/height, /*inf->ext_*/depth);
 
-        //Transform back
-        // FIXME: replace by SciPAL's FFT wrappers
+            //Transform back
+            // FIXME: replace by SciPAL's FFT wrappers
 #ifdef DOUBLE_PRECISION
-        cufftExecZ2D(*iplan_fft, fm1.data(), out);
+            cufftExecZ2D(*iplan_fft, fm1.data(), out);
 #else
-        cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
+            cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
 #endif
-        checkCudaErrors(cudaDeviceSynchronize());
-        getLastCudaError("cufft error!\n");
+            checkCudaErrors(cudaDeviceSynchronize());
+            getLastCudaError("cufft error!\n");
 #else
 
             dealii::Vector<Mdouble> tmp_dst(src.size()), tmp_src(dst.size());
@@ -281,14 +345,14 @@ public:
                 for (int i=0; i< width; i++)
                     for (int j=0; j< height; j++)
                     {
-                         int xyz_pos = dof_handler.global_index(i, j, k);
+                        int xyz_pos = dof_handler.global_index(i, j, k);
 
-                         tmp_src(xyz_pos) = 0.;
+                        tmp_src(xyz_pos) = 0.;
 
-                         for (int p = -N; p <= N; p++)
+                        for (int p = -N; p <= N; p++)
                         {
-                             if (j+p< 0 || j+p>=height)
-                                 continue;
+                            if (j+p< 0 || j+p>=height)
+                                continue;
                             int xyz_pos_p = dof_handler.global_index(i, j+p, k);
                             tmp_src(xyz_pos) += psf_1d[p+N]*tmp_dst(xyz_pos_p);
                         }
@@ -300,12 +364,12 @@ public:
                 for (int i=N; i< width-N; i++)
                     for (int j=N; j< height-N; j++)
                     {
-                         int xyz_pos = dof_handler.global_index(i, j, k);
-                         tmp_dst(xyz_pos) = 0.;
-                         for (int p = -N; p <= N; p++)
+                        int xyz_pos = dof_handler.global_index(i, j, k);
+                        tmp_dst(xyz_pos) = 0.;
+                        for (int p = -N; p <= N; p++)
                         {
-                             if (i+p< 0 || i+p>=width)
-                                 continue;
+                            if (i+p< 0 || i+p>=width)
+                                continue;
 
                             int xyz_pos_p = dof_handler.global_index(i+p, j, k);
                             tmp_dst(xyz_pos) += psf_1d[p+N]*tmp_src(xyz_pos_p);
@@ -316,12 +380,75 @@ public:
 #endif
         }
 
-    protected:
-        int cframesize;
-        SciPAL::Vector<complex, cublas> fm1;
+        void vmult_FFT(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        {
+            // Assert that dst is large enough.
+            // We assume that the image space has
+            // the same dimension as the range space.
+            if (dst.size() == 0)
+                dst.reinit(src.size());
 
-        //Point spread function on device
-        SciPAL::Vector<complex, cublas> psf_fourier_transform_d;
+//            cufftShift_2D_impl(src.data(), width, height);
+#ifdef DOUBLE_PRECISION
+            cufftExecD2Z(*plan_fft, in, fm1.data());
+#else
+            cufftExecR2C(*plan_fft, src.data(), fm1.data());
+#endif
+            checkCudaErrors(cudaDeviceSynchronize());
+
+            fm1 = fm1 && psf_fourier_transform_d;
+
+            //Transform back
+            // FIXME: replace by SciPAL's FFT wrappers
+#ifdef DOUBLE_PRECISION
+            cufftExecZ2Z(*iplan_fft, fm1.data(), fm1.data(), CUFFT_INVERSE);
+#else
+            cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
+#endif
+            checkCudaErrors(cudaDeviceSynchronize());
+            getLastCudaError("cufft error!\n");
+
+           dst *= 1./dst.size();
+           //ugly...
+           kernelConf* conf = (kernelConf*) malloc(sizeof(kernelConf));
+           int threadsPerBlock_X = 16;
+           int threadsPerBlock_Y = 16;
+           conf->block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
+           conf->grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
+           cufftShift_2D_config_impl(dst.data(), width, height, conf);
+
+           //            dst = SciPAL::abs(fm1);
+
+        }
+
+        //@sect5{Function: _psf}
+        //@brief Returns a 2D gaussian convolution kernel in direct space
+        Mdouble _psf(Mdouble x,Mdouble y,Mdouble z, Mdouble fwhm) {
+
+            double sigma = std::max(1e-12, fwhm/2.3548);
+
+            //Fixme
+            //            if ( params.dim == 2 )
+            //            {
+            if ( z < 0.5 )//float conditional to distinguish z=0 vs. z=1
+            {
+                Mdouble tmp = exp(-(boost::math::pow<2>(x - width/2.) + boost::math::pow<2>(y - height/2.))/
+                                  (2.0*boost::math::pow<2>(sigma/2.0)));
+//                if (tmp > 0.01)
+//                    std::cout<<"psf "<<tmp<<std::endl;
+
+                return tmp;
+            }
+            else
+                return 0;
+            //            }
+            //            else
+            {
+
+                //                    return exp(-(boost::math::pow<2>(x - sigma) + boost::math::pow<2>(y - sigma) +
+                //                                 boost::math::pow<2>(z - sigma))/(TWO*boost::math::pow<2>(HALF*sigma)));
+            }
+        }
 
     };
 
@@ -396,7 +523,7 @@ public:
           x_d(dofs.n_dofs()),
           z_d(dofs.n_dofs()),
           __im_d(dofs.n_dofs()),
-        //
+          //
           dof_handler(dofs),
           tmp_d(dofs.n_dofs()),
           tmp2_d(  dofs.n_dofs()),
@@ -454,8 +581,8 @@ public:
 
         if (this->dim == 2) {
             //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
-           for (int so=0; so< 1 // 5
-                ; so++)
+            for (int so=0; so< 1 // 5
+                 ; so++)
             {
                 for (int z=0; z< dof_handler.pdepth(); z++) {
                     kernels.dyadic_dykstra(this->writeable_e_d().data(),
@@ -464,7 +591,7 @@ public:
                                            dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
                                            n_max_dykstra_steps, dykstra_Tol);
                 }
-              //  if (so == 1) AssertThrow(false, dealii::ExcInternalError());
+                //  if (so == 1) AssertThrow(false, dealii::ExcInternalError());
             }
         }
         else { //TODO 3d
@@ -572,56 +699,56 @@ public:
                       const SciPAL::Vector<Mdouble, cublas> & lag_1,
                       ADMMParams& params)
     {
-            const Mdouble rho1 = params.rho1;
+        const Mdouble rho1 = params.rho1;
 
-            const Mdouble reg_strength = params.reg_strength;
+        const Mdouble reg_strength = params.reg_strength;
 
 
-            // the residual
-            // $\text{tmp}_d=I-e-A*x$
-            this->residual(this->tmp2_d, this->im_d(), this->e_d(), x_old);
+        // the residual
+        // $\text{tmp}_d=I-e-A*x$
+        this->residual(this->tmp2_d, this->im_d(), this->e_d(), x_old);
 
-            // $\text{tmp}_d=A*\left(\left(I-e-A*x\right) \rho_1+\Upsilon_1\right)$
+        // $\text{tmp}_d=A*\left(\left(I-e-A*x\right) \rho_1+\Upsilon_1\right)$
 #ifndef nFMM_VERSION
-            dst = rho1 * this->tmp2_d + lag_1;
+        dst = rho1 * this->tmp2_d + lag_1;
 #else
-            dst =  Mdouble(1./params.inv_gamma) * lag_1 + this->tmp2_d;
-            dst /= 0.99;
+        dst =  Mdouble(1./params.inv_gamma) * lag_1 + this->tmp2_d;
+        dst /= 0.99;
 #endif
-            convolution.vmult(dst, dst);
+        convolution.vmult(dst, dst);
 
-            // Add regularization
-            step35::Kernels<Mdouble> kernel;
-            kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
-                                 this->im_d().data(),
+        // Add regularization
+        step35::Kernels<Mdouble> kernel;
+        kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
+                             this->im_d().data(),
                      #ifndef nFMM_VERSION
-                                 reg_strength
+                             reg_strength
                      #else
-                                 reg_strength / 0.99
+                             reg_strength / 0.99
                      #endif
-                                 ,
-                                 dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
+                             ,
+                             dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
 
-            #ifndef nFMM_VERSION
-                        this->tmp2_d *= params.rho2;
+#ifndef nFMM_VERSION
+        this->tmp2_d *= params.rho2;
 #else
-              this->tmp2_d *= Mdouble((1./params.inv_gamma) / 0.99);
+        this->tmp2_d *= Mdouble((1./params.inv_gamma) / 0.99);
 #endif
-            dst -= this->tmp2_d;
+        dst -= this->tmp2_d;
 
-            // For LJs's version:
-            // 2nd constraint
-            //            {
-            //                  tmp2_d = this->z_d - this->x_old;
-            //                  tmp2_d *= Mdouble(params.rho2);
-            //                  tmp2_d += tmp_d;
-            //                  tmp_d  = tmp2_d - lag2;
-            //            }
+        // For LJs's version:
+        // 2nd constraint
+        //            {
+        //                  tmp2_d = this->z_d - this->x_old;
+        //                  tmp2_d *= Mdouble(params.rho2);
+        //                  tmp2_d += tmp_d;
+        //                  tmp_d  = tmp2_d - lag2;
+        //            }
 
-            // test, whether sign reversal stems from here:
+        // test, whether sign reversal stems from here:
 #ifdef nFMM_VERSION
-            // It seems that we have to reverse the sign of the rhs for the FMM version to get convergence.
-            dst *= -1;
+        // It seems that we have to reverse the sign of the rhs for the FMM version to get convergence.
+        dst *= -1;
 #endif
     }
 
@@ -676,7 +803,7 @@ public:
                 //return;
 
 
-                  // Evaluate rhs of Euler-Lagrange
+                // Evaluate rhs of Euler-Lagrange
                 argmin_x_rhs(k_2, x_tmp, this->lag1, params);
 
                 // The difference of the two solutions is given by the differnce of the derivatives
@@ -943,7 +1070,7 @@ public:
         h[0] = this->e_d();
 
         for (int j = min_scale + 1; j <= n_scales; j++)
-             Q[j-1] = 0;
+            Q[j-1] = 0;
 
         int iter = 0;
         bool iterate = true;
@@ -952,31 +1079,31 @@ public:
 
             for (int j = 1; j <= n_scales; j++)         // loop over subsets
             {
-                 h[j-1] -= Q[j-1];
+                h[j-1] -= Q[j-1];
 
-                 // ------
-//                 sum_of_squares_on_2D_subsets(j-1, ps_sum);
+                // ------
+                //                 sum_of_squares_on_2D_subsets(j-1, ps_sum);
 
-//                 T weight =  // 0.25*
-//                         ICD_weights[j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+                //                 T weight =  // 0.25*
+                //                         ICD_weights[j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
 
-//                 int s_x = n_scales - j;
-//                 int s_y = s_x;
+                //                 int s_x = n_scales - j;
+                //                 int s_y = s_x;
 
-//                 h[j]   = project(s_x, //j-1 /* s_x*/,
-//                                  s_y, // j-1 /* s_y */,
-//                                  ps_sum, h[j-1], m_data, g_noise, weight);
-                 // ------
-                  Q[j-1] = h[j] - h[j-1];
+                //                 h[j]   = project(s_x, //j-1 /* s_x*/,
+                //                                  s_y, // j-1 /* s_y */,
+                //                                  ps_sum, h[j-1], m_data, g_noise, weight);
+                // ------
+                Q[j-1] = h[j] - h[j-1];
             }
 
 
-//            tmp_d = h[n_scales] - h[0];
-//            Mdouble norm = L2_norm(tmp_d);
+            //            tmp_d = h[n_scales] - h[0];
+            //            Mdouble norm = L2_norm(tmp_d);
 
-//            iterate = ( norm > Tol &&
-//                       iter < n_max_steps);
-//            iterate ?  h[0] = h[n_scales] : *m_px = h[n_scales];
+            //            iterate = ( norm > Tol &&
+            //                       iter < n_max_steps);
+            //            iterate ?  h[0] = h[n_scales] : *m_px = h[n_scales];
             iter++;
         }
     }
@@ -1005,10 +1132,10 @@ public:
             for (int i=0; i< nx2; i++) {
                 if ( i <  dof_handler.pheight()) {
                     checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.data()[i* ny2]), &(this->x_d.data()[i* dof_handler.pheight()]),
-                                                     dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
+                            dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
 
                     checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.data()[i* ny2]), &(lag2.data()[i* dof_handler.pheight()]),
-                                                     dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
+                            dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
                 }
             }
             checkCudaErrors(cudaDeviceSynchronize());
@@ -1024,7 +1151,7 @@ public:
             for (int i=0; i< nx2; i++) {
                 if ( i <  dof_handler.pwidth() )
                     checkCudaErrors(cudaMemcpyAsync(&(this->z_d.data()[i* dof_handler.pheight()]), &(tmp_haar.data()[i* ny2]),
-                                                     dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
+                            dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
             }
             checkCudaErrors(cudaDeviceSynchronize());
         }

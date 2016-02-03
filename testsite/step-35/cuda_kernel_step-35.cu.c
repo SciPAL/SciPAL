@@ -429,7 +429,8 @@ __forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
 
 
 template<typename T>
-__forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x, T data, T g_noise, T weight)
+__forceinline__ __device__ T
+project(int s_x, int s_y, T * ps_sum, T x, T data, T g_noise, T weight)
 {
     int row = threadIdx.y;
     int col = threadIdx.x;
@@ -754,7 +755,7 @@ __incomplete_dykstra_2D(T *residual,
     int col = threadIdx.x;
     int idx = row*blockDim.x + col; // This is for QTCreator's insufficient Intellisense.
 
-    int min_scale = 1;
+    int min_scale = 0;
 
 
     volatile T * m_ps = ps_sum + idx;
@@ -809,17 +810,16 @@ __incomplete_dykstra_2D(T *residual,
 
             sum_of_squares_on_2D_subsets(s_x/*j-1*/, ps_sum);
 
-            T weight =  // 0.25*
-                    ICD_weights[ //
-                    n_scales-j]; //   j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+            T weight = ICD_weights[n_scales-j];
 
 
 
             h[j]   = project(s_x, //j-1 /* s_x*/,
                              s_y, // j-1 /* s_y */,
                              ps_sum, h[j-1], m_data, g_noise, weight);
-
             __syncthreads();
+            if ((threadIdx.x == 1) && blockIdx.x == 1)
+               printf("n_scales= %i, j= %i, weight= %f\n", n_scales, j, weight);
 
             Q[j-1] = h[j] - h[j-1];
         }

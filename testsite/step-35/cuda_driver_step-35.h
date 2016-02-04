@@ -1080,7 +1080,9 @@ public:
         h_init = this->e_d();
         h_old = h_init;
 
-        Mdouble cs_weight = 1e-5; // FIXME: this is a educated guess. Lookup exact value
+        Mdouble cs_weight =  //9.46624e-07; // 1024x1024, 0.9, c_S
+                9.51511e-07; // 1024x1024, 0.9, c_Ss
+                //9.53509e-07; // 1024x1024, 0.1, c_Ss
 
         int iter = 0;
         bool iterate = true;
@@ -1107,10 +1109,10 @@ public:
             // initialize : d.h_init with global h_init
 
              // loop over subsets
-            kernel.dyadic_dykstra_fine_scale_part(h_iter.array().val(), h_old.array().val(),
-                                     Q_full.array().val(),
-                                                  this->writeable_e_d().array().val(),
-                                                                                         //    this->im_d().array().val(),
+            kernel.dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
+                                     Q_full.data(),
+                                                  this->writeable_e_d().data(),
+                                                                                         //    this->im_d().data(),
                                                                                              this->sigma_noise,
                                                                                              dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
                                                                                              n_max_dykstra_steps, dykstra_Tol

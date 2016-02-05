@@ -118,8 +118,10 @@ INCLUDEPATH += /usr/local/dealii/include
 INCLUDEPATH += /usr/include/x86_64-linux-gnu
 
 
-LIBS += /usr/lib/x86_64-linux-gnu/libtiff.so
-LIBS += /usr/lib/x86_64-linux-gnu/libtiffxx.so
+LIBS += /usr/lib/x86_64-linux-gnu/libtiff.so \
+        /usr/lib/x86_64-linux-gnu/libtiffxx.so \
+        -lfftw3f
+    #        /usr/local/lib/libfftw3f_omp.a
 }
 
 #include(qtlibs)

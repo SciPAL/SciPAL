@@ -63,10 +63,10 @@ Copyright  Lutz Künneke, Jan Lebert, Stephan Kramer, Johannes Hagemann 2014-201
 #include "cuda_helper.h"
 #include "preprocessor_directives.h"
 #include "ADMMParams.h"
-
+#include <fftw3.h>
 #include <smre_problem.hh>
 
-#include <csignal>
+//#include <csignal>
 
 namespace step35 {
 // We encapsulate each project into a dedicated namespace
@@ -95,7 +95,9 @@ public:
     //    typedef typename PrecisionTraits<Mdouble, c>::ComplexType complex;
     typedef CudaComplex<Mdouble> complex;
 
-    typedef  SciPAL::Vector<Mdouble,cublas> Vector;
+    typedef blas BW;
+
+    typedef  SciPAL::Vector<Mdouble, BW> Vector;
 
 
 private:
@@ -108,18 +110,18 @@ public:
     dealii::Vector<Mdouble> x_h, e_h, z_h, im_h, generated_noise;
 
     // Access to noise contribution.
-    const SciPAL::Vector<Mdouble,cublas> & e_d() const { return __e_d; }
+    const SciPAL::Vector<Mdouble,BW> & e_d() const { return __e_d; }
 
-    SciPAL::Vector<Mdouble,cublas> & writeable_e_d() { return __e_d; }
+    SciPAL::Vector<Mdouble,BW> & writeable_e_d() { return __e_d; }
 
     // The input image should not be touched anywhere in the program. Therefore we only grant read access.
-    const SciPAL::Vector<Mdouble,cublas> & im_d() const { return __im_d; }
+    const SciPAL::Vector<Mdouble,BW> & im_d() const { return __im_d; }
 
     // FIXME: remove:
-    SciPAL::Vector<Mdouble,cublas> & writeable_im_d() { return __im_d; }
+    SciPAL::Vector<Mdouble,BW> & writeable_im_d() { return __im_d; }
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, cublas> tmp_d, tmp2_d, lag1, lag2, tmp_haar2, tmp_lagr, tmp_haar, tmp_lag1, tmp_lag2;
+    SciPAL::Vector<Mdouble, BW> tmp_d, tmp2_d, lag1, lag2, tmp_haar2, tmp_lagr, tmp_haar, tmp_lag1, tmp_lag2;
 
 
 
@@ -128,12 +130,17 @@ public:
 
         int depth, width, height;
         int cframesize; // image size for r2c images
+        bool init; // for fftw
 
         cufftHandle *plan_fft,*iplan_fft;
+        //        CUDAFFT<T, dim, cufft_type, gpu_cuda> FFT; //FIXME use that
 
-        SciPAL::Vector<complex, cublas> fm1;
+        fftwf_plan plan_cpu_d_forward;
+        fftwf_plan plan_cpu_d_backward;
+
+        SciPAL::Vector<complex, BW> fm1;
         //Point spread function on device
-        SciPAL::Vector<complex, cublas> psf_fourier_transform_d;
+        SciPAL::Vector<complex, BW> psf_fourier_transform_d;
 
         dealii::Vector<Mdouble> psf_h;
 
@@ -143,19 +150,21 @@ public:
 
 
         ~Convolution() {
-            //#ifdef USE_FFT_CONV
+#ifdef USE_FFT_CONV
             cufftDestroy(*plan_fft);
             cufftDestroy(*iplan_fft);
             delete plan_fft;
             delete iplan_fft;
-            //#endif
+            fftwf_destroy_plan(this->plan_cpu_f_forward);
+            fftwf_destroy_plan(this->plan_cpu_f_backward);
+#endif
         }
 
         Convolution(int d, int w, int h, double fwhm)
             :
               depth(d), width(w), height(h),
               cframesize(/*ext_*/depth*/*ext_*/width*(/*ext_*/height/2+1)/**sizeof(Mcomplex)*/),
-              fm1(cframesize),
+              fm1(cframesize), init(false),
               psf_fourier_transform_d(fm1.size()),
               psf_h(width*height),
               is_delta_peak(false),
@@ -163,10 +172,10 @@ public:
               dof_handler(dealii::Point<3>(width, height, depth))
     #endif
         {
-            {
+          {
                 // TO DO: compute psf_h here
 
-                SciPAL::Vector<Mdouble,cublas> fpsf_tmp_d(psf_h.size());
+                SciPAL::Vector<Mdouble,BW> fpsf_tmp_d(psf_h.size());
 
                 Mdouble psf_norm=0;
 
@@ -181,13 +190,14 @@ public:
 
                 //norm
                 psf_h *= 1. / psf_norm;
-//                                psf_h *= 65535;
+                //                                psf_h *= 65535;
                 fpsf_tmp_d = psf_h;
-//                cufftShift_2D_impl(fpsf_tmp_d.data(), width, height);
+                //                cufftShift_2D_impl(fpsf_tmp_d.data(), width, height);
                 //Cufft setup
                 //Create cufft plans
                 plan_fft=new cufftHandle();
                 iplan_fft=new cufftHandle();
+
 #ifdef DOUBLE_PRECISION
                 cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
                 cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
@@ -197,26 +207,11 @@ public:
 #endif
 
 
-
-                //Fourier transformation of psf using cuFFT
-                cufftHandle plan;
-#ifdef DOUBLE_PRECISION
-                cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
-                cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
-#else
-                cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
-                cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
-#endif
-                //Cleanup
-                cufftDestroy(plan);
-                getLastCudaError("cufft error!\n");
-
-
             }
 
 #ifdef USE_FFT_CONV
             // TO DO: compute psf_h here
-            SciPAL::Vector<Mdouble,cublas> fpsf_tmp_d;
+            SciPAL::Vector<Mdouble,BW> fpsf_tmp_d;
             fpsf_tmp_d = (psf_h);
 
 
@@ -234,21 +229,32 @@ public:
 #endif
 
 
-
-            //Fourier transformation of psf using cuFFT
-            cufftHandle plan;
+            if(typeid(BW) = typeid(cublas))
+            {
+                //Fourier transformation of psf using cuFFT
+                cufftHandle plan;
 #ifdef DOUBLE_PRECISION
-            cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
-            cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
+                cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
+                cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
 #else
-            cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
-            cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
+                cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
+                cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
 #endif
-            //Cleanup
-            cufftDestroy(plan);
-            getLastCudaError("cufft error!\n");
-
+                //Cleanup
+                cufftDestroy(plan);
+                getLastCudaError("cufft error!\n");
+            } else
+            {
+                fftwf_plan plan =
+                        fftwf_plan_dft_r2c_2d(width, height,
+                                              fpsf_tmp_d.data(),
+                                              reinterpret_cast<fftwf_complex*>(psf_fourier_transform_d.data()),
+                                              FFTW_PATIENT);
+                fftwf_execute(plan);
+                fftwf_destroy_plan(plan);
+            }
 #else
+
             // Compute 1D PSF
             if (fwhm >0)
             {
@@ -287,7 +293,7 @@ public:
         ImageDoFHandler dof_handler;
 #endif
 
-        void vmult(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        void vmult(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
         {
             if (is_delta_peak)
                 this->vmult_id(dst, src);
@@ -296,13 +302,13 @@ public:
         }
 
         //    private:
-        void vmult_id(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        void vmult_id(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
         {
             dst = src;
             return;
         }
 
-        void vmult_conv(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        void vmult_conv(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
         {
             // Assert that dst is large enough.
             // We assume that the image space has
@@ -380,44 +386,76 @@ public:
 #endif
         }
 
-        void vmult_FFT(SciPAL::Vector<Mdouble, cublas> &dst, const SciPAL::Vector<Mdouble, cublas>& src)
+        void vmult_FFT(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
         {
             // Assert that dst is large enough.
             // We assume that the image space has
             // the same dimension as the range space.
+
+            // setup fftw on first run
+            //fftw plans
+            if(init == false)
+            {
+                init = true;
+//                fftwf_plan_with_nthreads();
+                this->plan_cpu_d_forward
+                        = fftwf_plan_dft_r2c_2d(width, height,
+                                                (src.data()),
+                                                reinterpret_cast<fftwf_complex*>(fm1.data()),
+                                                FFTW_PATIENT);
+
+                this->plan_cpu_d_backward
+                        = fftwf_plan_dft_c2r_2d(width, height,
+                                                reinterpret_cast<fftwf_complex*>(fm1.data()),
+                                                (dst.data()),
+                                                FFTW_PATIENT);
+            }
             if (dst.size() == 0)
                 dst.reinit(src.size());
 
-//            cufftShift_2D_impl(src.data(), width, height);
+            //            cufftShift_2D_impl(src.data(), width, height);
+            if(typeid(BW) == typeid(cublas)) {
 #ifdef DOUBLE_PRECISION
-            cufftExecD2Z(*plan_fft, in, fm1.data());
+                cufftExecD2Z(*plan_fft, src.data(), fm1.data());
 #else
-            cufftExecR2C(*plan_fft, src.data(), fm1.data());
+                cufftExecR2C(*plan_fft, src.data(), fm1.data());
 #endif
-            checkCudaErrors(cudaDeviceSynchronize());
+                checkCudaErrors(cudaDeviceSynchronize());
+            } // cublas case
+            else
+            {
+                fftwf_execute(plan_cpu_d_forward);
+            }
 
+            // multiplication in fourier space
             fm1 = fm1 && psf_fourier_transform_d;
 
             //Transform back
             // FIXME: replace by SciPAL's FFT wrappers
+            if(typeid(BW) == typeid(cublas)) {
 #ifdef DOUBLE_PRECISION
-            cufftExecZ2Z(*iplan_fft, fm1.data(), fm1.data(), CUFFT_INVERSE);
+                cufftExecZ2D(*iplan_fft, fm1.data(), fm1.data(), CUFFT_INVERSE);
 #else
-            cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
+                cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
 #endif
-            checkCudaErrors(cudaDeviceSynchronize());
-            getLastCudaError("cufft error!\n");
+                checkCudaErrors(cudaDeviceSynchronize());
+                getLastCudaError("cufft error!\n");
+            }
+            else
+            {
+                fftwf_execute(plan_cpu_d_backward);
+            }
 
-           dst *= 1./dst.size();
-           //ugly...
-           kernelConf* conf = (kernelConf*) malloc(sizeof(kernelConf));
-           int threadsPerBlock_X = 16;
-           int threadsPerBlock_Y = 16;
-           conf->block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
-           conf->grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
-           cufftShift_2D_config_impl(dst.data(), width, height, conf);
+            dst *= 1./dst.size();
+            //ugly...
+            kernelConf* conf = (kernelConf*) malloc(sizeof(kernelConf));
+            int threadsPerBlock_X = 16;
+            int threadsPerBlock_Y = 16;
+            conf->block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
+            conf->grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
+            cufftShift_2D_config_impl(dst.data(), width, height, conf);
 
-           //            dst = SciPAL::abs(fm1);
+            //            dst = SciPAL::abs(fm1);
 
         }
 
@@ -434,8 +472,8 @@ public:
             {
                 Mdouble tmp = exp(-(boost::math::pow<2>(x - width/2.) + boost::math::pow<2>(y - height/2.))/
                                   (2.0*boost::math::pow<2>(sigma/2.0)));
-//                if (tmp > 0.01)
-//                    std::cout<<"psf "<<tmp<<std::endl;
+                //                if (tmp > 0.01)
+                //                    std::cout<<"psf "<<tmp<<std::endl;
 
                 return tmp;
             }
@@ -450,16 +488,16 @@ public:
             }
         }
 
-    };
+    }; // end of class definition of convolution
 
 
     Convolution convolution;
 
     // Compute the residual $I - \epsilon - A * x$. To be put into an expression.
-    void residual(SciPAL::Vector<Mdouble, cublas> & res,
-                  const SciPAL::Vector<Mdouble, cublas> & im,
-                  const SciPAL::Vector<Mdouble, cublas> & noise,
-                  const SciPAL::Vector<Mdouble, cublas> & est_im)
+    void residual(SciPAL::Vector<Mdouble, BW> & res,
+                  const SciPAL::Vector<Mdouble, BW> & im,
+                  const SciPAL::Vector<Mdouble, BW> & noise,
+                  const SciPAL::Vector<Mdouble, BW> & est_im)
     {
 
         // A * x
@@ -694,9 +732,9 @@ public:
     //                        -
     //                        \rho_2 \frac{\delta J}{\delta x}(x_{old}) \,.
     //             \f}
-    void argmin_x_rhs(SciPAL::Vector<Mdouble, cublas> & dst,
-                      const SciPAL::Vector<Mdouble, cublas> & x_old,
-                      const SciPAL::Vector<Mdouble, cublas> & lag_1,
+    void argmin_x_rhs(SciPAL::Vector<Mdouble, BW> & dst,
+                      const SciPAL::Vector<Mdouble, BW> & x_old,
+                      const SciPAL::Vector<Mdouble, BW> & lag_1,
                       ADMMParams& params)
     {
         const Mdouble rho1 = params.rho1;
@@ -763,12 +801,12 @@ public:
         const Mdouble Tol = 1e-2;
         const int max_dt_iter = 10;
 
-        SciPAL::Vector<Mdouble, cublas> & x_tmp = this->tmp_lag2;
+        SciPAL::Vector<Mdouble, BW> & x_tmp = this->tmp_lag2;
 
-        SciPAL::Vector<Mdouble, cublas> & k_1 = this->tmp_haar;
-        SciPAL::Vector<Mdouble, cublas> & k_2 = this->tmp_haar2;
+        SciPAL::Vector<Mdouble, BW> & k_1 = this->tmp_haar;
+        SciPAL::Vector<Mdouble, BW> & k_2 = this->tmp_haar2;
 
-        SciPAL::Vector<Mdouble, cublas> & sol_diff = this->tmp_lagr;
+        SciPAL::Vector<Mdouble, BW> & sol_diff = this->tmp_lagr;
 
         Mdouble err = 2*Tol;
         int n_max_admm_iter = 1000;
@@ -1001,7 +1039,7 @@ public:
 #else
 
 #ifndef nFMM_VERSION
-       dykstra_gauss_global_mem(rho); // dykstra_gauss_LNCS(rho);
+        dykstra_gauss_global_mem(rho); // dykstra_gauss_LNCS(rho);
 #else
         dykstra_gauss_FMM(rho);
 #endif
@@ -1063,7 +1101,7 @@ public:
         static const int n_scales = 10;
         static const int min_scale = 0;
 
-        typedef SciPAL::Vector<Mdouble, cublas> Vc;
+        typedef SciPAL::Vector<Mdouble, BW> Vc;
 
         std::vector<Mdouble> zero_init(this->e_d().size());
 
@@ -1082,12 +1120,12 @@ public:
 
         Mdouble cs_weight =  //9.46624e-07; // 1024x1024, 0.9, c_S
                 9.51511e-07; // 1024x1024, 0.9, c_Ss
-                //9.53509e-07; // 1024x1024, 0.1, c_Ss
+        //9.53509e-07; // 1024x1024, 0.1, c_Ss
 
         int iter = 0;
         bool iterate = true;
 
-         step35::Kernels<Mdouble> kernel;
+        step35::Kernels<Mdouble> kernel;
 
         while (iterate)
         {
@@ -1108,29 +1146,42 @@ public:
             // Q_0 <- Q_full
             // initialize : d.h_init with global h_init
 
-             // loop over subsets
-            kernel.dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
-                                     Q_full.data(),
-                                                  this->writeable_e_d().data(),
-                                                                                         //    this->im_d().data(),
-                                                                                             this->sigma_noise,
-                                                                                             dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
-                                                                                             n_max_dykstra_steps, dykstra_Tol
-                                     );
-
+            // loop over subsets
+            if(typeid(BW) == typeid(cublas))
+            {
+                kernel.dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
+                                                      Q_full.data(),
+                                                      this->writeable_e_d().data(),
+                                                      //    this->im_d().data(),
+                                                      this->sigma_noise,
+                                                      dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
+                                                      n_max_dykstra_steps, dykstra_Tol
+                                                      );
+            }
+            else
+            {
+                kernel.dyadic_dykstra_fine_scale_part_cpu(h_iter.data(), h_old.data(),
+                                                          Q_full.data(),
+                                                          this->writeable_e_d().data(),
+                                                          //    this->im_d().data(),
+                                                          this->sigma_noise,
+                                                          dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
+                                                          n_max_dykstra_steps, dykstra_Tol
+                                                          );
+            }
 
             // Convergence control.
             {
                 h_init -= h_iter;
-               Mdouble norm = h_init.l2_norm();
+                Mdouble norm = h_init.l2_norm();
 
                 iterate = ( norm > dykstra_Tol &&
                             iter < n_max_dykstra_steps);
 
                 iterate ? h_init = h_iter : this->writeable_e_d() = h_iter;
-            iter++;
+                iter++;
+            }
         }
-    }
     }
 
 
@@ -1150,8 +1201,8 @@ public:
             int nx2 = dof_handler.n_dofs_x_padded();
             int ny2 = dof_handler.n_dofs_y_padded();
             //kernel.reset(tmp_haar,inf->nx2*inf->ny2);
-            tmp_haar = SciPAL::Vector<Mdouble,cublas>( nx2 * ny2);
-            tmp_lagr = SciPAL::Vector<Mdouble,cublas>( tmp_haar.size());
+            tmp_haar = SciPAL::Vector<Mdouble,BW>( nx2 * ny2);
+            tmp_lagr = SciPAL::Vector<Mdouble,BW>( tmp_haar.size());
 
             //Copy $x$ into the bigger temp variable while conserving its shape
             for (int i=0; i< nx2; i++) {

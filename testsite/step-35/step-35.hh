@@ -340,7 +340,7 @@ void step35::ImageIO::write_image(std::string path, dealii::Vector<PixelDataType
 // - preprocessing and output of results
 template<typename T>
 class ADMM {
-
+    typedef blas BW;
 public:
 
     ADMM(int argc, char *argv[], SciPAL::GPUInfo &g);
@@ -355,9 +355,9 @@ public:
     // The ADMM algoritmh is put into a separate class which inherits from deal.II's base class
     // for iterative solvers. The advantage of this is, that we do not have to explain the design in detail
     // as this is already done in the deal.II doc.
-    class ADMMSolver : public dealii::Solver<SciPAL::Vector<T, cublas> > {
+    class ADMMSolver : public dealii::Solver<SciPAL::Vector<T, BW> > {
 
-        typedef SciPAL::Vector<T, cublas> VECTOR;
+        typedef SciPAL::Vector<T, BW> VECTOR;
 
         typedef dealii::Solver< > Base;
 
@@ -655,7 +655,7 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<Mpatch, T,
                          dof_handler,
                          params.gnoise, params.anscombe);
 
-    SciPAL::Vector<float, cublas> tmp(driver.im_h.size());
+    SciPAL::Vector<float, BW> tmp(driver.im_h.size());
     tmp = SciPAL::abs(driver.convolution.psf_fourier_transform_d);
     dealii::Vector<float> tmp2;
     tmp.push_to(tmp2);
@@ -796,7 +796,7 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
     dealii::Vector<T> prev_image(input_image.size());
     prev_image = 0;
 
-    SciPAL::Vector<T, cublas> res_tmp1, res_tmp2;
+    SciPAL::Vector<T, BW> res_tmp1, res_tmp2;
 
     //Residual of the current step, initialize as residual>tolerance
     T res=TWO*params.solver_control.tolerance();

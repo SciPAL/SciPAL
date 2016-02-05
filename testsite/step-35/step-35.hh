@@ -42,7 +42,6 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 #include<tiffio.h>
 
 //Our stuff
-#include <extremeValueStatisticsGenerator.h>
 #include <ADMMParams.h>
 #include <cuda_driver_step-35.h>
 #include <cuda_driver_step-35.hh>
@@ -349,8 +348,8 @@ public:
     T _psf(T x, T y, T z, T sigma);
     void create_psf();
 
-    template<typename Mpatch>
-    void add_blur_and_gaussian_noise(step35::CUDADriver<Mpatch, T, gpu_cuda> &driver);
+
+    void add_blur_and_gaussian_noise(step35::CUDADriver<T, gpu_cuda> &driver);
 
     // The ADMM algoritmh is put into a separate class which inherits from deal.II's base class
     // for iterative solvers. The advantage of this is, that we do not have to explain the design in detail
@@ -393,8 +392,7 @@ private:
     std::chrono::high_resolution_clock::time_point clock1;
     std::chrono::high_resolution_clock::time_point clock2;
 
-    template<typename field_patch, typename driver_patch>
-    void __run(extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> &field, step35::CUDADriver<driver_patch, T, gpu_cuda> &driver);
+    void __run(step35::CUDADriver<T, gpu_cuda> &driver);
 
     ImageIO image_io;
 protected:
@@ -587,8 +585,8 @@ void step35::ADMM<T>::set_initial_condition(Driver &driver, ParallelArch arch)
 }
 //@sect5{Function: add_gaussian_noise}
 //@brief Simulates dataset by adding gaussian noise, the whole driver is given to used on device convolution
-template<typename T> template<typename Mpatch>
-void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<Mpatch, T, gpu_cuda> &driver) {
+template<typename T>
+void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cuda> &driver) {
     //Constant seed to get reproducable tests
     boost::mt19937 rng;
     //Seed rng
@@ -678,11 +676,8 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<Mpatch, T,
 // Read in settings and data and perform the algorithm
 template<typename T>
 void step35::ADMM<T>::run() {
+
     std::cout << "Starting run" << std::endl;
-
-    //Quantile of the extreme value statistics in (0,1). The larger the smoother the result
-    const T alpha_quant = this->params.alpha_quantile;
-
 
     //Read in the image
     image_io.read_image(this->input_image, this->image_as_read, dof_handler, params.input_image, params.gnoise, params.anscombe);
@@ -692,9 +687,7 @@ void step35::ADMM<T>::run() {
 
 
     std::vector<T> cs;
-    T *qalpha_ret;
-    //A reusable part of the statics generation will be stored here and written to disk
-    qalpha_ret = new T[1];
+
 
     //At this point we have to decide if we do an approximated dykstra method.
     //The approximated dykstra method will be much faster, but use much less frames
@@ -705,35 +698,9 @@ void step35::ADMM<T>::run() {
 
     //Approximated algorithm
     if ( params.do_approx ) {
-        typedef cset_dyadic field_patch;
-        typedef cset_dyadic driver_patch;
-
-        //Get an instance of the extremeValueStatisticsGenerator class \n
-        //* Generates the patches and puts them in clusters if needed \n
-        //* Calculates the weights $c_s$
-        std::cout << "Creating field\n";
-        extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> field(
-            #ifdef nUSE_DOF_HANDLER
-                    image_io.pwidth, image_io.pheight, image_io.pdepth,
-            #else
-                    dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
-            #endif
-                    input_image,
-                    params.psf_fwhm,
-                    params.step, 1024);//only kept for statitics generation atm
-
-        std::cout << "Getting quantile\n";
-        field.get_quantile_gauss(cs, params.gnoise, alpha_quant, params.step,
-                         #ifdef nUSE_DOF_HANDLER
-                                 image_io.pwidth, image_io.pheight, image_io.pdepth,
-                         #else
-                                 dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
-                         #endif
-                                 qalpha_ret);
-
         //Prepare the driver
         std::cout << "Setting up driver\n";
-        step35::CUDADriver<driver_patch, T, gpu_cuda> driver(cs,
+        step35::CUDADriver<T, gpu_cuda> driver(cs,
                                                      #ifdef nUSE_DOF_HANDLER
                                                              image_io.pwidth, image_io.pheight, image_io.pdepth,
                                                      #else
@@ -741,14 +708,12 @@ void step35::ADMM<T>::run() {
                                                      #endif
                                                              params);
 
-
-
         this->set_initial_condition(driver, gpu_cuda);
 
 
         //This function templates to whatever Dykstra Flavour we have chosen
         std::cout << "Starting run\n";
-        __run<field_patch, driver_patch>(field, driver);
+        __run(driver);
     }
     //Exact algorithm
     else {
@@ -762,9 +727,9 @@ void step35::ADMM<T>::run() {
 //@brief Second part of the run function, templatized
 //this enables a unified interface of the driver for exact and approximative method
 //but one has to split the run method in two functions
-template<typename T> template<typename field_patch, typename driver_patch>
-void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu_cuda> &field,
-                             step35::CUDADriver<driver_patch, T, gpu_cuda> &driver) {
+template<typename T>
+void step35::ADMM<T>::__run (step35::CUDADriver<T, gpu_cuda> &driver)
+{
     //Used for shifted indexing
     int ti,tj,tk;
     //Used to count up to the next report iteration
@@ -836,18 +801,9 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
         // std::cout << "entering step " << iter << std::endl;
 
 
-#ifdef USE_TV_ITER
         //Argmin w.r.t. x
-     // driver.x_step_adaptive(params); //
-        driver.x_step(params.rho1, params.rho2);
-
-
-        //Argmin w.r.t. z
-       driver.m_smoothing(params.reg_strength, params.rho2);
-#else
    driver.x_step_adaptive(params);
 
-#endif
 
         //Argmin w.r.t. e, is equivalent to a projection   
         if ( params.gnoise > 0 )
@@ -855,28 +811,12 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
 
         //Update the Lagrange Multipliers
 
-#ifdef USE_TV_ITER
-        driver.update_lagrangian(alpha1
-                                 ,
-                                 params.alpha2);
-#else
-         #ifndef nFMM_VERSION
+
         driver.update_lagrangian(
                     1./
                                  params.inv_gamma
                                  ,
                                  params.alpha2);
-
-
-#else
-        // $p_k = p_{k-1} + \frac{1}{\lambda} (Ku -v_k)$
-        driver.residual(driver.tmp_lag1, driver.im_d(), driver.e_d(), driver.x_d);
-        driver.lag1 =  T(// 1./
-                         params.inv_gamma) * driver.tmp_lag1 + driver.lag1;
-#endif
-
-
-#endif
 
 
         //Report progress
@@ -891,62 +831,7 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
             driver.get_data();
             //Calculate the change w.r.t. the last reported result
             //Calculate the violation of constraints
-#ifdef USE_FFT_CONV
-            for (int i=0; i< image_io./*p*/width; i++) {
-                for (int j=0; j< image_io./*p*/height; j++) {
-                    for (int k=0; k< image_io./*p*/depth; k++) {
-                        //The image shifts by sigma during the convolution
-                        //therefore access it shifted
-                        ti = i + params.sigma;
-                        tj = j + params.sigma;
-                        tk = k + params.sigma;
-#ifdef nUSE_DOF_HANDLER
-                        while ( ti >= image_io.pwidth )
-                            ti=ti- image_io.pwidth;
 
-                        while ( tj >= image_io.pheight )
-                            tj=tj- image_io.pheight;
-
-                        while ( tk >= image_io.pdepth )
-                            tk = tk- image_io.pdepth;
-
-                        int xyz_pos = k*image_io.pwidth*image_io.pheight + i*image_io.pheight + j;
-                        // std::cout << driver.im_h[i*pheight+j] << " " << driver.e_h[i*pheight+j] << " " << driver.tmp_h[ti*pheight+tj] << " " << i << " " << j << std::endl;
-                        c1 += boost::math::pow<2>(driver.im_h[xyz_pos]  - driver.e_h[xyz_pos]
-                                                  - driver.tmp_h[tk*image_io.pwidth*image_io.pheight+ti*image_io.pheight+tj]);
-#else
-                        while ( ti >= dof_handler.pwidth() )
-                            ti=ti- dof_handler.pwidth();
-
-                        while ( tj >= dof_handler.pheight() )
-                            tj=tj- dof_handler.pheight();
-
-                        while ( tk >= dof_handler.pdepth() )
-                            tk = tk- dof_handler.pdepth();
-
-                          int xyz_pos = dof_handler.global_index(i, j, k);
-                          // std::cout << driver.im_h[i*pheight+j] << " " << driver.e_h[i*pheight+j] << " " << driver.tmp_h[ti*pheight+tj] << " " << i << " " << j << std::endl;
-                          c1 += boost::math::pow<2>(driver.im_h[xyz_pos]  - driver.e_h[xyz_pos]
-                                                    - driver.tmp_h[tk*dof_handler.pwidth()*dof_handler.pheight()+ti*dof_handler.pheight()+tj]);
-#endif
-                        // Violation of data constraint
-                        // if (i < 50)
-                          // if (j < 20)
-
-
-                        //Violation of smoothness constraint
-                        //std::cout << driver.z_h[i*pheight+j] << " " << driver.x_h[i*pheight+j] << " " << i << " " << j << endl;
-                        c2 += boost::math::pow<2>(driver.z_h[xyz_pos] - driver.x_h[xyz_pos]);
-                        //Residual with respect to last reported image
-                        res+= boost::math::pow<2>(driver.x_h[xyz_pos] - prev_image[xyz_pos]);
-                    }
-                }
-            }
-
-            c1 = c1/( (T)(driver.ext_num_pix()) );
-            c2 = c2/( (T)(driver.ext_num_pix()) );
-            res=res/( (T)(driver.ext_num_pix()) ) + c1;
-#else
  // driver.im_d - driver.e_d - driver.tmp_d
             // c1  = L2_norm (driver.im_h - driver.e_h - driver.tmp_h);
 
@@ -972,7 +857,6 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
             res_tmp1 = driver.generated_noise;
             res_tmp1 -= driver.e_d();
             T c3 = res_tmp1.l2_norm()/std::sqrt( (T)(dof_handler.n_dofs()) );
-#endif
 
             // FIXME: vectors in drif.inf
 
@@ -980,7 +864,7 @@ void step35::ADMM<T>::__run (extremeValueStatisticsGenerator<field_patch, T, gpu
             driver.x_d.push_to(prev_image);
             gain_out << iter << " " << c1 << " " << c2 << " " <<  std::endl;
             std::cout << "Iteration: " << iter << " | Constraint1 ||im - e - tmp||_2   : " << c1 << " | Constraint2 : ||x - z||_2  : "
-                      << c2 << ", L2-distance to generated noise : " << c3 << ", MR-level " << field.split << std::endl;
+                      << c2 << ", L2-distance to generated noise : " << c3 << std::endl;
 
 
             //Print the current estimate to a tiff file

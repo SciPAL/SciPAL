@@ -182,7 +182,6 @@ HEADERS += \
     cuda_helper.h \
     ADMMParams.h \
     preprocessor_directives.h \
-    extremeValueStatisticsGenerator.h \
     step-35.hh \
     smre_problem.hh \
     *.h* \

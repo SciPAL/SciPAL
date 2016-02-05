@@ -14,29 +14,12 @@
     You should have received a copy of the GNU Lesser General Public License
     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright  Lutz Künneke, Jan Lebert, Stephan Kramer, Johannes Hagemann 2014-2015
+Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hagemann 2014-2016
 */
 
 #ifndef CUDADriver_STEP_35_H
 #define CUDADriver_STEP_35_H
 
-
-
-#define USE_DEBLUR
-
-#define DISABLE_PSF
-#undef DISABLE_PSF
-
-
-#define USE_FFT_CONV
-#undef USE_FFT_CONV
-
-#ifdef USE_FFT_CONV
-#define USE_SHIFT_ARITH
-#define SHIFT_FACTOR 1
-#else
-#define SHIFT_FACTOR 0
-#endif
 
 //std
 #include<iostream>
@@ -72,24 +55,14 @@ namespace step35 {
 // We encapsulate each project into a dedicated namespace
 // in order to be able to re-use parts of a test program in others.
 
-//Forward declarations
-template<typename Mpatch,typename T,ParallelArch c> class CUDADriver;
-template<typename Mpatch,typename T,ParallelArch c> struct constructStruct;
-template<typename Mpatch,typename T,ParallelArch c> struct runStruct;
-
-//@sect4{Struct: constructStruct}
-//template specialized struct for the constructor and destructor of
-//CUDADriver class based on which Mpatch we're dealing with
-
-
 // @sect4{Class: CUDADriver}
 //
 // Main class, sets up an instance of queue and info class. A number of threads is started which
 // each handles a cuda stream and processes items obtained by the queue. The main thread adds items
 // to the queue until everything is processed.
-template<typename Mpatch,typename Mdouble, ParallelArch c>
+template<typename Mdouble, ParallelArch c>
 class CUDADriver {
-    friend  struct runStruct<Mpatch,Mdouble,c>;
+
 public:
     //complex type: double2 for double, float2 for float
     //    typedef typename PrecisionTraits<Mdouble, c>::ComplexType complex;
@@ -98,7 +71,6 @@ public:
     typedef blas BW;
 
     typedef  SciPAL::Vector<Mdouble, BW> Vector;
-
 
 private:
     // The data of the SMRE problem stored on the device.
@@ -197,7 +169,6 @@ public:
                 //Create cufft plans
                 plan_fft=new cufftHandle();
                 iplan_fft=new cufftHandle();
-
 #ifdef DOUBLE_PRECISION
                 cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
                 cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
@@ -285,13 +256,12 @@ public:
                 is_delta_peak = true;
 #endif
 
+
         }
-#ifdef USE_FFT_CONV
-#else
+
         dealii::Vector<Mdouble> psf_1d;
         int cut_off;
         ImageDoFHandler dof_handler;
-#endif
 
         void vmult(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
         {
@@ -316,30 +286,6 @@ public:
             if (dst.size() == 0)
                 dst.reinit(src.size());
 
-
-#ifdef USE_FFT_CONV
-#ifdef DOUBLE_PRECISION
-            cufftExecD2Z(*plan_fft, in, fm1.data());
-#else
-            cufftExecR2C(*plan_fft, const_cast<Mdouble*>(src.data()), fm1.data());
-#endif
-            checkCudaErrors(cudaDeviceSynchronize());
-
-            //Convolve, multiply in Fourier space
-            step35::Kernels<Mdouble> kernel;
-            kernel.element_norm_product(fm1.data(), psf_fourier_transform_d.data(),
-                                        /*inf->ext_*/width, /*inf->ext_*/height, /*inf->ext_*/depth);
-
-            //Transform back
-            // FIXME: replace by SciPAL's FFT wrappers
-#ifdef DOUBLE_PRECISION
-            cufftExecZ2D(*iplan_fft, fm1.data(), out);
-#else
-            cufftExecC2R(*iplan_fft, fm1.data(), dst.data());
-#endif
-            checkCudaErrors(cudaDeviceSynchronize());
-            getLastCudaError("cufft error!\n");
-#else
 
             dealii::Vector<Mdouble> tmp_dst(src.size()), tmp_src(dst.size());
             src.push_to(tmp_dst);
@@ -383,7 +329,7 @@ public:
                     }
 
             dst = tmp_dst;
-#endif
+
         }
 
         void vmult_FFT(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
@@ -499,11 +445,9 @@ public:
                   const SciPAL::Vector<Mdouble, BW> & noise,
                   const SciPAL::Vector<Mdouble, BW> & est_im)
     {
-
         // A * x
         convolution.vmult(res, est_im);
 
-#ifndef nFMM_VERSION
         // A * x + eps
         res += noise;
         // A * x + eps -I
@@ -511,12 +455,6 @@ public:
 
         // I - eps - A * x
         res *= -1;
-#else
-        res -= this->lag2; // noise;
-
-
-#endif
-
     }
 
 
@@ -603,106 +541,6 @@ public:
 
     }
 
-    //@sect5{Function: nostream_handler}
-    //@brief Wrapper if we use the dyadyc_dykstra Kernel.
-    void iterate() {
-#ifdef TIME_KERNELS
-        cudaEvent_t start, stop;
-        float time;
-        cudaEventCreate(&start);
-        cudaEventCreate(&stop);
-        cudaEventRecord(start, 0);
-        cudaEventSynchronize(stop);
-#endif
-
-        step35::Kernels<Mdouble> kernels;
-
-        if (this->dim == 2) {
-            //Do the approximate method shifted by 2^so. This choice of shifts enables us to omit some sets in later instances of the kernel
-            for (int so=0; so< 1 // 5
-                 ; so++)
-            {
-                for (int z=0; z< dof_handler.pdepth(); z++) {
-                    kernels.dyadic_dykstra(this->writeable_e_d().data(),
-                                           this->im_d().data(),
-                                           this->sigma_noise,
-                                           dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
-                                           n_max_dykstra_steps, dykstra_Tol);
-                }
-                //  if (so == 1) AssertThrow(false, dealii::ExcInternalError());
-            }
-        }
-        else { //TODO 3d
-            for (int so=0; so<5; so++) {
-                for (int z=0; z< dof_handler.pdepth(); z++) {
-                    kernels.dyadic_dykstra(this->writeable_e_d().data(),
-                                           this->im_d().data(),
-                                           this->sigma_noise,
-                                           dof_handler.pwidth(),  dof_handler.pheight(),  dof_handler.pdepth(), n_max_dykstra_steps, dykstra_Tol);
-                }
-            }
-        }
-
-#ifdef TIME_KERNELS
-        cudaEventRecord(stop, 0);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&time, start, stop);
-        kernel_time += time;
-#endif
-
-
-    }
-
-    //@sect5{Function: projection_gauss}
-    //@brief CPU implementation of dykstras algorithm with Gauss projection, performs projection for a single set
-    //@param d_q pointer to vector q
-    //@param im_h pointer to image
-    //@param cs_h array of weights
-    //@param width width of the image
-    //@param height height of the image
-    //@param n edge length of the set
-    //@param i0 starting row of the set
-    //@param j0 starting col of the set
-    void projection_gauss(Mdouble* d_q, Mdouble* im_h, Mdouble* cs_h, const int width, const int height,
-                          const int n, const int i0, const int j0) {
-        //Do the difference and square
-        int size=n*n;
-        std::vector<Mdouble> f(size);
-        Mdouble square_sum;
-        int is,js;
-        //Square the vector
-        for (int i=0; i<size; i++) {
-            is = i/n + i0;
-            if ( is >= width )
-                std::cout << "Error in gauss Projection, dimension too large " << std::endl;
-            js = i%n + j0;
-            f[i]=im_h[is*height+js]-d_q[i];
-            d_q[i]=-f[i];
-            square_sum=square_sum+f[i]*f[i];
-        }
-        square_sum*=cs_h[n];
-        //Check the condition
-        if ( square_sum > 1.0 ) {
-            square_sum=1.0/sqrt(square_sum);
-            for (int i=0; i<size; i++) {
-                //Do the projection
-                is = i/n + i0;
-                js = i%n + j0;
-                im_h[is*height+js]=f[i]*square_sum;
-                d_q[i]+=f[i];
-            }
-        } else {
-            for (int i=0; i<size; i++) {
-                is = i/n + i0;
-                js = i%n + j0;
-                im_h[is*height+js]=f[i];
-                d_q[i]+=f[i];
-            }
-        }
-    }
-
-
-
     //@sect5{Function: push_data}
     //@brief Push all data from host to device
     void push_data() {
@@ -747,47 +585,20 @@ public:
         this->residual(this->tmp2_d, this->im_d(), this->e_d(), x_old);
 
         // $\text{tmp}_d=A*\left(\left(I-e-A*x\right) \rho_1+\Upsilon_1\right)$
-#ifndef nFMM_VERSION
         dst = rho1 * this->tmp2_d + lag_1;
-#else
-        dst =  Mdouble(1./params.inv_gamma) * lag_1 + this->tmp2_d;
-        dst /= 0.99;
-#endif
+
         convolution.vmult(dst, dst);
 
         // Add regularization
         step35::Kernels<Mdouble> kernel;
         kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
                              this->im_d().data(),
-                     #ifndef nFMM_VERSION
-                             reg_strength
-                     #else
-                             reg_strength / 0.99
-                     #endif
-                             ,
+                             reg_strength,
                              dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
 
-#ifndef nFMM_VERSION
         this->tmp2_d *= params.rho2;
-#else
-        this->tmp2_d *= Mdouble((1./params.inv_gamma) / 0.99);
-#endif
+
         dst -= this->tmp2_d;
-
-        // For LJs's version:
-        // 2nd constraint
-        //            {
-        //                  tmp2_d = this->z_d - this->x_old;
-        //                  tmp2_d *= Mdouble(params.rho2);
-        //                  tmp2_d += tmp_d;
-        //                  tmp_d  = tmp2_d - lag2;
-        //            }
-
-        // test, whether sign reversal stems from here:
-#ifdef nFMM_VERSION
-        // It seems that we have to reverse the sign of the rhs for the FMM version to get convergence.
-        dst *= -1;
-#endif
     }
 
 
@@ -834,12 +645,7 @@ public:
                 delta_t = 1./params.inv_gamma;
 
                 // Euler step for intermediate solution.
-                x_tmp = delta_t * k_1 + x_old;          // for reconstructing LJ: replace delta_t by Mdouble(1./delta_t)
-
-                // For LJ:
-                //this->x_d = x_tmp;
-                //return;
-
+                x_tmp = delta_t * k_1 + x_old;
 
                 // Evaluate rhs of Euler-Lagrange
                 argmin_x_rhs(k_2, x_tmp, this->lag1, params);
@@ -898,39 +704,14 @@ public:
     void x_step(const Mdouble rho1,const Mdouble rho2)
     {
         step35::Kernels<Mdouble> kernel;
-        //$\text{tmp}_d=I$tmp2
-        // // // kernel.reset(tmp_d.data(), inf->ext_num_pix);
-        // // // kernel.sum(tmp_d.data(), this->im_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        //$\text{tmp}_d=I-e$
-        // kernel.diff(tmp_d.data(), this->e_d().data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        // conv2(this->x_d.data(), tmp2_d.data()); // args: in, out
 
         // the residual
         //$\text{tmp}_d=I-e-A*x$
-#ifdef USE_SHIFT_ARITH
-        kernel.diff(tmp_d.data(), tmp2_d.data(),
-                    SHIFT_FACTOR * inf->sigma,
-                    inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
-#else
-
-#endif
-        // Test x -y
-        {
-            //            tmp2_d = Mdouble(-1.) * this->x_d + this->z_d;
-            //            tmp_d =  this->z_d - this->x_d;
-            //            tmp2_d -= tmp_d;
-            //            std::cout << "tmp2_d.l2_norm : 0 =?= " << tmp2_d.l2_norm() << std::endl;
-        }
-
         this->residual(tmp2_d, this->im_d(), this->e_d(), this->x_d);
 
+        // FIXME: do we need the following two doc lines?
         //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
-        // kernel.mult(tmp_d.data(), rho1, inf->ext_num_pix);
-
         //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-        // kernel.sum(tmp_d.data(), lag1.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
 
         //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
         tmp_d = rho1 * tmp2_d + lag1;
@@ -939,51 +720,24 @@ public:
         // FIXME: inplace works?
         convolution.vmult(tmp_d, tmp_d);
 
-        //$\text{tmp2}_d=z$
-        // kernel.reset(tmp2_d.data(), inf->ext_num_pix);
-        // kernel.sum(tmp2_d.data(), this->z_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-
-
-        //$\text{tmp2}_d=z-x$
-
-        // kernel.diff(tmp2_d.data(), this->x_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
-        // tmp2_d -= this->x_d;
-
         //$\text{tmp2}_d=z-x$
         tmp2_d = this->z_d - this->x_d;
 
 
-
+        // FIXME: fuse expressions
         //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        // kernel.mult(tmp2_d.data(), rho2, inf->ext_num_pix);
         tmp2_d *= rho2;
 
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-#ifdef USE_SHIFT_ARITH
-        kernel.sum(tmp2_d.data(), tmp_d.data(),
-                   SHIFT_FACTOR * inf->sigma,
-                   inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
-#else
         tmp2_d += tmp_d;
-#endif
 
         //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        // kernel.diff(tmp2_d.data(), lag2.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         tmp2_d -= lag2;
-
-        //$\text{tmp2}_d=\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        // kernel.mult(tmp2_d.data(), inf->gamma, inf->ext_num_pix);
-
-        // tmp2_d *= inf->gamma;
-
 
         // THE FOLLOWING DOC EQ APPLIES TO HAVING DONE BEFORE : tmp2_d *= inf->gamma;
         //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        //kernel.sum(this->x_d.data(), tmp2_d.data(), 0, inf->ext_width, inf->ext_height, inf->ext_depth);
         //  this->x_d += tmp2_d;
         this->x_d = this->inv_gamma * tmp2_d + this->x_d;
-
     }
 
     //@sect5{Function: update_lagrangian}
@@ -993,31 +747,12 @@ public:
     void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
         step35::Kernels<Mdouble> kernel;
 
-        // kernel.reset(tmp_d.data(), inf->ext_num_pix);
-        // kernel.sum(tmp_d.data(), this->x_d.data(),0, inf->ext_width, inf->ext_height, inf->ext_depth);
-
-        //  conv2(tmp_d.data(), tmp_d.data());
         //Update the lagrangian estimates
-#ifdef USE_SHIFT_ARITH
-        kernel.update_lagrangian(lag1.data(), lag2.data(),
-                                 SHIFT_FACTOR *  inf->sigma,
-                                 inf->ext_width(),  inf->ext_height(),  inf->ext_depth(),
-                                 alpha1, alpha2, this->e_d().data(), inf->writeable_im_d().data(),tmp_d.data(), this->x_d.data(), this->z_d.data());
-#else
-
-
-        // lag1 += alpha1 * (this->im_d() - this->e_d() - tmp_d);
         residual(tmp_lag1, this->im_d(), this->e_d(), this->x_d);
         lag1 =  alpha1 * tmp_lag1 + lag1;
 
-#ifndef nFMM_VERSION
-
-        // lag2 += alpha2 * (this->x_d - this->z_d);
-
         tmp_lag2 = this->x_d - this->z_d;
         lag2  = alpha2 * tmp_lag2 + lag2;
-#endif
-#endif
     }
 
     //@sect5{Function: dykstra_gauss}
@@ -1025,73 +760,8 @@ public:
     //@param rho parameter for the first constraint
     void dykstra_gauss(const Mdouble rho)
     {
-
-#ifdef USE_SHIFT_ARITH
-        convolution.vmult(tmp_d, this->x_d); // conv2(this->x_d.data(),tmp_d.data());
-
-
-        step35::Kernels<Mdouble> kernel;
-        //the value to be projected is copied into e_d
-
-        kernel.prepare_e(inf->writeable_e_d().data(), this->im_d().data(), tmp_d.data(), lag1.data(), rho,
-                         SHIFT_FACTOR * inf->sigma,
-                         inf->ext_width(),  inf->ext_height(),  inf->ext_depth());
-#else
-
-#ifndef nFMM_VERSION
-        dykstra_gauss_global_mem(rho); // dykstra_gauss_LNCS(rho);
-#else
-        dykstra_gauss_FMM(rho);
-#endif
-        // Will the generated noise be transformed?
-        // this->writeable_e_d() = this->generated_noise;
-
-#endif
-
-
-
-
-    }
-
-
-
-
-    void dykstra_gauss_LNCS(const Mdouble rho)
-    {
-        // $A * x_{k}$
-        convolution.vmult(tmp_d, this->x_d);
-
-        // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
-        this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
-        this->writeable_e_d() -= tmp_d;
-
-        //Perform the Dykstra Algorithm
-        iterate();
-
-    }
-
-
-    void dykstra_gauss_FMM(const Mdouble rho)
-    {
-        // $A * x_{k-1}$
-        convolution.vmult(tmp_d, this->x_d);
-
-        // $\epsilon = dt \cdot \Upsilon_1 + A * x_{k-1} $
-        this->writeable_e_d() = Mdouble(1./this->inv_gamma) * lag1 + tmp_d;
-
-        //Perform the Dykstra Algorithm
-        this->iterate();
-
-        // After the Dykstra iteration @p e_d contains the slack variable $v$ for the constraint $A * x - v = 0$
-        this->lag2 = this->e_d();
-
-        // compute noise contribution
-        this->writeable_e_d() -= this->im_d();
-    }
-
-
-    void dykstra_gauss_global_mem(const Mdouble rho)
-    {
+        // old dykstra_gauss and dykstra_gauss_global_mem merged.
+        // The former was anyway only a wrapper of the latter.
         convolution.vmult(tmp_d, this->x_d);
 
         // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
@@ -1152,7 +822,6 @@ public:
                 kernel.dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
                                                       Q_full.data(),
                                                       this->writeable_e_d().data(),
-                                                      //    this->im_d().data(),
                                                       this->sigma_noise,
                                                       dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
                                                       n_max_dykstra_steps, dykstra_Tol
@@ -1163,12 +832,12 @@ public:
                 kernel.dyadic_dykstra_fine_scale_part_cpu(h_iter.data(), h_old.data(),
                                                           Q_full.data(),
                                                           this->writeable_e_d().data(),
-                                                          //    this->im_d().data(),
                                                           this->sigma_noise,
                                                           dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
                                                           n_max_dykstra_steps, dykstra_Tol
                                                           );
             }
+
 
             // Convergence control.
             {
@@ -1188,106 +857,7 @@ public:
     //@sect5{Function: m_smoothing}
     //@brief Smoothing step
     //@param gamma Strength of the regularization, small choices render the algorithm unstable
-    //TODO rho2
-    void m_smoothing(Mdouble reg_strength, Mdouble rho2) {
-        step35::Kernels<Mdouble> kernel;
-        //Regularization by Haar Wavelet Coefficient sparsity
-        if ( this->regType == haar ) {
-            if ( dof_handler.pdepth() > 1) {//TODO 3d
-                std::cerr << "Haar regularisation with 3d images is not yet implemented!" << std::endl;
-                std::abort();
-            }
 
-            int nx2 = dof_handler.n_dofs_x_padded();
-            int ny2 = dof_handler.n_dofs_y_padded();
-            //kernel.reset(tmp_haar,inf->nx2*inf->ny2);
-            tmp_haar = SciPAL::Vector<Mdouble,BW>( nx2 * ny2);
-            tmp_lagr = SciPAL::Vector<Mdouble,BW>( tmp_haar.size());
-
-            //Copy $x$ into the bigger temp variable while conserving its shape
-            for (int i=0; i< nx2; i++) {
-                if ( i <  dof_handler.pheight()) {
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_haar.data()[i* ny2]), &(this->x_d.data()[i* dof_handler.pheight()]),
-                            dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-
-                    checkCudaErrors(cudaMemcpyAsync(&(tmp_lagr.data()[i* ny2]), &(lag2.data()[i* dof_handler.pheight()]),
-                            dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-                }
-            }
-            checkCudaErrors(cudaDeviceSynchronize());
-
-            //Forward 2D Haar Wavelet transform
-            kernel.haar(tmp_haar.data(), tmp_haar2.data(), ny2);
-            kernel.haar(tmp_lagr.data(), tmp_haar2.data(), ny2);
-            kernel.soft_threshold(tmp_haar.data(), lag2.data(), tmp_haar.data(), rho2, reg_strength, nx2* ny2);
-            //Backward 2D Haar Wavelet transform
-            kernel.inverse_haar(tmp_haar.data(), tmp_haar2.data(), ny2);
-
-            //Copy back, pay attention not to mess up the shape
-            for (int i=0; i< nx2; i++) {
-                if ( i <  dof_handler.pwidth() )
-                    checkCudaErrors(cudaMemcpyAsync(&(this->z_d.data()[i* dof_handler.pheight()]), &(tmp_haar.data()[i* ny2]),
-                            dof_handler.pwidth()*sizeof(Mdouble), cudaMemcpyDeviceToDevice));
-            }
-            checkCudaErrors(cudaDeviceSynchronize());
-        }
-
-        //Regularization by direct space sparsity
-        if ( this->regType == sparse ) {
-            this->z_d = this->x_d;
-            kernel.soft_threshold(this->z_d.data(),lag2.data(),this->x_d.data(), rho2, reg_strength,   dof_handler.n_dofs());
-            //kernel.tv_regularization(this->x_d,this->z_d,lag2,gamma,rho2,inf->ext_width,inf->ext_height,inf->ext_depth);
-        }
-        //Regularization by Fourier Space L_2 Norm
-        if ( this->regType == quadratic ) {
-            this->z_d = this->x_d;
-            //the solution with smallest L_2 Norm is obtained, this corresponds to the pseudoinverse
-            kernel.pseudo_inverse(this->z_d.data(), lag2.data(), rho2, reg_strength, dof_handler.n_dofs());
-        }
-
-
-        //Regularization by Fourier Space L_2 Norm
-        if ( this->regType == TV ) {
-            this->z_d = this->x_d;
-            //checkCudaErrors(cudaMemcpy(this->z_d.data(), this->x_d.data(), inf->n_bytes_per_frame, cudaMemcpyDeviceToDevice));
-            if (true)
-                kernel.tv_regularization(this->x_d.data(), this->z_d.data(),
-                                         lag2.data(), reg_strength, rho2,
-                                         dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
-            else
-            {
-                Mdouble dt = 1e-1;
-
-                Mdouble Tol = 1e-4 * std::sqrt(tmp2_d.size()) / dt;
-                int n_max_iter = 100;
-                int n_iter = 0;
-                Mdouble err = 2*Tol;
-
-                while (err > Tol)
-                {
-                    kernel.tv_derivative(tmp2_d.data(), z_d.data(),
-                                         this->im_d().data(),
-                                         reg_strength,
-                                         dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
-
-                    tmp_d = rho2 * x_d + lag2;
-                    tmp_d = (-rho2) * z_d + tmp_d;
-                    tmp_d -= tmp2_d;
-
-                    z_d = dt * tmp_d + z_d;
-
-                    err = tmp_d.l2_norm();
-                    n_iter++;
-                    if (n_iter > n_max_iter)
-                        break;
-
-                }
-
-                std::cout << "n iter in Reg term : " << n_iter << ", final error : " << (err / ( std::sqrt(tmp2_d.size()) / dt )) << std::endl;
-            }
-        }
-
-    }
 };
 } // namespace step35 END
 

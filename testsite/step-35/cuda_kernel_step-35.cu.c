@@ -22,6 +22,7 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 //std
 #include <stdio.h>
+#include <omp.h>
 
 //CUDA
 #include <cuComplex.h>
@@ -1336,6 +1337,31 @@ void step35::Kernels<T>::dyadic_dykstra_fine_scale_part(
     cudaDeviceSynchronize();
 
 }
+
+template<typename T>
+void step35::Kernels<T>::dyadic_dykstra_fine_scale_part_cpu(
+        T* h_iter, T* h_old, T* Q_full,
+        T *A_image,
+        //    const T * data, // new argument w.r.t. LJ
+        const T g_noise, // dto.
+        const int ni, const int nj, const int nk,
+        const int n_max_steps=200, const T Tol=1e-4)
+{
+    int grid_2D_i= ni/N_PX_X_2D;
+    int grid_2D_j= nj/N_PX_Y_2D;
+    dim3 grid_2D(grid_2D_i, grid_2D_j);
+    dim3 blocks_2D(N_PX_X_2D, N_PX_Y_2D);
+
+#pragma omp parallel for
+    for(int bx = 0; bx  < grid_2D.x; bx++ )
+    {
+#pragma omp parallel for private Q, ps_sum
+        {
+
+        }
+    }
+}
+
 
 //@sect5{Function: dyadyc_dykstra}
 //@brief This is a wrapper for the __dyadyc_dykstra Kernel function.

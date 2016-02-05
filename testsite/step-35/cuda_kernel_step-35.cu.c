@@ -332,7 +332,7 @@ __forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
     volatile T * m_ps = ps_sum + tIx;
 
     T x =  // 1.0; //
-    *m_ps;
+            *m_ps;
     __syncthreads();
 
     *m_ps = x * x;
@@ -342,19 +342,19 @@ __forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
 
 
     // ------------------
-//    for (int e = edge_x; e>0; e/= 2)
-//    {
-//        int lane_id = col % (edge_x);
+    //    for (int e = edge_x; e>0; e/= 2)
+    //    {
+    //        int lane_id = col % (edge_x);
 
-//        if (lane_id < e/2)
-//        {
-//            *m_ps += *(m_ps + e/2);
-//            if (blockIdx.x == 0)
-//                printf ("col : %d, e : %d, lane_id : %d \n", col, e, lane_id);
-//        }
+    //        if (lane_id < e/2)
+    //        {
+    //            *m_ps += *(m_ps + e/2);
+    //            if (blockIdx.x == 0)
+    //                printf ("col : %d, e : %d, lane_id : %d \n", col, e, lane_id);
+    //        }
 
-//__syncthreads();
-//    }
+    //__syncthreads();
+    //    }
     // ------------------
 
 
@@ -364,9 +364,9 @@ __forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
     {
         if ((col+e) % e == 0)
         {
-                *m_ps += *(m_ps + e/2);
-           // if (*m_ps != e)
-             // printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
+            *m_ps += *(m_ps + e/2);
+            // if (*m_ps != e)
+            // printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
         }
         __syncthreads();
     }
@@ -386,7 +386,7 @@ __forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
 
     // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
     T x = // 1.0; //
-    *m_ps;
+            *m_ps;
     __syncthreads();
 
     *m_ps = x * x;
@@ -399,10 +399,10 @@ __forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
     {
         if ((col+e) % e == 0)
         {
-                *m_ps += *(m_ps + e/2);
+            *m_ps += *(m_ps + e/2);
             //  printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
         }
-// __syncthreads();
+        // __syncthreads();
     }
 
     __syncthreads();
@@ -411,18 +411,18 @@ __forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
 
     for (int e = 2; e <= edge_y; e*= 2) // add rows
     {
-         __syncthreads(); // Needed for some reason to ensure thread safety.
+        __syncthreads(); // Needed for some reason to ensure thread safety.
         int neighbor = blockDim.x*(row + e/2) + col;
         if ((row+e) % e == 0)
         {
-//            if (*m_ps != ps_sum[neighbor] /*&& row == 0 && col == 0*/)
-//            {
-//                printf("adding rows : ps_sum[%d] : %f, ps_sum[%d] : %f, e : %d\n", tIx, *m_ps, neighbor, ps_sum[neighbor], e);
-//            }
+            //            if (*m_ps != ps_sum[neighbor] /*&& row == 0 && col == 0*/)
+            //            {
+            //                printf("adding rows : ps_sum[%d] : %f, ps_sum[%d] : %f, e : %d\n", tIx, *m_ps, neighbor, ps_sum[neighbor], e);
+            //            }
             *m_ps += ps_sum[neighbor];
         }
 
-  __syncthreads();
+        __syncthreads();
 
     }
 
@@ -447,20 +447,20 @@ __forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x, T data, 
 
 #ifndef nFMM_VERSION
     if (ws > 1.)
-      x *= 1.
-              / sqrt(ws); // x /= sqrt(ws);
+        x *= 1.
+                / sqrt(ws); // x /= sqrt(ws);
 #else
-  // Dantzig version:  x = data + (x - data)*g_noise/sqrt(ws);
-  //  x = x * (1. + 1./sqrt(weight*ps_sum[ws_isx]));
-// JVIM version
+    // Dantzig version:  x = data + (x - data)*g_noise/sqrt(ws);
+    //  x = x * (1. + 1./sqrt(weight*ps_sum[ws_isx]));
+    // JVIM version
     if ( ws > 1)
-    x = data // paper : +
-            +
-            (x - data) // already in ws : * g_noise
-            / sqrt(ws);
+        x = data // paper : +
+                +
+                (x - data) // already in ws : * g_noise
+                / sqrt(ws);
 #endif
     // For debugging the 2D summation
-     if (false) //  ( blockIdx.x == blockIdx.y) && (ws != T(edge_x*edge_y)) ) //  && blockIdx.y == gridDim.y/2)
+    if (false) //  ( blockIdx.x == blockIdx.y) && (ws != T(edge_x*edge_y)) ) //  && blockIdx.y == gridDim.y/2)
         printf("ws_isx : %d, ws(%d, %d) : %f, x : %f, ps : %f\n ", ws_isx, col, row, ps_sum[ws_isx], x, T(edge_x*edge_y));
 
     if(false) // ( blockIdx.x == 0) && (blockIdx.y == 0) && row == 0 && col == 0)
@@ -478,27 +478,27 @@ __forceinline__ __device__ T L2_norm(T * ps_sum)
     int tIx = row*blockDim.x + col;
 
 
-   ps_sum[tIx] *= ps_sum[tIx]; // Compute squares of entries.
-   __syncthreads();
+    ps_sum[tIx] *= ps_sum[tIx]; // Compute squares of entries.
+    __syncthreads();
 
-   int k_max = blockDim.x*blockDim.y/2;
+    int k_max = blockDim.x*blockDim.y/2;
 
-   for (int k = k_max; k > 0; k/=2)
-   {
-     //  if (tIx == 0)  printf ("k in reduction : %d\n", k);
-       if (tIx < k)
-           ps_sum[tIx] += ps_sum[tIx+k];
-       __syncthreads();
-   }
+    for (int k = k_max; k > 0; k/=2)
+    {
+        //  if (tIx == 0)  printf ("k in reduction : %d\n", k);
+        if (tIx < k)
+            ps_sum[tIx] += ps_sum[tIx+k];
+        __syncthreads();
+    }
 
-   T result = ps_sum[0];
-   __syncthreads();
+    T result = ps_sum[0];
+    __syncthreads();
 
-   // Maybe we need the following for debugging again someday.
-   if (false) // tIx == 0)
-       printf ("ps_sum[%d] in reduction : %f, blockDim.x : %d\n", tIx, result, blockDim.x);
+    // Maybe we need the following for debugging again someday.
+    if (false) // tIx == 0)
+        printf ("ps_sum[%d] in reduction : %f, blockDim.x : %d\n", tIx, result, blockDim.x);
 
-   return sqrt(result/(blockDim.x*blockDim.y)); // returns norm squared.
+    return sqrt(result/(blockDim.x*blockDim.y)); // returns norm squared.
 }
 
 #define N_SCALES_2D 6
@@ -540,9 +540,9 @@ These are the weights one has to use for the subsets within the rows. Therefore 
 template<typename T, bool horizontal>
 __global__ void
 __incomplete_dykstra_1D(T *residual,
-                     const T * data, // new argument w.r.t. LJ
-                     const T g_noise,
-                     const int height, const int width, const int depth, const int n_max_steps, const T Tol)
+                        const T * data, // new argument w.r.t. LJ
+                        const T g_noise,
+                        const int height, const int width, const int depth, const int n_max_steps, const T Tol)
 {
     const int n_scales = N_SCALES_1D;
 
@@ -562,7 +562,7 @@ __incomplete_dykstra_1D(T *residual,
         0.00148168722893069,
         0.000801553557730089,
         //
-       0.244266654223811,
+        0.244266654223811,
         0.123736396966113,
         0.0729229695774703,
         0.0445585553148736,
@@ -572,16 +572,16 @@ __incomplete_dykstra_1D(T *residual,
         0.00526764212249119,
         0.00289717856415689,
         0.00154391203759664,   // 512 * 512x1
-                        0.00081990498443775,   // 256
-                        0.000429039881840065,  // 128
-                        0.000221956966667552,  // 64
-                        0.000113828038818893,  // 32
-                        5.79917105865275e-05,  // 16
-                        2.93993246304473e-05,  // 8
-                        1.48495267507585e-05,  // 4
-                        7.48008622774254e-06,  // 2
-                        3.76036659965917e-06   // 1
-                      };
+        0.00081990498443775,   // 256
+        0.000429039881840065,  // 128
+        0.000221956966667552,  // 64
+        0.000113828038818893,  // 32
+        5.79917105865275e-05,  // 16
+        2.93993246304473e-05,  // 8
+        1.48495267507585e-05,  // 4
+        7.48008622774254e-06,  // 2
+        3.76036659965917e-06   // 1
+    };
 
 
     T __shared__ ps_sum[N_PX_X_1D];
@@ -623,7 +623,7 @@ __incomplete_dykstra_1D(T *residual,
 
     h[0] =  *m_px;
     for (int j = 1; j <= n_scales; j++)
-         Q[j-1] = 0;
+        Q[j-1] = 0;
 
     int iter = 0;
     bool iterate = true;
@@ -631,17 +631,17 @@ __incomplete_dykstra_1D(T *residual,
     {
         for (int j = 1; j <= n_scales; j++)         // loop over subsets
         {
-             h[j-1] -= Q[j-1];
+            h[j-1] -= Q[j-1];
 #ifndef nFMM_VERSION
             *m_ps  = h[j-1];
 #else
-             *m_ps  = h[j-1] - m_data;
+            *m_ps  = h[j-1] - m_data;
 #endif
             __syncthreads();
 
             T weight = // 0.25*
                     ICD_weights[ //j-1]; //
-            n_scales - (j)]; // cs[j-1];
+                    n_scales - (j)]; // cs[j-1];
 
             L2_norm_on_sub_rows(n_scales - j // j-1
                                 , ps_sum);
@@ -656,24 +656,24 @@ __incomplete_dykstra_1D(T *residual,
         }
 
         // For debugging L2_norm:
-//        h[0] = -.5*sqrt(T(idx));;
-//        h[n_scales] = .5*sqrt(T(idx));
+        //        h[0] = -.5*sqrt(T(idx));;
+        //        h[n_scales] = .5*sqrt(T(idx));
 
         *m_ps_2 = /* 1.0; */ h[n_scales] - h[0];
         __syncthreads();
 
         T norm = L2_norm(ps_sum_2);
 
-         if ( false) // (blockIdx.x == blockIdx.y) && (60 < idx && idx < 90))
+        if ( false) // (blockIdx.x == blockIdx.y) && (60 < idx && idx < 90))
             printf("iter : %d, norm : %f, h[0] : %f, h[1] : %f, h[2] : %f, h[3] : %f, h[4] : %f, h[5] : %f, h[6] : %f\n", iter, norm, h[0], h[1], h[2], h[3], h[4], h[5], h[6]);
 
         iterate = ( norm > Tol &&
-                   iter < n_max_steps);
+                    iter < n_max_steps);
         iterate ?  h[0] = h[n_scales] : *m_px = h[n_scales];
         iter++;
     }
 
-  //  if (blockIdx.x == blockIdx.y) //  && blockIdx.y == gridDim.y/2)
+    //  if (blockIdx.x == blockIdx.y) //  && blockIdx.y == gridDim.y/2)
     //    printf("e(%d, %d) : %f\n ", col, row, h[n_scales]);
 }
 
@@ -693,7 +693,7 @@ struct DykstraStep {
     int  row, col, tIx, global_row, global_col, global_idx;
 #ifndef nFMM_VERSION
 #else
-     const T m_data;
+    const T m_data;
 #endif
     __device__ DykstraStep (int m, int n_s, const T* residual,
                         #ifndef nFMM_VERSION
@@ -720,14 +720,14 @@ struct DykstraStep {
         h_old = h_init = residual[global_idx];
 
         for (int j = 1; j <= n_scales; j++)
-             Q[j-1] = 0;
+            Q[j-1] = 0;
     }
 
 
 #ifdef blurb
     __forceinline__
 #endif
-     __forceinline__
+    __forceinline__
     __device__ void sum_of_squares_subsets(int s, T * ps_sum)
 #ifdef blurb
     {
@@ -736,7 +736,7 @@ struct DykstraStep {
 
         // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
         T x = // 1.0; //
-        *m_ps;
+                *m_ps;
         __syncthreads();
 
         *m_ps = x * x;
@@ -749,7 +749,7 @@ struct DykstraStep {
         {
             if ((col+e) % e == 0)
             {
-                    *m_ps += *(m_ps + e/2);
+                *m_ps += *(m_ps + e/2);
 
             }
         }
@@ -760,14 +760,14 @@ struct DykstraStep {
 
         for (int e = 2; e <= edge_y; e*= 2) // add rows
         {
-             __syncthreads(); // Needed for some reason to ensure thread safety.
+            __syncthreads(); // Needed for some reason to ensure thread safety.
             int neighbor = blockDim.x*(row + e/2) + col;
             if ((row+e) % e == 0)
             {
                 *m_ps += ps_sum[neighbor];
             }
 
-      __syncthreads();
+            __syncthreads();
 
         }
 
@@ -793,20 +793,20 @@ struct DykstraStep {
         T ws = (ps_sum[ws_isx]/(g_noise*g_noise)) * weight;
         __syncthreads();
 
-    #ifndef nFMM_VERSION
+#ifndef nFMM_VERSION
         if (ws > 1.)
-          x *= 1.
-                  / sqrt(ws); // x /= sqrt(ws);
-    #else
-      // Dantzig version:  x = data + (x - data)*g_noise/sqrt(ws);
-      //  x = x * (1. + 1./sqrt(weight*ps_sum[ws_isx]));
-    // JVIM version
+            x *= 1.
+                    / sqrt(ws); // x /= sqrt(ws);
+#else
+        // Dantzig version:  x = data + (x - data)*g_noise/sqrt(ws);
+        //  x = x * (1. + 1./sqrt(weight*ps_sum[ws_isx]));
+        // JVIM version
         if ( ws > 1)
-        x = data // paper : +
-                +
-                (x - data) // already in ws : * g_noise
-                / sqrt(ws);
-    #endif
+            x = data // paper : +
+                    +
+                    (x - data) // already in ws : * g_noise
+                    / sqrt(ws);
+#endif
 
         return x;
     }
@@ -814,15 +814,15 @@ struct DykstraStep {
 
     bool __device__ out_of_bound(const int width, const int height) const
     {
-            // Let threads working outside the computational domain idle.
-            if (
-                    (global_col < 0 || global_col >= width - offset_x)
-                    ||
-                    (global_row < 0 || global_row >= height - offset_y)
-                    )
-                return true;
-            else
-                return false;
+        // Let threads working outside the computational domain idle.
+        if (
+                (global_col < 0 || global_col >= width - offset_x)
+                ||
+                (global_row < 0 || global_row >= height - offset_y)
+                )
+            return true;
+        else
+            return false;
     }
 
 
@@ -834,10 +834,10 @@ struct DykstraStep {
         // FIXME: increasing min_scale leads to a loss of the large scales!
         for (int j = 1; j <= this->n_scales /* play here for increasing min_scale */; j++)         // loop over subsets
         {
-                    h_old -= this->Q[j-1];
-                    // The following makes a subtle difference.
-                    if (j == this->min_scale + 1)
-                        h_init = h_old;
+            h_old -= this->Q[j-1];
+            // The following makes a subtle difference.
+            if (j == this->min_scale + 1)
+                h_init = h_old;
 #ifndef nFMM_VERSION
             *m_ps  = h_old;
 #else
@@ -855,9 +855,9 @@ struct DykstraStep {
                     n_scales-j]; //   j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
 
             h_new = this->project(s_x, //j-1 /* s_x*/,
-                                 s_y, // j-1 /* s_y */,
-                                 ps_sum, // this->h[j-1]
-                   h_old ,
+                                  s_y, // j-1 /* s_y */,
+                                  ps_sum, // this->h[j-1]
+                                  h_old ,
                       #ifndef nFMM_VERSION
                       #else
                                   m_data,
@@ -886,7 +886,7 @@ struct DykstraStep {
 
         for (int j = this->min_scale + 1; j <= this->n_scales; j++)         // loop over subsets
         {
-                    h_old -= this->Q[j-1];
+            h_old -= this->Q[j-1];
 #ifndef nFMM_VERSION
             *m_ps  = h_old;
 #else
@@ -904,9 +904,9 @@ struct DykstraStep {
                     n_scales-j]; //   j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
 
             h_new = this->project(s_x, //j-1 /* s_x*/,
-                                 s_y, // j-1 /* s_y */,
-                                 ps_sum, // this->h[j-1]
-                   h_old ,
+                                  s_y, // j-1 /* s_y */,
+                                  ps_sum, // this->h[j-1]
+                                  h_old ,
                       #ifndef nFMM_VERSION
                       #else
                                   m_data,
@@ -926,52 +926,52 @@ struct DykstraStep {
 
 
 
-   //
+//
 template<typename T, int offset_x, int offset_y>
 __forceinline__ __device__
-   void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s, T * ps_sum)
+void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s, T * ps_sum)
+{
+    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
+    volatile T * m_ps = ps_sum + tIx;
+
+    // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
+    T x = // 1.0; //
+            *m_ps;
+    __syncthreads();
+
+    *m_ps = x * x;
+    __syncthreads();
+
+    int edge_x = pow_of_two(s);
+
+    // Each line is processed by one warp
+    for (int e = 2; e <= edge_x; e*= 2)
     {
-        // Pointer to first element of a row which (i.e. the element) is processed by this thread.
-        volatile T * m_ps = ps_sum + tIx;
-
-        // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
-        T x = // 1.0; //
-        *m_ps;
-        __syncthreads();
-
-        *m_ps = x * x;
-        __syncthreads();
-
-        int edge_x = pow_of_two(s);
-
-        // Each line is processed by one warp
-        for (int e = 2; e <= edge_x; e*= 2)
+        if ((col+e) % e == 0)
         {
-            if ((col+e) % e == 0)
-            {
-                    *m_ps += *(m_ps + e/2);
+            *m_ps += *(m_ps + e/2);
 
-            }
+        }
+    }
+
+    __syncthreads();
+
+    int edge_y = pow_of_two(s);
+
+    for (int e = 2; e <= edge_y; e*= 2) // add rows
+    {
+        __syncthreads(); // Needed for some reason to ensure thread safety.
+        int neighbor = blockDim.x*(row + e/2) + col;
+        if ((row+e) % e == 0)
+        {
+            *m_ps += ps_sum[neighbor];
         }
 
         __syncthreads();
-
-        int edge_y = pow_of_two(s);
-
-        for (int e = 2; e <= edge_y; e*= 2) // add rows
-        {
-             __syncthreads(); // Needed for some reason to ensure thread safety.
-            int neighbor = blockDim.x*(row + e/2) + col;
-            if ((row+e) % e == 0)
-            {
-                *m_ps += ps_sum[neighbor];
-            }
-
-      __syncthreads();
-
-        }
 
     }
+
+}
 
 
 
@@ -982,10 +982,10 @@ __global__ void
 __incomplete_dykstra_2D_fine_scales(
         T* h_iter, T* h_old, T* Q_full,
         T *residual,
-    #ifndef nFMM_VERSION
-    #else
+        #ifndef nFMM_VERSION
+        #else
         const T * data, // new argument w.r.t. LJ
-    #endif
+        #endif
         const T g_noise,
         const int height, const int width, const int depth
         )
@@ -1021,9 +1021,9 @@ __incomplete_dykstra_2D_fine_scales(
     if (dykstra.out_of_bound(width, height))
         return;
 
-        // Projection on scales suitable for intra-threadblock processing.
+    // Projection on scales suitable for intra-threadblock processing.
     h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_iter, h_old, Q_full,
-                ICD_weights, ps_sum, g_noise);
+                                                                        ICD_weights, ps_sum, g_noise);
 
 
 }
@@ -1034,66 +1034,66 @@ __global__ void
 __incomplete_dykstra_2D(T *residual,
                         #ifndef nFMM_VERSION
                         #else
-                     const T * data, // new argument w.r.t. LJ
+                        const T * data, // new argument w.r.t. LJ
                         #endif
-                     const T g_noise,
-                     const int height, const int width, const int depth, const int n_max_steps, const T Tol)
+                        const T g_noise,
+                        const int height, const int width, const int depth, const int n_max_steps, const T Tol)
 {
     const int n_scales = N_SCALES_2D;
 
     // 2D
     T ICD_weights[] = {
-//        // alpha = 0.5
-//        0.0247175052482826,
-//        0.0234101860882775,
-//        0.0157064920498531,
-//        0.00733315498850165,
-//        0.00262402918350882,
-//        0.000796077044123706,
-//        0.000220114811039996,
+        //        // alpha = 0.5
+        //        0.0247175052482826,
+        //        0.0234101860882775,
+        //        0.0157064920498531,
+        //        0.00733315498850165,
+        //        0.00262402918350882,
+        //        0.000796077044123706,
+        //        0.000220114811039996,
         // alpha = 0.1
         0.0284849245029229,
         0.0258315596691237,
         0.0167229685717504,
         0.00760602018197696,
         0.00267687492501606,
-//        // alpha = 0.9
-//        0.0202187993308712,
-//        0.0203274835770538,
-//        0.0143412644022621,
-//        0.00695182573457273,
-//        0.00254827749287444,
+        //        // alpha = 0.9
+        //        0.0202187993308712,
+        //        0.0203274835770538,
+        //        0.0143412644022621,
+        //        0.00695182573457273,
+        //        0.00254827749287444,
         /* 1.,
-                        0.5,
-                       0.25,
-                        0.125,
-                        0.0625,
-                        0.03125,
-                        0.015625,
-                        0.00390625,*/
-//                        0.0009765625,
-                        // From extreme value theory:
-      0.28, //
+                            0.5,
+                           0.25,
+                            0.125,
+                            0.0625,
+                            0.03125,
+                            0.015625,
+                            0.00390625,*/
+        //                        0.0009765625,
+        // From extreme value theory:
+        0.28, //
         //            1, //
         0.180406, // 1 subset
-     //      0.14, //
-                     //
+        //      0.14, //
+        //
         //             0.25, //
         0.0636429, // 4 subsets
-       //     0.06, //
-          //           0.1,  //
+        //     0.06, //
+        //           0.1,  //
         0.0253601, // 16 subsets
-         //   0.02, //
-                  //   0.02, //
+        //   0.02, //
+        //   0.02, //
         0.00904285, // 64
-          //  0.005, //
-                        0.00284996, // 256
-                    0.000818855, // 1024 16x16 tiles in 512x512 image
-                    0.000221662, // 4096  8x8
-    5.79917105865275e-05,  // 4x4
-    1.48495267507585e-05,   // 2x2
-    3.76036659965917e-06,   // 1x1
-    9.46523485047832e-07 };
+        //  0.005, //
+        0.00284996, // 256
+        0.000818855, // 1024 16x16 tiles in 512x512 image
+        0.000221662, // 4096  8x8
+        5.79917105865275e-05,  // 4x4
+        1.48495267507585e-05,   // 2x2
+        3.76036659965917e-06,   // 1x1
+        9.46523485047832e-07 };
 
 
     DykstraStep<T, offset_x, offset_y> dykstra(1 /*min_scale*/, n_scales, residual, // data,
@@ -1127,7 +1127,7 @@ __incomplete_dykstra_2D(T *residual,
 
         // Convergence control.
         {
-           T norm = L2_norm(ps_sum_2);
+            T norm = L2_norm(ps_sum_2);
 
             iterate = ( norm > Tol &&
                         iter < n_max_steps);
@@ -1142,9 +1142,9 @@ __incomplete_dykstra_2D(T *residual,
 template<typename T, int offset_x, int offset_y>
 __global__ void
 __incomplete_dykstra_2D_old(T *residual,
-                     const T * data, // new argument w.r.t. LJ
-                     const T g_noise,
-                     const int height, const int width, const int depth, const int n_max_steps, const T Tol)
+                            const T * data, // new argument w.r.t. LJ
+                            const T g_noise,
+                            const int height, const int width, const int depth, const int n_max_steps, const T Tol)
 {
     const int n_scales = N_SCALES_2D;
 
@@ -1153,57 +1153,57 @@ __incomplete_dykstra_2D_old(T *residual,
 
     // 2D
     T ICD_weights[] = {
-//        // alpha = 0.5
-//        0.0247175052482826,
-//        0.0234101860882775,
-//        0.0157064920498531,
-//        0.00733315498850165,
-//        0.00262402918350882,
-//        0.000796077044123706,
-//        0.000220114811039996,
+        //        // alpha = 0.5
+        //        0.0247175052482826,
+        //        0.0234101860882775,
+        //        0.0157064920498531,
+        //        0.00733315498850165,
+        //        0.00262402918350882,
+        //        0.000796077044123706,
+        //        0.000220114811039996,
         // alpha = 0.1
         0.0284849245029229,
         0.0258315596691237,
         0.0167229685717504,
         0.00760602018197696,
         0.00267687492501606,
-//        // alpha = 0.9
-//        0.0202187993308712,
-//        0.0203274835770538,
-//        0.0143412644022621,
-//        0.00695182573457273,
-//        0.00254827749287444,
+        //        // alpha = 0.9
+        //        0.0202187993308712,
+        //        0.0203274835770538,
+        //        0.0143412644022621,
+        //        0.00695182573457273,
+        //        0.00254827749287444,
         /* 1.,
-                        0.5,
-                       0.25,
-                        0.125,
-                        0.0625,
-                        0.03125,
-                        0.015625,
-                        0.00390625,*/
-//                        0.0009765625,
-                        // From extreme value theory:
-      0.28, //
+                            0.5,
+                           0.25,
+                            0.125,
+                            0.0625,
+                            0.03125,
+                            0.015625,
+                            0.00390625,*/
+        //                        0.0009765625,
+        // From extreme value theory:
+        0.28, //
         //            1, //
         0.180406, // 1 subset
-     //      0.14, //
-                     //
+        //      0.14, //
+        //
         //             0.25, //
         0.0636429, // 4 subsets
-       //     0.06, //
-          //           0.1,  //
+        //     0.06, //
+        //           0.1,  //
         0.0253601, // 16 subsets
-         //   0.02, //
-                  //   0.02, //
+        //   0.02, //
+        //   0.02, //
         0.00904285, // 64
-          //  0.005, //
-                        0.00284996, // 256
-                    0.000818855, // 1024 16x16 tiles in 512x512 image
-                    0.000221662, // 4096  8x8
-    5.79917105865275e-05,  // 4x4
-    1.48495267507585e-05,   // 2x2
-    3.76036659965917e-06,   // 1x1
-    9.46523485047832e-07 };
+        //  0.005, //
+        0.00284996, // 256
+        0.000818855, // 1024 16x16 tiles in 512x512 image
+        0.000221662, // 4096  8x8
+        5.79917105865275e-05,  // 4x4
+        1.48495267507585e-05,   // 2x2
+        3.76036659965917e-06,   // 1x1
+        9.46523485047832e-07 };
 
 
     T __shared__ ps_sum[// 4 *
@@ -1248,7 +1248,7 @@ __incomplete_dykstra_2D_old(T *residual,
 
     h[min_scale] =  *m_px;
     for (int j = 1; j <= n_scales; j++)
-         Q[j-1] = 0;
+        Q[j-1] = 0;
 
     int iter = 0;
     bool iterate = true;
@@ -1257,11 +1257,11 @@ __incomplete_dykstra_2D_old(T *residual,
 #ifndef nOLD_IMPL
         for (int j = min_scale+1; j <= n_scales; j++)         // loop over subsets
         {
-             h[j-1] -= Q[j-1];
+            h[j-1] -= Q[j-1];
 #ifndef nFMM_VERSION
             *m_ps  = h[j-1];
 #else
-             *m_ps  = h[j-1] - m_data;
+            *m_ps  = h[j-1] - m_data;
 #endif
             __syncthreads();
 
@@ -1280,7 +1280,7 @@ __incomplete_dykstra_2D_old(T *residual,
 
             __syncthreads();
             if ((threadIdx.x == 1) && blockIdx.x == 1)
-               printf("n_scales= %i, j= %i, weight= %f\n", n_scales, j, weight);
+                printf("n_scales= %i, j= %i, weight= %f\n", n_scales, j, weight);
 
             Q[j-1] = h[j] - h[j-1];
         }
@@ -1288,24 +1288,24 @@ __incomplete_dykstra_2D_old(T *residual,
 
 #endif
         // For debugging L2_norm:
-//        h[0] = -.5*sqrt(T(idx));;
-//        h[n_scales] = .5*sqrt(T(idx));
+        //        h[0] = -.5*sqrt(T(idx));;
+        //        h[n_scales] = .5*sqrt(T(idx));
 
         *m_ps_2 = /* 1.0; */ h[n_scales] - h[min_scale];
         __syncthreads();
 
         T norm = L2_norm(ps_sum_2);
 
-         if ( false) // (blockIdx.x == blockIdx.y) && (60 < idx && idx < 90))
+        if ( false) // (blockIdx.x == blockIdx.y) && (60 < idx && idx < 90))
             printf("iter : %d, norm : %f, h[0] : %f, h[1] : %f, h[2] : %f, h[3] : %f, h[4] : %f, h[5] : %f, h[6] : %f\n", iter, norm, h[0], h[1], h[2], h[3], h[4], h[5], h[6]);
 
         iterate = ( norm > Tol &&
-                   iter < n_max_steps);
+                    iter < n_max_steps);
         iterate ?  h[min_scale] = h[n_scales] : *m_px = h[n_scales];
         iter++;
     }
 
-  //  if (blockIdx.x == blockIdx.y) //  && blockIdx.y == gridDim.y/2)
+    //  if (blockIdx.x == blockIdx.y) //  && blockIdx.y == gridDim.y/2)
     //    printf("e(%d, %d) : %f\n ", col, row, h[n_scales]);
 }
 
@@ -1352,14 +1352,96 @@ void step35::Kernels<T>::dyadic_dykstra_fine_scale_part_cpu(
     dim3 grid_2D(grid_2D_i, grid_2D_j);
     dim3 blocks_2D(N_PX_X_2D, N_PX_Y_2D);
 
-#pragma omp parallel for
-    for(int bx = 0; bx  < grid_2D.x; bx++ )
-    {
-#pragma omp parallel for private Q, ps_sum
-        {
+    T ps_sum[N_PX_X_2D][N_PX_Y_2D];
+    T Q[N_SCALES_2D][N_PX_X_2D*N_PX_Y_2D];
 
-        }
-    }
+    T ICD_weights[] = { 0.0181658,
+                        0.0207498,
+                        0.0155408,
+                        0.00760004,
+                        0.002742,
+                        0.000825881};
+
+    omp_set_num_threads(40);
+
+#pragma omp parallel for
+    for(uint bx = 0; bx  < grid_2D.x; bx++ )
+    {
+#pragma omp parallel for private(Q, ps_sum)
+        for(uint by = 0; by < grid_2D.y; by++)
+        {
+            for(uint s = 1; s < N_SCALES_2D; s++)
+            {
+                uint s_x = N_SCALES_2D - s;
+                uint s_y = s_x;
+
+                uint edge_x = s_x * s_x;
+                uint edge_y = s_y * s_y;
+
+                T weight = ICD_weights[N_SCALES_2D - s];
+
+                // loop over tiles in a block
+                for(uint ti = 0; ti < grid_2D.x; ti += edge_x)
+                {
+                    for(uint tj = 0; tj = grid_2D.y; tj += edge_y)
+                    {
+                        for(uint ii = 0; ii < edge_x; ii++)
+                            for(uint jj = 0; jj < edge_y; jj++)
+                                ps_sum[ii][jj] = 0;
+
+                        // loop over pixels in tile
+                        for(uint ii = 0; ii < edge_x; ii++)
+                        {
+                            for(uint jj = 0; jj < edge_y; jj++)
+                            {
+                                // position of pixel wrt ps_sum
+                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
+                                uint global_idx =
+                                        by * blocks_2D.y * ni + ( tj + jj) * ni
+                                        + bx * blocks_2D.x + ti + ii;
+
+                                if(s == 1) // do that only on smallest level
+                                    Q[0][tile_idx] = Q_full[global_idx];
+
+                                T h_0 = h_old[global_idx] - Q[s - 1][tile_idx];
+
+                                ps_sum[ti/edge_x][tj/edge_y] += h_0 * h_0;
+                            }// jj end
+                        }// ii end
+
+                        // calculate weighted residua
+                        T ws = sqrt(ps_sum[ti/edge_x][tj/edge_y] * weight) / g_noise;
+                        if(ws > 1) // adapt pixels if statistic is violated
+                        {
+                            //adapt all pixels in the tile
+                            for(uint ii = 0; ii < edge_x; ii++)
+                                for(uint jj = 0; jj < edge_y; jj++)
+                                {
+                                    uint global_idx =
+                                            by * blocks_2D.y * ni + ( tj + jj) * ni
+                                            + bx * blocks_2D.x + ti + ii;
+                                    h_iter[global_idx] = h_old[global_idx] / ws;
+                                }
+                        }
+
+                        // update iteration variables for all pixels in a tile
+                        for(uint ii = 0; ii < edge_x; ii++)
+                            for(uint jj = 0; jj < edge_y; jj++)
+                            {
+                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
+                                uint global_idx =
+                                        by * blocks_2D.y * ni + ( tj + jj) * ni
+                                        + bx * blocks_2D.x + ti + ii;
+
+                                Q[s - 1][tile_idx] = h_iter[global_idx] - h_old[global_idx];
+                                h_old[global_idx] = h_iter[global_idx];
+                            }
+
+                    }//block x loop end
+                }// block y loop end
+            }// scale n end
+        }//by end
+    }// bx end
 }
 
 
@@ -1394,23 +1476,23 @@ void step35::Kernels<T>::dyadic_dykstra(T *A_image,
     // We first project on the rows. Since the largest subsets span through the whole image
     // this gives a fairly good exchange of information.
 
-//    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
-//                                                          data, g_noise,
-//                                                          ni, nj, nk, n_max_steps, Tol);
-//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
-//    cudaDeviceSynchronize();
+    //    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
+    //                                                          data, g_noise,
+    //                                                          ni, nj, nk, n_max_steps, Tol);
+    //    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+    //    cudaDeviceSynchronize();
 
-// return;
+    // return;
 
     // Then we project onto squares for a more isotropic equilibration.
 
     __incomplete_dykstra_2D<T, 0, 0><<<grid_2D, blocks_2D>>> (A_image,
                                                           #ifndef nFMM_VERSION
                                                           #else
-                                                           data,
+                                                              data,
                                                           #endif
-                                                           g_noise,
-                                                           ni, nj, nk, n_max_steps, Tol);
+                                                              g_noise,
+                                                              ni, nj, nk, n_max_steps, Tol);
 
     getLastCudaError("__incomplete_dykstra_2D(0,0)<<<>>> execution failed\n");
 
@@ -1423,77 +1505,77 @@ void step35::Kernels<T>::dyadic_dykstra(T *A_image,
 
     // Then on the columns.
     __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
-                                                           data,
-                                                           g_noise,
-                                                           ni, nj, nk, n_max_steps, Tol);
+                                                                     data,
+                                                                     g_noise,
+                                                                     ni, nj, nk, n_max_steps, Tol);
     getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 
 
 
     __incomplete_dykstra_2D<T, 0, 4><<<grid_2D, blocks_2D>>> (A_image,
-                                                         //  data,
-                                                           g_noise,
-                                                           ni, nj, nk, n_max_steps, Tol);
+                                                              //  data,
+                                                              g_noise,
+                                                              ni, nj, nk, n_max_steps, Tol);
 
     getLastCudaError("__incomplete_dykstra_2D(0,1)<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 
 
-//    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
-//                                                           data,
-//                                                           g_noise,
-//                                                           ni, nj, nk, n_max_steps, Tol);
-//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
-//    cudaDeviceSynchronize();
+    //    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
+    //                                                           data,
+    //                                                           g_noise,
+    //                                                           ni, nj, nk, n_max_steps, Tol);
+    //    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+    //    cudaDeviceSynchronize();
 
 
     __incomplete_dykstra_2D<T, 4, 0><<<grid_2D, blocks_2D>>> (A_image,
-                                                         //  data,
-                                                           g_noise,
-                                                           ni, nj, nk, n_max_steps, Tol);
+                                                              //  data,
+                                                              g_noise,
+                                                              ni, nj, nk, n_max_steps, Tol);
 
     getLastCudaError("__incomplete_dykstra_2D(1,0)<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 
 
-//    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
-//                                                           data,
-//                                                           g_noise,
-//                                                           ni, nj, nk, n_max_steps, Tol);
-//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
-//    cudaDeviceSynchronize();
+    //    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
+    //                                                           data,
+    //                                                           g_noise,
+    //                                                           ni, nj, nk, n_max_steps, Tol);
+    //    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+    //    cudaDeviceSynchronize();
 
     __incomplete_dykstra_2D<T, 0, -4><<<grid_2D, blocks_2D>>> (A_image,
-                                                        //   data,
-                                                           g_noise,
-                                                           ni, nj, nk, n_max_steps, Tol);
+                                                               //   data,
+                                                               g_noise,
+                                                               ni, nj, nk, n_max_steps, Tol);
 
     getLastCudaError("__incomplete_dykstra_2D(0,-1)<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 
 
-//    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
-//                                                           data,
-//                                                           g_noise,
-//                                                           ni, nj, nk, n_max_steps, Tol);
-//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
-//    cudaDeviceSynchronize();
+    //    __incomplete_dykstra_1D<T, horizontal><<<grid_1D, blocks_1D>>> (A_image,
+    //                                                           data,
+    //                                                           g_noise,
+    //                                                           ni, nj, nk, n_max_steps, Tol);
+    //    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+    //    cudaDeviceSynchronize();
 
     __incomplete_dykstra_2D<T, -4, 0><<<grid_2D, blocks_2D>>> (A_image,
-                                                        //   data,
-                                                           g_noise,
-                                                           ni, nj, nk, n_max_steps, Tol);
+                                                               //   data,
+                                                               g_noise,
+                                                               ni, nj, nk, n_max_steps, Tol);
 
     getLastCudaError("__incomplete_dykstra_2D(-1,0)<<<>>> execution failed\n");
     cudaDeviceSynchronize();
 
-//    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
-//                                                           data,
-//                                                           g_noise,
-//                                                           ni, nj, nk, n_max_steps, Tol);
-//    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
-//    cudaDeviceSynchronize();
+    //    __incomplete_dykstra_1D<T, !horizontal><<<grid_1D, blocks_1D>>> (A_image,
+    //                                                           data,
+    //                                                           g_noise,
+    //                                                           ni, nj, nk, n_max_steps, Tol);
+    //    getLastCudaError("__incomplete_dykstra_1D<<<>>> execution failed\n");
+    //    cudaDeviceSynchronize();
 
 
 
@@ -1578,16 +1660,16 @@ __tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, c
         sum_grad_m += grad_m[d];
     }
 
-     dTV_du[site] = lambda * (
-                 (alpha_p *
-                      sum_grad_p
-                  -
-                  alpha_m *
-                      sum_grad_m)
-                 +
-                  2 * ( // f[site] -
-                           u[site])
-                 );
+    dTV_du[site] = lambda * (
+                (alpha_p *
+                 sum_grad_p
+                 -
+                 alpha_m *
+                 sum_grad_m)
+                +
+                2 * ( // f[site] -
+                      u[site])
+                );
 }
 
 
@@ -1687,14 +1769,14 @@ __incomplete_dykstra_LJ(T *A_image, const int ni, const int nj, const int nk, co
             //i = blockInd + row * MaxBlock + col * MaxRow * MaxBlock \n
             //row= ( i / MaxBlock ) % MaxRow                          \n
             //col = ( i / MaxRow ) / MaxBlock
-int tci = threadIdx.x/n_px_per_subset;
-int tci_s = tci*n_px_per_subset;
+            int tci = threadIdx.x/n_px_per_subset;
+            int tci_s = tci*n_px_per_subset;
             //Line in global image
             is = subset_length*(tci%n_subsets) +
-                 (threadIdx.x%n_px_per_subset)%subset_length + blockIdx.x*32 + offseti;
+                    (threadIdx.x%n_px_per_subset)%subset_length + blockIdx.x*32 + offseti;
             //Column in global image
             js = subset_length*(tci/n_subsets) +
-                 (threadIdx.x%n_px_per_subset)/subset_length + blockIdx.y*32 + offsetj;
+                    (threadIdx.x%n_px_per_subset)/subset_length + blockIdx.y*32 + offsetj;
             ks=offsetk;
             is=is%ni;
             js=js%nj;
@@ -1703,7 +1785,7 @@ int tci_s = tci*n_px_per_subset;
 
 #ifdef DY_DEBUG
             if (idx%891==0)
-            printf("A_%d : %f, ", idx, A_image[idx] );
+                printf("A_%d : %f, ", idx, A_image[idx] );
 #endif
             //Fill shared memory with variables we later use
             f[threadIdx.x] = A_image[idx] - q[s*1024+threadIdx.x];
@@ -1739,8 +1821,8 @@ int tci_s = tci*n_px_per_subset;
             __syncthreads();
         }
     }
-   // if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
-     //   printf("ICD convergence of block (%d,%d) in step %d : res_init = %f, res = %f, tol = %f\n", blockIdx.x, blockIdx.y, it, delta_init, delta, tol);
+    // if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
+    //   printf("ICD convergence of block (%d,%d) in step %d : res_init = %f, res = %f, tol = %f\n", blockIdx.x, blockIdx.y, it, delta_init, delta, tol);
 }
 
 
@@ -1795,7 +1877,7 @@ __tv_regularization(T* x,T* z,T* lag,T lambda,T rho,int nx,int ny,int nz)
 
     // The following values do not get changed and thus are loaded only once.
     T x_kij = x[k_i_j];
-     T lag_kij = lag[k_i_j];
+    T lag_kij = lag[k_i_j];
 
     while ( delta > tol && it < maxit )
     {
@@ -1827,7 +1909,7 @@ __tv_regularization(T* x,T* z,T* lag,T lambda,T rho,int nx,int ny,int nz)
             z[k_i_j]=0;
         *m_ps = mabs(newval);
         __syncthreads();
-         delta = L2_norm(ps_sum);
+        delta = L2_norm(ps_sum);
 #else
         newval = -rho * (x_kij - *z_kij) - lag_kij;
 
@@ -1842,7 +1924,7 @@ __tv_regularization(T* x,T* z,T* lag,T lambda,T rho,int nx,int ny,int nz)
         }
         if ( nx > 1 && i > 0 )
         {
-             T du =  (*z_east - *z_kij);
+            T du =  (*z_east - *z_kij);
             nn_contrib -= du;
             grad_norm += du*du;
         }
@@ -1853,21 +1935,21 @@ __tv_regularization(T* x,T* z,T* lag,T lambda,T rho,int nx,int ny,int nz)
         }
         if ( ny > 1 && j > 0  )
         {
-          T du =  (*z_south - *z_kij);
-          nn_contrib -= du;
-          grad_norm += du*du;
-      }
+            T du =  (*z_south - *z_kij);
+            nn_contrib -= du;
+            grad_norm += du*du;
+        }
         if ( nz > 1 && k < nz-1 ) {
-             T du =  (*z_top - *z_kij);
-             nn_contrib -= du;
-             grad_norm += du*du;
-         }
+            T du =  (*z_top - *z_kij);
+            nn_contrib -= du;
+            grad_norm += du*du;
+        }
         if ( nz > 1 && k > 0 )
         {
-          T du = (*z_bottom - *z_kij);
-          nn_contrib -= du;
-          grad_norm += du*du;
-      }
+            T du = (*z_bottom - *z_kij);
+            nn_contrib -= du;
+            grad_norm += du*du;
+        }
         grad_norm = sqrt(grad_norm+1e-14);
 
         newval += (nn_contrib/grad_norm)*lambda;
@@ -2177,8 +2259,8 @@ void step35::Kernels<T>::dyadic_dykstra_LJ(T *A_image, const int ni, const int n
 //@param height height of the array
 template<typename T>
 void step35::Kernels<T>::element_norm_product(typename PrecisionTraits<T, gpu_cuda>::ComplexType* arr1,
-        typename PrecisionTraits<T, gpu_cuda>::ComplexType* arr2,
-        int width, int height, int depth) {
+                                              typename PrecisionTraits<T, gpu_cuda>::ComplexType* arr2,
+                                              int width, int height, int depth) {
     int size=depth*width*(height/2+1);
     T normalization=width*height*depth;
     __element_norm_product<T> op(normalization);
@@ -2261,7 +2343,7 @@ void step35::Kernels<T>::soft_threshold(T* arr, T* lag,T *xvec, T rho, T thresho
 //@param size size of arr
 template<typename T>
 void step35::Kernels<T>::soft_threshold_complex(typename PrecisionTraits<T, gpu_cuda>::ComplexType* arr,
-        T threshold, int size) {
+                                                T threshold, int size) {
     int grids=size/1024+1;
     dim3 grid(grids,1);
     dim3 blocks(1024,1);

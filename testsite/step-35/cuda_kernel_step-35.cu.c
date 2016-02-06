@@ -1003,6 +1003,103 @@ __tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, c
 
 
 
+//@setc5{Kernel: __tv_derivative}
+//@brief kernel for evaluation of the functional derivative of th TV regularization functional.
+template<typename T>
+inline void
+__tv_derivative_cpu(dim3 blockDim, T* dTV_du, const T* u, const T* f, T lambda, const int height, const int width, const int depth)
+{
+    T beta = 1e-4;
+
+    // Arrays for the gradient at a given site.
+    T grad_p[3/*dim*/];
+    T grad_m[3];
+
+    for (int d = 0; d < 3; d++)
+    {
+        grad_p[d] = 0.;
+        grad_m[d] = 0.;
+    }
+
+    // CUDA
+    // int row = threadIdx.y;
+    // int col = threadIdx.x;
+
+    // OpenMP
+    for (int row = 0; row < blockDim.y; row++)
+        for (int col = 0; col < blockDim.x; col++)
+        {
+
+            int global_row = blockDim.y*blockIdx.y + row;
+            int global_col = blockDim.x*blockIdx.x + col;
+
+            int site = global_row*width + global_col;
+
+            int north = site + width;
+            int south = site - width;
+
+            int east = site + 1;
+            int west = site - 1;
+
+            // TO DO: 3D
+
+            // The gradient is computed using forward differences.
+            if (global_col < width-1)
+                grad_p[0] = u[east]  - u[site];
+
+            if (global_row < height-1)
+                grad_p[1] = u[north] - u[site];
+            // grad_p[2] = u[top] -u[site];
+
+            if (global_col > 0)
+                grad_m[0] = u[site] - u[west];
+
+            if (global_row > 0)
+                grad_m[1] = u[site] - u[south];
+
+            // grad_m[2] = u[site] - u[bottom];
+
+            // From the components of the gradient we can compute the local diffusion coefficient.
+            T alpha_p = 0;
+            T alpha_m = 0;
+
+            for (int d = 0; d < 3; d++)
+            {
+                alpha_p += grad_p[d]*grad_p[d];
+                alpha_m += grad_m[d]*grad_m[d];
+            }
+
+            alpha_p = 1./(sqrt(alpha_p + beta));
+            alpha_m = 1./(sqrt(alpha_m + beta));
+
+            // from the diffusion coefficient and the gradients
+            // we finally compute the divergence weighted by
+            // the regularization parameter $\lambda$.
+            // To minimize multiplications we first add up the components
+            // of the gradients and multiply with the diffusion coefficients only afterwards.
+            T sum_grad_p = 0.;
+            T sum_grad_m = 0.;
+
+            for (int d = 0; d < 3; d++)
+            {
+                sum_grad_p += grad_p[d];
+                sum_grad_m += grad_m[d];
+            }
+
+            dTV_du[site] = lambda * (
+                        (alpha_p *
+                         sum_grad_p
+                         -
+                         alpha_m *
+                         sum_grad_m)
+                        +
+                        2 * ( // f[site] -
+                              u[site])
+                        );
+        }
+}
+
+
 //@sect5{Function: tv_derivative}
 //@brief This is a wrapper for the __tv_derivative Kernel.
 //@param A pointer to the image
@@ -1023,6 +1120,8 @@ void step35::Kernels<T>::tv_derivative(T * dTV_du,
     dim3 grid(gridsi,gridsj);
     dim3 blocks(N_PX_X_2D, N_PX_Y_2D);
 
+    // IF CUDA
+    if (arch == cuda) {
     __tv_derivative<T><<<grid,blocks>>> (dTV_du,
                                          A_image,
                                          f,
@@ -1030,6 +1129,23 @@ void step35::Kernels<T>::tv_derivative(T * dTV_du,
                                          ni, nj, nk);
     getLastCudaError("__tv_derivative<<<>>> execution failed\n");
     cudaDeviceSynchronize();
+    }
+    else {
+        // ELSE
+#pragma omp parallel for
+        for(uint bx = 0; bx  < grid.x; bx++ )
+        {
+#pragma omp parallel for
+            for(uint by = 0; by < grid.y; by++)
+            {
+                __tv_derivative_cpu<T> (blocks, dTV_du,
+                                        A_image,
+                                        f,
+                                        lambda,
+                                        ni, nj, nk);
+            }
+        }
+    }
 }
 
 

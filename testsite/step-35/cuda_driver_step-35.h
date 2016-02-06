@@ -795,6 +795,7 @@ public:
         int iter = 0;
         bool iterate = true;
 
+        // FIXME: arch flag as template parameter in Kernels structure
         step35::Kernels<Mdouble> kernel;
 
         while (iterate)

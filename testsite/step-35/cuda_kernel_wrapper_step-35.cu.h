@@ -26,13 +26,11 @@ Copyright  Stephan Kramer, Johannes Hagemann 2014 - 2016, Lutz Künneke, Jan Leb
 //CUDA
 #include <cuda.h>
 
-//SciPAL
-#include <base/PrecisionTraits.h>
 namespace step35 {
 
 // @sect4{Class: Kernels}
 // Wrapper for our kernels
-template<typename T>
+template<typename T, ParallelArch arch>
 struct Kernels {
 
     void set_cs(T* cs_h, int maxnum);

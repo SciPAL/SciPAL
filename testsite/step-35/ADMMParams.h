@@ -45,7 +45,7 @@ enum regularisationType {haar, sparse, quadratic, TV};
 // This class contains parameters read from control file, default: step-35.prm
 class ADMMParams {
 
-  public:
+public:
     // First of all, we declare the most important parameter of the whole algorithm: How
     // probable it is that the residual is chi-squared distributed.
     double alpha_quantile;
@@ -54,7 +54,7 @@ class ADMMParams {
     double psf_fwhm;
 
     //Stopping tolerance of ADMM
-   // double tol;
+    // double tol;
 
     //First Lagrangian update parameter
     double alpha1;
@@ -75,8 +75,20 @@ class ADMMParams {
     // Maximum number of Dykstra iterations
     int n_max_dykstra_steps;
 
+    //Maximum number of Heun steps, number of iteration steps to compute the reconstructed image for given noise.
+    int n_max_heun_steps;
+
+    // In each time step of the heun algorithm we adapt the time step this many times.
+    int n_max_heun_dt_adaption_steps;
+
     // Threshold for L2-norm of solution increment in Dykstra.
     double dykstra_Tol;
+
+    // Tolerance of the norm of the difference of two successive Heun steps.
+    double heun_Tol;
+
+    // Tolerance of the norm of the difference of two successive time step attempts within a Heun step.
+    double dt_adaption_Tol;
 
 
     //Used for shifted indexing
@@ -109,7 +121,7 @@ class ADMMParams {
 
     dealii::SolverControl solver_control;
 
-  private:
+private:
     ADMMParams (const ADMMParams & /*other*/) {}
 
     ADMMParams & operator = (const ADMMParams & /*other*/) {
@@ -125,7 +137,39 @@ void ADMMParams::declare(dealii::ParameterHandler &prm) {
     prm.enter_subsection ("Solver control");
 
     dealii::SolverControl::declare_parameters(prm);
+    prm.enter_subsection("Heun");
+    {
+        prm.declare_entry ("N max time steps",
+                           "1000",
+                           dealii::Patterns::Integer(),"Maximum number of Heun steps, number of iteration steps to compute the reconstructed image for given noise.");
 
+        prm.declare_entry ("N max time step adaptions",
+                           "10",
+                           dealii::Patterns::Integer(),"");
+
+        prm.declare_entry ("Tolerance",
+                           "1e-4",
+                           dealii::Patterns::Double(),
+                           "Tolerance of the norm of the difference of two successive Heun steps.");
+
+        prm.declare_entry ("Time step adaption tolerance",
+                           "1e-4",
+                           dealii::Patterns::Double(),
+                           "Tolerance of the norm of the difference of two successive time step attempts within a Heun step.");
+
+    }
+    prm.leave_subsection();
+
+    prm.enter_subsection("Dykstra");
+    {
+        prm.declare_entry ("N max Dykstra iterations",
+                           "100",
+                           dealii::Patterns::Integer(),"");
+        prm.declare_entry ("Dykstra tolerance",
+                           "1e-4",
+                           dealii::Patterns::Double(),"Finish when |x_r - x_{r-1}| < tolerance");
+    }
+    prm.leave_subsection();
     prm.leave_subsection ();
 
 
@@ -151,14 +195,6 @@ void ADMMParams::declare(dealii::ParameterHandler &prm) {
                           ".1",
                           dealii::Patterns::Double(),
                           "Stabilization parameter. Similar to a pseudo-timestep. The smaller, the more stable but also the more slower the convergence." );
-
-
-        prm.declare_entry ("N max Dykstra iterations",
-                           "100",
-                           dealii::Patterns::Integer(),"");
-        prm.declare_entry ("Dykstra tolerance",
-                           "1e-4",
-                           dealii::Patterns::Double(),"Finish when |x_r - x_{r-1}| < tolerance");
 
 
 
@@ -243,8 +279,26 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
     prm.enter_subsection ("Solver control");
 
     solver_control.parse_parameters(prm);
+    prm.enter_subsection("Heun");
+    {
+        this->n_max_heun_steps = prm.get_integer("N max time steps");
 
-     prm.leave_subsection ();
+        this->n_max_heun_dt_adaption_steps = prm.get_integer ("N max time step adaptions");
+
+        this->heun_Tol = prm.get_double("Tolerance");
+
+        this->dt_adaption_Tol = prm.get_double("Time step adaption tolerance");
+    }
+    prm.leave_subsection();
+
+    prm.enter_subsection("Dykstra");
+    {
+        this->n_max_dykstra_steps = prm.get_integer("N max Dykstra iterations");
+
+        this->dykstra_Tol = prm.get_double("Dykstra tolerance");
+    }
+    prm.leave_subsection();
+    prm.leave_subsection ();
 
     prm.enter_subsection("input data");
     {
@@ -255,17 +309,6 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
 
         this->inv_gamma = 1./prm.get_double("Gamma");
 
-
-
-        this->n_max_dykstra_steps = prm.get_integer("N max Dykstra iterations");
-
-        this->dykstra_Tol = prm.get_double("Dykstra tolerance");
-
-
-
-
-
-
         this->rho1 = prm.get_double("rho1");
         this->rho2 = prm.get_double("rho2");
         this->dim = prm.get_integer("dim");
@@ -274,7 +317,7 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
 
 
         this->psf_fwhm = prm.get_double("PSF FWHM");
-        this->psf_fwhm = 2.0*this->psf_fwhm; //the gaussian is calculated with the input sigma, its support has edge length 4 sigma
+        this->psf_fwhm = 2.0*this->psf_fwhm;//FIXME //the gaussian is calculated with the input sigma, its support has edge length 4 sigma
 
 
         this->reg_strength = prm.get_double("regularization");
@@ -299,6 +342,9 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
         }
     }
     prm.leave_subsection ();
+
+
+
 
     prm.enter_subsection("simulate dataset from real image");
     {
@@ -365,10 +411,10 @@ void SimParams::declare(dealii::ParameterHandler &prm)
     prm.enter_subsection ("Input");
     {
 
-    prm.declare_entry ("Image to reconstruct",
-                       "",
-                       dealii::Patterns::FileName(),
-                       "path to the .tif image");
+        prm.declare_entry ("Image to reconstruct",
+                           "",
+                           dealii::Patterns::FileName(),
+                           "path to the .tif image");
     }
     prm.leave_subsection ();
 
@@ -407,7 +453,7 @@ void SimParams::declare(dealii::ParameterHandler &prm)
 
 void SimParams::get(dealii::ParameterHandler &prm)
 {
-     this->ADMMParams::get(prm);
+    this->ADMMParams::get(prm);
 
     prm.enter_subsection ("Input");
     {

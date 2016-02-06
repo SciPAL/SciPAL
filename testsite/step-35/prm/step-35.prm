@@ -1,84 +1,115 @@
 # Listing of Parameters
 # ---------------------
-subsection input data
-  # enforces first constraint
-  set alpha1         = 1.2
-
-  # enforces second constraint
-  set alpha2         = 0.12
-
-  # estimate of gaussian noise standard deviation. If simulate = true, will be
-  # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 10
-
+subsection Input
   # path to the .tif image
-  set image          = /clusterfs/cuda-2015/austausch_rw/imagetif.tif
-
-  # intensity of regularisation
-  set regularization = 1.0
-
-  # stabilises first constraint
-  set rho1           = 6.192
-
-  # stabilises second constraint
-  set rho2           = 1.8
-
-  # PSF spread
-  set sigma          = 4 
+  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/johanns_eule.tif
 end
 
-subsection stoch dykstra
 
-    # stochastic dykstra on, else old incomplete dykstra is executed
-    set stoch dyk      = true
-
-    # decomposition of image into rectangles with width 2^power_x
-    # power_x = -1 means stochastically chosen decompositions
-    set power x = -1
-
-    # random resolution, if resol = -1, all resolutions if resol = 0,
-    # else consider only certain resoution depth (between 1 and power_x)
-    set resol = -1
-
-    # for rectangles choose way of decomposing into chunks for higher resolution
-    # both_halving = true means for next resolution to consider in algorithm the chunks are
-    # created by halving both sides of the rectangle until one side is 1 pixel, then only the other is
-    # divided by 2, else first the longest side is divided by 2 until a square is achieved, then both sides are halved
-    # until their length is 1
-    set both halving = false
-end
-
-subsection output
-  # save preliminary results of the output image
-  set control      = true
-
-  # where should we put the ouput image? Will be a tiff image
-  set output image = control.tif
-
+subsection Output
   # Specify a directory where the results of the test are to be stored. This
   # can be either an absolute path or path relative to the directory where the
   # program has been started. The default is subdir called results-<date>
   # where <date> will be replaced by the date at which the program has been
   # started. this simplifies keeping the projects directory clean
-  set Run directory = /clusterfs/cuda-2015/step-35/results
+  set Run directory = /z/johannes/cuda_results/step-35/
+
+  # If true, preliminary results of the output image are saved to the run
+  # directory.
+  set control       = true
+
+  # Where should we put the ouput image? Will be a tiff image
+  set output image  = control.tif
+end
+
+
+subsection Solver control
+  set Log frequency = 1
+  set Log history   = false
+  set Log result    = true
+  set Max steps     = 100
+  set Tolerance     = 1.e-10
+
+
+  subsection Dykstra
+    # Finish when |x_r - x_{r-1}| < tolerance
+    set Dykstra tolerance        = 1e-4
+    set N max Dykstra iterations = 1
+  end
+
+  subsection Heun
+    set N max time step adaptions    = 10
+    # Maximum number of Heun steps, number of iteration steps to compute the
+    # reconstructed image for given noise.
+    set N max time steps             = 1
+
+    # Tolerance of the norm of the difference of two successive time step
+    # attempts within a Heun step.
+    set Time step adaption tolerance = 1e-1
+
+    # Tolerance of the norm of the difference of two successive Heun steps.
+    set Tolerance                    = 1e-2
+  end
+
+end
+
+
+subsection input data
+  # Principal parameter. Allowed range : (0,1). Default : 0.9. The higher the
+  # more accurate.
+  set Alpha quantile        = 0.9 # not used
+
+  # Do an Anscombe Transformation on input image
+  set Anscombe              = false
+
+  # Stabilization parameter. Similar to a pseudo-timestep. The smaller, the
+  # more stable but also the more slower the convergence.
+  set Gamma                 = 8e-3
+
+  # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
+  # reasonably sampled on the lattice of pixels we simply assume that it is a
+  # delta peak and consider the convolution operator as identity.
+  set PSF FWHM          = 9.4     #in new impl...consider factor of 2!  #
+
+  # Regularisation type
+  set Regularization method = TV
+
+  # enforces first constraint
+  set alpha1                = 1
+
+  # enforces second constraint
+  set alpha2                = 2
+
+  # Dimension of the images (if TIFF-stack process each slice individually if
+  # dim = 2)
+  set dim                   = 2
+
+  # estimate of gaussian noise standard deviation. If simulate = true, will be
+  # used to add gaussian noise with standard deviation of ...
+  set gaussian noise = 242  
+  
+ # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
+
+  # intensity of regularisation
+  set regularization        = 1.0
+
+  # stabilises first constraint
+  set rho1                  = 0.99
+
+  # stabilises second constraint
+  set rho2                  = 1.0
 end
 
 
 subsection program flow control
   # largest patch edge length if not using small dykstra in approximation
-  set MRdepth            = 15
+  set MRdepth         = 15 #not used
 
-  # do a small dykstra in approximation
-  set approx             = true
-
-  # Set maximum number of iterations
-  set maximum iterations = 10002
+  # do a small Dykstra in approximation
+  set approx          = true
 
   # Reporting progress in intervals of ... Iterations
-  set report interval    = 100
-
-  # Finish when |x_r - x_{r-1}| < tolerance
-  set tolerance          = 1e-3
+  set report interval = 10
 end
 
 
@@ -86,9 +117,10 @@ subsection simulate dataset from real image
   # If set to false the input is treated as real data, if true input will be
   # treated as test image and blurring and noise are added
   set simulate  = true
+
   # If false simulated noise has a constant seed, if true the seed is taken
   # from the clock
-  set time seed = true
+  set time seed = false
 end
 
 

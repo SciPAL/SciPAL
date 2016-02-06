@@ -40,7 +40,6 @@ Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hage
 #include <lac/cublas_Vector.h>
 
 //Our stuff
-#include "cuda_driver_step-35.hh"
 #include <step-35/cuda_kernel_wrapper_step-35.cu.h>
 #include "patch.h"
 #include "cuda_helper.h"
@@ -120,6 +119,9 @@ public:
         // we have to bypass the convolution operation as then the blurrign operator is the identity.
         bool is_delta_peak;
 
+        dealii::Vector<Mdouble> psf_1d;
+        int cut_off;
+        ImageDoFHandler dof_handler;
 
         ~Convolution() {
 #ifdef USE_FFT_CONV
@@ -140,11 +142,9 @@ public:
               psf_fourier_transform_d(fm1.size()),
               psf_h(width*height),
               is_delta_peak(false),
-      #ifndef USE_FFT_CONV
               dof_handler(dealii::Point<3>(width, height, depth))
-    #endif
         {
-          {
+
                 // TO DO: compute psf_h here
 
                 SciPAL::Vector<Mdouble,BW> fpsf_tmp_d(psf_h.size());
@@ -154,17 +154,19 @@ public:
                 for (int z=0; z<depth; z++ ) {
                     for (int x=0; x<width; x++) {
                         for (int y=0; y<height; y++) {
-                            psf_h(z*height*width+x*height+y) = _psf(Mdouble(x), Mdouble(y), Mdouble(z), fwhm );
+                            psf_h(z*height*width+x*height+y) =
+                                    _psf(Mdouble(x), Mdouble(y), Mdouble(z), fwhm );
                             psf_norm += psf_h[z*height*width+x*height+y];
                         }
                     }
                 }
-
+                std::cout<< "psf_norm: "<<psf_norm << std::endl;
                 //norm
                 psf_h *= 1. / psf_norm;
                 //                                psf_h *= 65535;
                 fpsf_tmp_d = psf_h;
                 //                cufftShift_2D_impl(fpsf_tmp_d.data(), width, height);
+
                 //Cufft setup
                 //Create cufft plans
                 plan_fft=new cufftHandle();
@@ -177,57 +179,39 @@ public:
                 cufftPlan3d(iplan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_C2R);
 #endif
 
+                if(BW::arch == gpu_cuda)
+                {
+                    //Fourier transformation of psf using cuFFT
+                    cufftHandle plan;
+    #ifdef DOUBLE_PRECISION
+                    cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
+                    cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
+    #else
+                    cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
+                    cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
+    #endif
+                    //Cleanup
+                    cufftDestroy(plan);
+                    getLastCudaError("cufft error!\n");
+                }
+                else
+                {
+                    //Fourier transformation of psf using fftw
+                    fftwf_plan plan =
+                            fftwf_plan_dft_r2c_2d(width, height,
+                                                  fpsf_tmp_d.data(),
+                                                  reinterpret_cast<fftwf_complex*>(psf_fourier_transform_d.data()),
+                                                  FFTW_PATIENT);
+                    fftwf_execute(plan);
+                    fftwf_destroy_plan(plan);
+                }
 
-            }
-
-#ifdef USE_FFT_CONV
-            // TO DO: compute psf_h here
-            SciPAL::Vector<Mdouble,BW> fpsf_tmp_d;
-            fpsf_tmp_d = (psf_h);
 
 
-
-            //Cufft setup
-            //Create cufft plans
-            plan_fft=new cufftHandle();
-            iplan_fft=new cufftHandle();
-#ifdef DOUBLE_PRECISION
-            cufftPlan3d(plan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_D2Z);
-            cufftPlan3d(iplan_fft, inf->ext_depth, inf->ext_width, inf->ext_height,  CUFFT_Z2D);
-#else
-            cufftPlan3d(plan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_R2C);
-            cufftPlan3d(iplan_fft, /*inf->ext_*/depth, /*inf->ext_*/width, /*inf->ext_*/height,  CUFFT_C2C);
-#endif
-
-
-            if(typeid(BW) = typeid(cublas))
-            {
-                //Fourier transformation of psf using cuFFT
-                cufftHandle plan;
-#ifdef DOUBLE_PRECISION
-                cufftPlan3d(&plan, ext_depth, ext_width, ext_height, CUFFT_D2Z);
-                cufftExecD2Z(plan, fpsf_tmp_d, fpsf_d);
-#else
-                cufftPlan3d(&plan, /*ext_*/depth, /*ext_*/width, /*ext_*/height,  CUFFT_R2C);
-                cufftExecR2C(plan, fpsf_tmp_d.data(), psf_fourier_transform_d.data());
-#endif
-                //Cleanup
-                cufftDestroy(plan);
-                getLastCudaError("cufft error!\n");
-            } else
-            {
-                fftwf_plan plan =
-                        fftwf_plan_dft_r2c_2d(width, height,
-                                              fpsf_tmp_d.data(),
-                                              reinterpret_cast<fftwf_complex*>(psf_fourier_transform_d.data()),
-                                              FFTW_PATIENT);
-                fftwf_execute(plan);
-                fftwf_destroy_plan(plan);
-            }
-#else
+//#ifdef USE_FFT_CONV
 
             // Compute 1D PSF
-            if (fwhm >0)
+            if(fwhm > 1e-10)
             {
                 cut_off = std::ceil(1.2*fwhm); // corresponds approximately to a cut off radius of 3 std devs
 
@@ -254,21 +238,24 @@ public:
             }
             else
                 is_delta_peak = true;
-#endif
+//#endif
 
 
         }
 
-        dealii::Vector<Mdouble> psf_1d;
-        int cut_off;
-        ImageDoFHandler dof_handler;
+
 
         void vmult(SciPAL::Vector<Mdouble, BW> &dst, const SciPAL::Vector<Mdouble, BW>& src)
         {
             if (is_delta_peak)
                 this->vmult_id(dst, src);
             else
-                this->vmult_FFT(dst, src);
+            {
+                if(BW::arch == gpu_cuda )
+                    this->vmult_FFT(dst, src);
+                else
+                    this->vmult_conv(dst, src);
+            }
         }
 
         //    private:
@@ -340,6 +327,8 @@ public:
 
             // setup fftw on first run
             //fftw plans
+            if(BW::arch == cpu)
+            {
             if(init == false)
             {
                 init = true;
@@ -348,19 +337,20 @@ public:
                         = fftwf_plan_dft_r2c_2d(width, height,
                                                 (src.data()),
                                                 reinterpret_cast<fftwf_complex*>(fm1.data()),
-                                                FFTW_PATIENT);
+                                                FFTW_ESTIMATE);
 
                 this->plan_cpu_d_backward
                         = fftwf_plan_dft_c2r_2d(width, height,
                                                 reinterpret_cast<fftwf_complex*>(fm1.data()),
                                                 (dst.data()),
-                                                FFTW_PATIENT);
+                                                FFTW_ESTIMATE);
+            }
             }
             if (dst.size() == 0)
                 dst.reinit(src.size());
 
             //            cufftShift_2D_impl(src.data(), width, height);
-            if(typeid(BW) == typeid(cublas)) {
+            if(BW::arch == gpu_cuda) {
 #ifdef DOUBLE_PRECISION
                 cufftExecD2Z(*plan_fft, src.data(), fm1.data());
 #else
@@ -386,22 +376,30 @@ public:
 #endif
                 checkCudaErrors(cudaDeviceSynchronize());
                 getLastCudaError("cufft error!\n");
+                dst *= 1./dst.size();
+                //ugly...
+    //            kernelConf conf;
+    //            int threadsPerBlock_X = 16;
+    //            int threadsPerBlock_Y = 16;
+    //            conf.block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
+    //            conf.grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
+    //            cufftShift_2D_config_impl(dst.data(), width, height, &conf);
             }
             else
             {
                 fftwf_execute(plan_cpu_d_backward);
             }
 
-            dst *= 1./dst.size();
+//            dst *= 1./dst.size();
             //ugly...
-            kernelConf* conf = (kernelConf*) malloc(sizeof(kernelConf));
-            int threadsPerBlock_X = 16;
-            int threadsPerBlock_Y = 16;
-            conf->block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
-            conf->grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
-            cufftShift_2D_config_impl(dst.data(), width, height, conf);
+//            kernelConf conf;
+//            int threadsPerBlock_X = 16;
+//            int threadsPerBlock_Y = 16;
+//            conf.block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
+//            conf.grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
+//            cufftShift_2D_config_impl(dst.data(), width, height, &conf);
 
-            //            dst = SciPAL::abs(fm1);
+
 
         }
 
@@ -590,11 +588,12 @@ public:
         convolution.vmult(dst, dst);
 
         // Add regularization
-        step35::Kernels<Mdouble> kernel;
+        step35::Kernels<Mdouble, BW::arch> kernel;
         kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
                              this->im_d().data(),
                              reg_strength,
-                             dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth());
+                             dof_handler.pwidth(),
+                             dof_handler.pheight(), dof_handler.pdepth());
 
         this->tmp2_d *= params.rho2;
 
@@ -609,8 +608,6 @@ public:
 
         const Mdouble reg_strength = params.reg_strength;
 
-        const Mdouble Tol = 1e-2;
-        const int max_dt_iter = 10;
 
         SciPAL::Vector<Mdouble, BW> & x_tmp = this->tmp_lag2;
 
@@ -619,17 +616,17 @@ public:
 
         SciPAL::Vector<Mdouble, BW> & sol_diff = this->tmp_lagr;
 
-        Mdouble err = 2*Tol;
-        int n_max_admm_iter = 1000;
+        Mdouble err = 2*params.heun_Tol;
+
         int n_err_iter = 0;
         // For a given Lagrange parameter @p lag1 and a given estimate of the noise we compute
         // a new estimate for how the reconstructed image should look like.
-        while (err > Tol)
+        while (err > params.heun_Tol)
         {
             // Save old solution.
             this->x_old = this->x_d;
 
-            Mdouble Delta = 2*Tol;
+            Mdouble Delta = 2*params.dt_adaption_Tol;
 
             // Evaluate rhs of Euler-Lagrange for explicit Euler step.
             // This does not change over the course of the timestep adaption.
@@ -639,8 +636,8 @@ public:
 
             int dt_iter = 1;
             Mdouble delta_t;
-            // Th einne rloop does the time-step adaption.
-            for (; dt_iter <= max_dt_iter; dt_iter++)
+            // The inner loop does the time-step adaption.
+            for (/*dt_iter*/; dt_iter <= params.n_max_heun_dt_adaption_steps; dt_iter++)
             {
                 delta_t = 1./params.inv_gamma;
 
@@ -664,10 +661,10 @@ public:
 
                 Delta = sol_diff.l2_norm()/std::sqrt(sol_diff.size());
 
-                Mdouble new_dt = 0.9 * Tol / Delta;
+                Mdouble new_dt = 0.9 * params.dt_adaption_Tol / Delta;
 
                 // To avoid excessive oscillations we limit the increase of the timestep.
-                if (Delta < Tol) {
+                if (Delta < params.dt_adaption_Tol) {
                     if (new_dt > 2*delta_t)
                         new_dt = 2*delta_t;
                 }
@@ -677,7 +674,7 @@ public:
 
                 delta_t = params.inv_gamma = 1./(new_dt);
 
-                if (Delta <= Tol)
+                if (Delta <= params.dt_adaption_Tol)
                     break;
             }
             //  std::cout << "             n dt adaptions : " << dt_iter << ", new timestep : " << 1./params.inv_gamma << ", Delta : " << Delta << std::endl;
@@ -687,23 +684,24 @@ public:
             tmp2_d -= this->x_old;
             err = tmp2_d.l2_norm()/std::sqrt(tmp2_d.size());
             n_err_iter++;
-            if (n_err_iter > n_max_admm_iter)
+            if (n_err_iter > params.n_max_heun_steps)
                 break;
         }
-        std::cout << "    n ADMM steps : " << n_err_iter << std::endl;
+        std::cout << "    n Heun steps used : " << n_err_iter <<
+                  ", norm of solution increment : "<< err<< std::endl;
 
 
         this->z_d = this->x_d;
     }
 
 
-    // FIXME: use SciPAL vectors and ETs!!!
+
     //@sect5{Function: x_step}
     //@brief Performs approximative argmin with respect to $x$
-    // FIXME: component wise
+    // FIXME: component wise; to be removed 2016 02 06
     void x_step(const Mdouble rho1,const Mdouble rho2)
     {
-        step35::Kernels<Mdouble> kernel;
+        step35::Kernels<Mdouble, BW::arch> kernel;
 
         // the residual
         //$\text{tmp}_d=I-e-A*x$
@@ -745,7 +743,7 @@ public:
     //$ \Upsilon_1^{r+1} = \Upsilon_1^r + \alpha_1 \left( I - A*x - \epsilon \right) $ \n
     //$\Upsilon_2^{r+1} = \Upsilon_2^r + \alpha_2 \left( x - z \right) $
     void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
-        step35::Kernels<Mdouble> kernel;
+        step35::Kernels<Mdouble, BW::arch> kernel;
 
         //Update the lagrangian estimates
         residual(tmp_lag1, this->im_d(), this->e_d(), this->x_d);
@@ -796,7 +794,8 @@ public:
         bool iterate = true;
 
         // FIXME: arch flag as template parameter in Kernels structure
-        step35::Kernels<Mdouble> kernel;
+        step35::Kernels<Mdouble, BW::arch> kernel;
+        Mdouble norm = 2*dykstra_Tol;  //norm of residuals
 
         while (iterate)
         {
@@ -824,26 +823,29 @@ public:
                                                       Q_full.data(),
                                                       this->writeable_e_d().data(),
                                                       this->sigma_noise,
-                                                      dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
-                                                      n_max_dykstra_steps, dykstra_Tol
+                                                      dof_handler.pwidth(),
+                                                      dof_handler.pheight(),
+                                                      dof_handler.pdepth()//,
+//                                                      n_max_dykstra_steps, dykstra_Tol
                                                       );
             }
             else
             {
+                h_old = this->e_d();
                 kernel.dyadic_dykstra_fine_scale_part_cpu(h_iter.data(), h_old.data(),
                                                           Q_full.data(),
                                                           this->writeable_e_d().data(),
                                                           this->sigma_noise,
-                                                          dof_handler.pwidth(), dof_handler.pheight(), dof_handler.pdepth(),
-                                                          n_max_dykstra_steps, dykstra_Tol
+                                                          dof_handler.pwidth(),
+                                                          dof_handler.pheight(),
+                                                          dof_handler.pdepth()//,
                                                           );
             }
 
-
-            // Convergence control.
+            //Convergence control.
             {
                 h_init -= h_iter;
-                Mdouble norm = h_init.l2_norm();
+                norm = h_init.l2_norm();
 
                 iterate = ( norm > dykstra_Tol &&
                             iter < n_max_dykstra_steps);
@@ -851,7 +853,9 @@ public:
                 iterate ? h_init = h_iter : this->writeable_e_d() = h_iter;
                 iter++;
             }
-        }
+        }// iterate end
+        std::cout<<"    n Dykstra steps used : " << iter <<
+                   ", norm of noise increment : "<< norm<< std::endl;
     }
 
 

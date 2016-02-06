@@ -564,7 +564,7 @@ void step35::ADMM<T>::set_initial_condition(Driver &driver, ParallelArch arch)
 
     driver.x_h = driver.im_h;
 
-    if ( arch == gpu_cuda ) {
+//    if ( arch == gpu_cuda ) {
 
         driver.writeable_im_d() = driver.im_h;
         driver.x_d = driver.x_h;
@@ -580,7 +580,7 @@ void step35::ADMM<T>::set_initial_condition(Driver &driver, ParallelArch arch)
 //        cs_d.print();
 
      //   checkCudaErrors(cudaDeviceSynchronize());
-    }
+//    }
 
 }
 //@sect5{Function: add_gaussian_noise}
@@ -597,7 +597,16 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cud
     boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_nor(rng, nd);
 
 
-   driver.convolution.vmult(driver.writeable_im_d(), driver.writeable_im_d() ); // conv2(driver.im_d.array().val(), driver.im_d.array().val());
+
+   driver.convolution.vmult(driver.writeable_im_d(), driver.writeable_im_d() ); //
+
+   dealii::Vector<float> bla;//(input_image.begin(), input_image.end());// bla= (input_image);
+   driver.writeable_im_d().push_to(bla);
+     image_io.write_image("bla.tif", bla,
+                          // image_io.pheight, image_io.pwidth, image_io.pdepth,
+                          dof_handler,
+                          params.gnoise, params.anscombe);
+
     //Push data from device to host
     driver.get_data();
 
@@ -652,6 +661,11 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cud
                          // image_io.pheight, image_io.pwidth, image_io.pdepth,
                          dof_handler,
                          params.gnoise, params.anscombe);
+//    dealii::Vector<float> bla(input_image.begin(), input_image.end());// bla= (input_image);
+//    image_io.write_image("bla.tif", bla,
+//                         // image_io.pheight, image_io.pwidth, image_io.pdepth,
+//                         dof_handler,
+//                         params.gnoise, params.anscombe);
 
     SciPAL::Vector<float, BW> tmp(driver.im_h.size());
     tmp = SciPAL::abs(driver.convolution.psf_fourier_transform_d);
@@ -680,7 +694,8 @@ void step35::ADMM<T>::run() {
     std::cout << "Starting run" << std::endl;
 
     //Read in the image
-    image_io.read_image(this->input_image, this->image_as_read, dof_handler, params.input_image, params.gnoise, params.anscombe);
+    image_io.read_image(this->input_image, this->image_as_read, dof_handler,
+                        params.input_image, params.gnoise, params.anscombe);
 
     // Debugging info about image sizes.
     image_io.print();
@@ -754,7 +769,7 @@ void step35::ADMM<T>::__run (step35::CUDADriver<T, gpu_cuda> &driver)
     driver.get_data();
     //Simulates dataset by adding gaussian noise
     if( params.simulate ) {
-        add_blur_and_gaussian_noise<driver_patch>(driver);
+        add_blur_and_gaussian_noise(driver);
     }
 
     //Copy to determine relative change in each iteration
@@ -764,7 +779,7 @@ void step35::ADMM<T>::__run (step35::CUDADriver<T, gpu_cuda> &driver)
     SciPAL::Vector<T, BW> res_tmp1, res_tmp2;
 
     //Residual of the current step, initialize as residual>tolerance
-    T res=TWO*params.solver_control.tolerance();
+    T res=2.0*params.solver_control.tolerance();
 
     //Log file
     std::ofstream gain_out("gain.txt");

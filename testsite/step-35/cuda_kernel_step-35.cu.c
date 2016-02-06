@@ -59,8 +59,8 @@ __constant__ float cs[512];
 //@brief Copy $c_s$ to constant memory
 //@param cs_h pointer to $c_s$ on host
 //@param maxnum number of elements in cs_h
-template<typename T>
-void step35::Kernels<T>::set_cs(T* cs_h, int maxnum) {
+template<typename T, ParallelArch arch>
+void step35::Kernels<T, arch>::set_cs(T* cs_h, int maxnum) {
     checkCudaErrors(cudaMemcpyToSymbol(cs, cs_h, sizeof(T)*maxnum));
 }
 
@@ -531,7 +531,6 @@ template<typename T, int offset_x, int offset_y>
 struct DykstraStep {
 
     // In contrast to the formulation as pseudo code we only need a constant number of @p h variables because they are computed incrementally.
-    T h_init, h_old, h_new;
 
     // For the corrections we need the full history w.r.t. the number of levels in subset hierarchy.
     T Q[N_SCALES_2D];
@@ -554,7 +553,6 @@ struct DykstraStep {
           global_col (blockDim.x*blockIdx.x + col + offset_x),
           global_idx (global_row*width + global_col)
     {
-        h_old = h_init = residual[global_idx];
 
         for (int j = 1; j <= n_scales; j++)
             Q[j-1] = 0;
@@ -597,46 +595,6 @@ struct DykstraStep {
             return false;
     }
 
-
-    // shared memory arrays cannot be attributes, hence we pass it as argument.
-    T __device__ operator () (const T* ICD_weights, T* ps_sum, const T g_noise)
-    {
-        volatile T * m_ps = ps_sum + tIx;
-
-        // FIXME: increasing min_scale leads to a loss of the large scales!
-        for (int j = 1; j <= this->n_scales /* play here for increasing min_scale */; j++)         // loop over subsets
-        {
-            h_old -= this->Q[j-1];
-            // The following makes a subtle difference.
-            if (j == this->min_scale + 1)
-                h_init = h_old;
-            *m_ps  = h_old;
-            __syncthreads();
-
-            int s_x = n_scales - j; // we loop trough the scales from coarse to fine
-            int s_y = s_x;
-
-            this->sum_of_squares_subsets(s_x/*j-1*/, ps_sum);
-
-            T weight =  // 0.25*
-                    ICD_weights[ //
-                    n_scales-j]; //   j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
-
-            h_new = this->project(s_x, //j-1 /* s_x*/,
-                                  s_y, // j-1 /* s_y */,
-                                  ps_sum, // this->h[j-1]
-                                  h_old ,
-                                  g_noise, weight);
-
-            __syncthreads();
-
-            this->Q[j-1] = h_new - h_old;
-            h_old = h_new;
-        }
-        return h_new - h_init;
-    }
-
-
     T __device__ sweep_fine_scales (
             T* h_iter, T* h_old_in,  T* Q_full,
             const T* ICD_weights, T* ps_sum, const T g_noise)
@@ -645,8 +603,8 @@ struct DykstraStep {
 
         Q[0] = Q_full[this->global_idx];
 
-        this->h_old = h_old_in[this->global_idx];
-
+        T h_old = h_old_in[this->global_idx];
+        T h_new = T(0);
 
         for (int j = this->min_scale + 1; j <= this->n_scales; j++)         // loop over subsets
         {
@@ -778,8 +736,8 @@ __incomplete_dykstra_2D_fine_scales(
 }
 
 
-template<typename T>
-void step35::Kernels<T>::dyadic_dykstra_fine_scale_part(
+template<typename T, ParallelArch arch>
+void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
         T* h_iter, T* h_old, T* Q_full,
         T *residual,
         const T g_noise,
@@ -802,8 +760,8 @@ void step35::Kernels<T>::dyadic_dykstra_fine_scale_part(
 
 }
 
-template<typename T>
-void step35::Kernels<T>::dyadic_dykstra_fine_scale_part_cpu(
+template<typename T, ParallelArch arch>
+void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part_cpu(
         T* h_iter, T* h_old, T* Q_full,
         T *residual,
         const T g_noise,
@@ -827,16 +785,17 @@ void step35::Kernels<T>::dyadic_dykstra_fine_scale_part_cpu(
                         0.000825881};
 
     // FIXME: make number of OpenMP threads editable via prm file
-    omp_set_num_threads(40);
+//    omp_set_num_threads(4);
 
-#pragma omp parallel for
+//#pragma omp parallel for
     for(uint bx = 0; bx  < grid_2D.x; bx++ )
     {
-#pragma omp parallel for private(Q, ps_sum)
+//#pragma omp parallel for private(Q, ps_sum)
         for(uint by = 0; by < grid_2D.y; by++)
         {
             for(uint s = 1; s < N_SCALES_2D; s++)
             {
+                printf("bx: %d, by: %d, s:%d \n", bx, by, s);
                 uint s_x = N_SCALES_2D - s;
                 uint s_y = s_x;
 
@@ -845,65 +804,65 @@ void step35::Kernels<T>::dyadic_dykstra_fine_scale_part_cpu(
 
                 T weight = ICD_weights[N_SCALES_2D - s];
 
-                // loop over tiles in a block
-                for(uint ti = 0; ti < grid_2D.x; ti += edge_x)
-                {
-                    for(uint tj = 0; tj = grid_2D.y; tj += edge_y)
-                    {
-                        for(uint ii = 0; ii < edge_x; ii++)
-                            for(uint jj = 0; jj < edge_y; jj++)
-                                ps_sum[ii][jj] = 0;
+//                // loop over tiles in a block
+//                for(uint ti = 0; ti < blocks_2D.x; ti += edge_x)
+//                {
+//                    for(uint tj = 0; tj = blocks_2D.y; tj += edge_y)
+//                    {
+//                        for(uint ii = 0; ii < edge_x; ii++)
+//                            for(uint jj = 0; jj < edge_y; jj++)
+//                                ps_sum[ii][jj] = 0;
 
-                        // loop over pixels in tile
-                        for(uint ii = 0; ii < edge_x; ii++)
-                        {
-                            for(uint jj = 0; jj < edge_y; jj++)
-                            {
-                                // position of pixel wrt ps_sum
-                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
-                                uint global_idx =
-                                        by * blocks_2D.y * ni + ( tj + jj) * ni
-                                        + bx * blocks_2D.x + ti + ii;
+//                        // loop over pixels in tile
+//                        for(uint ii = 0; ii < edge_x; ii++)
+//                        {
+//                            for(uint jj = 0; jj < edge_y; jj++)
+//                            {
+//                                // position of pixel wrt ps_sum
+//                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
+//                                uint global_idx =
+//                                        by * blocks_2D.y * ni + ( tj + jj) * ni
+//                                        + bx * blocks_2D.x + ti + ii;
 
-                                if(s == 1) // do that only on smallest level
-                                    Q[0][tile_idx] = Q_full[global_idx];
+//                                if(s == 1) // do that only on smallest level
+//                                    Q[0][tile_idx] = Q_full[global_idx];
 
-                                T h_0 = h_old[global_idx] - Q[s - 1][tile_idx];
+//                                T h_0 = h_old[global_idx] - Q[s - 1][tile_idx];
 
-                                ps_sum[ti/edge_x][tj/edge_y] += h_0 * h_0;
-                            }// jj end
-                        }// ii end
+//                                ps_sum[ti/edge_x][tj/edge_y] += h_0 * h_0;
+//                            }// jj end
+//                        }// ii end
 
-                        // calculate weighted residua
-                        T ws = sqrt(ps_sum[ti/edge_x][tj/edge_y] * weight) / g_noise;
-                        if(ws > 1) // adapt pixels if statistic is violated
-                        {
-                            //adapt all pixels in the tile
-                            for(uint ii = 0; ii < edge_x; ii++)
-                                for(uint jj = 0; jj < edge_y; jj++)
-                                {
-                                    uint global_idx =
-                                            by * blocks_2D.y * ni + ( tj + jj) * ni
-                                            + bx * blocks_2D.x + ti + ii;
-                                    h_iter[global_idx] = h_old[global_idx] / ws;
-                                }
-                        }
+//                        // calculate weighted residua
+//                        T ws = sqrt(ps_sum[ti/edge_x][tj/edge_y] * weight) / g_noise;
+//                        if(ws > 1) // adapt pixels if statistic is violated
+//                        {
+//                            //adapt all pixels in the tile
+//                            for(uint ii = 0; ii < edge_x; ii++)
+//                                for(uint jj = 0; jj < edge_y; jj++)
+//                                {
+//                                    uint global_idx =
+//                                            by * blocks_2D.y * ni + ( tj + jj) * ni
+//                                            + bx * blocks_2D.x + ti + ii;
+//                                    h_iter[global_idx] = h_old[global_idx] / ws;
+//                                }
+//                        }
 
-                        // update iteration variables for all pixels in a tile
-                        for(uint ii = 0; ii < edge_x; ii++)
-                            for(uint jj = 0; jj < edge_y; jj++)
-                            {
-                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
-                                uint global_idx =
-                                        by * blocks_2D.y * ni + ( tj + jj) * ni
-                                        + bx * blocks_2D.x + ti + ii;
+//                        // update iteration variables for all pixels in a tile
+//                        for(uint ii = 0; ii < edge_x; ii++)
+//                            for(uint jj = 0; jj < edge_y; jj++)
+//                            {
+//                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
+//                                uint global_idx =
+//                                        by * blocks_2D.y * ni + ( tj + jj) * ni
+//                                        + bx * blocks_2D.x + ti + ii;
 
-                                Q[s - 1][tile_idx] = h_iter[global_idx] - h_old[global_idx];
-                                h_old[global_idx] = h_iter[global_idx];
-                            }
+//                                Q[s - 1][tile_idx] = h_iter[global_idx] - h_old[global_idx];
+//                                h_old[global_idx] = h_iter[global_idx];
+//                            }
 
-                    }//block x loop end
-                }// block y loop end
+//                    }//block x loop end
+//                }// block y loop end
             }// scale n end
         }//by end
     }// bx end
@@ -1007,7 +966,9 @@ __tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, c
 //@brief kernel for evaluation of the functional derivative of th TV regularization functional.
 template<typename T>
 inline void
-__tv_derivative_cpu(dim3 blockDim, T* dTV_du, const T* u, const T* f, T lambda, const int height, const int width, const int depth)
+__tv_derivative_cpu(dim3 blockDim, dim3 blockId, T* dTV_du, const T* u,
+                    const T* f, T lambda, const int height, const int width,
+                    const int depth)
 {
     T beta = 1e-4;
 
@@ -1030,8 +991,8 @@ __tv_derivative_cpu(dim3 blockDim, T* dTV_du, const T* u, const T* f, T lambda, 
         for (int col = 0; col < blockDim.x; col++)
         {
 
-            int global_row = blockDim.y*blockIdx.y + row;
-            int global_col = blockDim.x*blockIdx.x + col;
+            int global_row = blockDim.y*blockId.y + row;
+            int global_col = blockDim.x*blockId.x + col;
 
             int site = global_row*width + global_col;
 
@@ -1108,8 +1069,8 @@ __tv_derivative_cpu(dim3 blockDim, T* dTV_du, const T* u, const T* f, T lambda, 
 //@param offseti offset in vertical direction
 //@param offsetj offset in horizontal direction
 //@param smin minimum frame size is $2^{smin}$
-template<typename T>
-void step35::Kernels<T>::tv_derivative(T * dTV_du,
+template<typename T, ParallelArch arch>
+void step35::Kernels<T, arch>::tv_derivative(T * dTV_du,
                                        const T *A_image,
                                        const T* f,
                                        const T lambda,
@@ -1121,7 +1082,7 @@ void step35::Kernels<T>::tv_derivative(T * dTV_du,
     dim3 blocks(N_PX_X_2D, N_PX_Y_2D);
 
     // IF CUDA
-    if (arch == cuda) {
+    if (arch == gpu_cuda) {
     __tv_derivative<T><<<grid,blocks>>> (dTV_du,
                                          A_image,
                                          f,
@@ -1130,7 +1091,8 @@ void step35::Kernels<T>::tv_derivative(T * dTV_du,
     getLastCudaError("__tv_derivative<<<>>> execution failed\n");
     cudaDeviceSynchronize();
     }
-    else {
+    else
+    {
         // ELSE
 #pragma omp parallel for
         for(uint bx = 0; bx  < grid.x; bx++ )
@@ -1138,7 +1100,8 @@ void step35::Kernels<T>::tv_derivative(T * dTV_du,
 #pragma omp parallel for
             for(uint by = 0; by < grid.y; by++)
             {
-                __tv_derivative_cpu<T> (blocks, dTV_du,
+                dim3 blockId(bx,by);
+                __tv_derivative_cpu<T> (blocks, blockId, dTV_du,
                                         A_image,
                                         f,
                                         lambda,
@@ -1171,8 +1134,10 @@ void step35::Kernels<T>::tv_derivative(T * dTV_du,
 // Finally, we have to specialize the templates to force the compiler to actually compile something.
 // This has to be at the end of file, because all functions have to be declared and their bodies defined before the
 // class can be explictly instantiated by the compiler.
-template class step35::Kernels<float>;
-template class step35::Kernels<double>;
+template class step35::Kernels<float, gpu_cuda>;
+template class step35::Kernels<double, gpu_cuda>;
+template class step35::Kernels<float, cpu>;
+template class step35::Kernels<double, cpu>;
 
 //void ImplCUDA<float>::apply<SDf, minus, SDf >(SDf&, SciPAL::DevBinaryExpr<SDf, minus, SDf > const&)", referenced from:
 

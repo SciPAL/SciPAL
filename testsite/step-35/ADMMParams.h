@@ -317,8 +317,6 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
 
 
         this->psf_fwhm = prm.get_double("PSF FWHM");
-        this->psf_fwhm = 2.0*this->psf_fwhm;//FIXME //the gaussian is calculated with the input sigma, its support has edge length 4 sigma
-
 
         this->reg_strength = prm.get_double("regularization");
 

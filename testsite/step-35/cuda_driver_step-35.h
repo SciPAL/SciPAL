@@ -281,7 +281,9 @@ public:
             // which have to be taken into account.
             int N = cut_off;
             for (int k=0; k< depth; k++)
+#pragma omp parallel for
                 for (int i=0; i< width; i++)
+
                     for (int j=0; j< height; j++)
                     {
                         int xyz_pos = dof_handler.global_index(i, j, k);
@@ -300,6 +302,7 @@ public:
             // We abuse the host-side source array as a temporary one.
             // To avoid unphysical oscillations at the boundaries of the image we have to exclude a boundary layer from the convolution.
             for (int k=0; k< depth; k++)
+#pragma omp parallel for
                 for (int i=N; i< width-N; i++)
                     for (int j=N; j< height-N; j++)
                     {
@@ -378,12 +381,12 @@ public:
                 getLastCudaError("cufft error!\n");
                 dst *= 1./dst.size();
                 //ugly...
-    //            kernelConf conf;
-    //            int threadsPerBlock_X = 16;
-    //            int threadsPerBlock_Y = 16;
-    //            conf.block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
-    //            conf.grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
-    //            cufftShift_2D_config_impl(dst.data(), width, height, &conf);
+                kernelConf conf;
+                int threadsPerBlock_X = 16;
+                int threadsPerBlock_Y = 16;
+                conf.block = dim3(threadsPerBlock_X, threadsPerBlock_Y, 1);
+                conf.grid = dim3(((width/2) / threadsPerBlock_X), ((width/2) / threadsPerBlock_Y), 1);
+                cufftShift_2D_config_impl(dst.data(), width, height, &conf);
             }
             else
             {
@@ -415,7 +418,7 @@ public:
             if ( z < 0.5 )//float conditional to distinguish z=0 vs. z=1
             {
                 Mdouble tmp = exp(-(boost::math::pow<2>(x - width/2.) + boost::math::pow<2>(y - height/2.))/
-                                  (2.0*boost::math::pow<2>(sigma/2.0)));
+                                  (2.0*boost::math::pow<2>(sigma)));
                 //                if (tmp > 0.01)
                 //                    std::cout<<"psf "<<tmp<<std::endl;
 

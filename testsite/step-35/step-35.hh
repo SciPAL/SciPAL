@@ -290,7 +290,7 @@ void step35::ImageIO::write_image(std::string path, dealii::Vector<PixelDataType
 #else
                 int xyz_pos = dof_handler.global_index(x, y, z);
 #endif
-                PixelDataType intensity_value_xyz = in[xyz_pos];
+                PixelDataType intensity_value_xyz = in[xyz_pos]; //FIXME think about negative values
                 if ( intensity_value_xyz > 0 )
                 {    // FIXME: reenable Anscombe trafo
                     if (use_anscombe)
@@ -600,13 +600,6 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cud
 
    driver.convolution.vmult(driver.writeable_im_d(), driver.writeable_im_d() ); //
 
-   dealii::Vector<float> bla;//(input_image.begin(), input_image.end());// bla= (input_image);
-   driver.writeable_im_d().push_to(bla);
-     image_io.write_image("bla.tif", bla,
-                          // image_io.pheight, image_io.pwidth, image_io.pdepth,
-                          dof_handler,
-                          params.gnoise, params.anscombe);
-
     //Push data from device to host
     driver.get_data();
 
@@ -633,7 +626,8 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cud
 
               driver.generated_noise[xyz_pos] = var_nor();
                driver.im_h[xyz_pos] += driver.generated_noise[xyz_pos];
-               gn_offset[xyz_pos] = 200 + driver.generated_noise[xyz_pos];
+               //shift output of noise distribution to avoid negative numbers
+               gn_offset[xyz_pos] = 3*params.gnoise + driver.generated_noise[xyz_pos];
                // Add offset so that we something when plotting the noise component alone.
 
                 //The simulated data is meant to represent a noisy image, which is naturally non-negative everywhere
@@ -667,15 +661,6 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cud
 //                         dof_handler,
 //                         params.gnoise, params.anscombe);
 
-    SciPAL::Vector<float, BW> tmp(driver.im_h.size());
-    tmp = SciPAL::abs(driver.convolution.psf_fourier_transform_d);
-    dealii::Vector<float> tmp2;
-    tmp.push_to(tmp2);
-
-    image_io.write_image("mtf.tif", tmp2,
-                         // image_io.pheight, image_io.pwidth, image_io.pdepth,
-                         dof_handler,
-                         params.gnoise, params.anscombe);
 
 
 

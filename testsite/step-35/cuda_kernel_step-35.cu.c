@@ -14,7 +14,7 @@
     You should have received a copy of the GNU Lesser General Public License
     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright  Lutz Künneke, Jan Lebert 2014
+Copyright Stephan Kramer, Johannes Hagemann,  Lutz Künneke, Jan Lebert 2014-2016
 */
 
 //Header containing the declarations of the wrapper functions - not the kernels.
@@ -535,15 +535,13 @@ struct DykstraStep {
     // For the corrections we need the full history w.r.t. the number of levels in subset hierarchy.
     T Q[N_SCALES_2D];
 
-    int min_scale;
     int n_scales;
 
     int  row, col, tIx, global_row, global_col, global_idx;
 
-    __device__ DykstraStep (int m, int n_s, const T* residual,
+    __device__ DykstraStep (int n_s, const T* residual,
                             const int width)
         :
-          min_scale(m),
           n_scales(n_s),
 
           row (threadIdx.y),
@@ -596,7 +594,7 @@ struct DykstraStep {
     }
 
     T __device__ sweep_fine_scales (
-            T* h_iter, T* h_old_in,  T* Q_full,
+            T* h_old_in,  T* Q_full,
             const T* ICD_weights, T* ps_sum, const T g_noise)
     {
         volatile T * m_ps = ps_sum + tIx;
@@ -606,7 +604,7 @@ struct DykstraStep {
         T h_old = h_old_in[this->global_idx];
         T h_new = T(0);
 
-        for (int j = this->min_scale + 1; j <= this->n_scales; j++)         // loop over subsets
+        for (int j = 1; j <= this->n_scales; j++)         // loop over subsets
         {
             h_old -= this->Q[j-1];
 
@@ -713,7 +711,7 @@ __incomplete_dykstra_2D_fine_scales(
                         0.000825881};
 
 
-    DykstraStep<T, offset_x, offset_y> dykstra(1 /*min_scale*/, n_scales, residual,
+    DykstraStep<T, offset_x, offset_y> dykstra( n_scales, residual,
                                                width);
 
     T __shared__ ps_sum[N_PX_X_2D * N_PX_Y_2D];
@@ -729,7 +727,7 @@ __incomplete_dykstra_2D_fine_scales(
         return;
 
     // Projection on scales suitable for intra-threadblock processing.
-    h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_iter, h_old, Q_full,
+    h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_old, Q_full,
                                                                         ICD_weights, ps_sum, g_noise);
 
 
@@ -785,84 +783,85 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part_cpu(
                         0.000825881};
 
     // FIXME: make number of OpenMP threads editable via prm file
-//    omp_set_num_threads(4);
+    omp_set_num_threads(8);
 
-//#pragma omp parallel for
+#pragma omp parallel for
     for(uint bx = 0; bx  < grid_2D.x; bx++ )
     {
-//#pragma omp parallel for private(Q, ps_sum)
+#pragma omp parallel for private(Q, ps_sum)
         for(uint by = 0; by < grid_2D.y; by++)
         {
-            for(uint s = 1; s < N_SCALES_2D; s++)
+            for(uint s = 1; s <= N_SCALES_2D; s++)
             {
-                printf("bx: %d, by: %d, s:%d \n", bx, by, s);
+//                printf("bx: %d, by: %d, s:%d \n", bx, by, s);
                 uint s_x = N_SCALES_2D - s;
+
                 uint s_y = s_x;
 
-                uint edge_x = s_x * s_x;
-                uint edge_y = s_y * s_y;
+                uint edge_x = pow(2., s_x);
+                uint edge_y = pow(2., s_y);
 
                 T weight = ICD_weights[N_SCALES_2D - s];
 
-//                // loop over tiles in a block
-//                for(uint ti = 0; ti < blocks_2D.x; ti += edge_x)
-//                {
-//                    for(uint tj = 0; tj = blocks_2D.y; tj += edge_y)
-//                    {
-//                        for(uint ii = 0; ii < edge_x; ii++)
-//                            for(uint jj = 0; jj < edge_y; jj++)
-//                                ps_sum[ii][jj] = 0;
+                // loop over tiles in a block
+                for(uint ti = 0; ti < blocks_2D.x; ti += edge_x)
+                {
+                    for(uint tj = 0; tj < blocks_2D.y; tj += edge_y)
+                    {
+                        for(uint ii = 0; ii < edge_x; ii++)
+                            for(uint jj = 0; jj < edge_y; jj++)
+                                ps_sum[ii][jj] = 0;
 
-//                        // loop over pixels in tile
-//                        for(uint ii = 0; ii < edge_x; ii++)
-//                        {
-//                            for(uint jj = 0; jj < edge_y; jj++)
-//                            {
-//                                // position of pixel wrt ps_sum
-//                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
-//                                uint global_idx =
-//                                        by * blocks_2D.y * ni + ( tj + jj) * ni
-//                                        + bx * blocks_2D.x + ti + ii;
+                        // loop over pixels in tile
+                        for(uint ii = 0; ii < edge_x; ii++)
+                        {
+                            for(uint jj = 0; jj < edge_y; jj++)
+                            {
+                                // position of pixel wrt ps_sum
+                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
+                                uint global_idx =
+                                        by * blocks_2D.y * ni + ( tj + jj) * ni
+                                        + bx * blocks_2D.x + ti + ii;
 
-//                                if(s == 1) // do that only on smallest level
-//                                    Q[0][tile_idx] = Q_full[global_idx];
+                                if(s == 1) // do that only on smallest level
+                                    Q[0][tile_idx] = Q_full[global_idx];
 
-//                                T h_0 = h_old[global_idx] - Q[s - 1][tile_idx];
+                                T h_0 = h_old[global_idx] - Q[s - 1][tile_idx];
 
-//                                ps_sum[ti/edge_x][tj/edge_y] += h_0 * h_0;
-//                            }// jj end
-//                        }// ii end
+                                ps_sum[ti/edge_x][tj/edge_y] += h_0 * h_0;
+                            }// jj end
+                        }// ii end
 
-//                        // calculate weighted residua
-//                        T ws = sqrt(ps_sum[ti/edge_x][tj/edge_y] * weight) / g_noise;
-//                        if(ws > 1) // adapt pixels if statistic is violated
-//                        {
-//                            //adapt all pixels in the tile
-//                            for(uint ii = 0; ii < edge_x; ii++)
-//                                for(uint jj = 0; jj < edge_y; jj++)
-//                                {
-//                                    uint global_idx =
-//                                            by * blocks_2D.y * ni + ( tj + jj) * ni
-//                                            + bx * blocks_2D.x + ti + ii;
-//                                    h_iter[global_idx] = h_old[global_idx] / ws;
-//                                }
-//                        }
+                        // calculate weighted residua
+                        T ws = sqrt(ps_sum[ti/edge_x][tj/edge_y] * weight) / g_noise;
+                        if(ws > 1) // adapt pixels if statistic is violated
+                        {
+                            //adapt all pixels in the tile
+                            for(uint ii = 0; ii < edge_x; ii++)
+                                for(uint jj = 0; jj < edge_y; jj++)
+                                {
+                                    uint global_idx =
+                                            by * blocks_2D.y * ni + ( tj + jj) * ni
+                                            + bx * blocks_2D.x + ti + ii;
+                                    h_iter[global_idx] = h_old[global_idx] / ws;
+                                }
+                        }
 
-//                        // update iteration variables for all pixels in a tile
-//                        for(uint ii = 0; ii < edge_x; ii++)
-//                            for(uint jj = 0; jj < edge_y; jj++)
-//                            {
-//                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
-//                                uint global_idx =
-//                                        by * blocks_2D.y * ni + ( tj + jj) * ni
-//                                        + bx * blocks_2D.x + ti + ii;
+                        // update iteration variables for all pixels in a tile
+                        for(uint ii = 0; ii < edge_x; ii++)
+                            for(uint jj = 0; jj < edge_y; jj++)
+                            {
+                                uint tile_idx = (tj + jj) * blocks_2D.x + ti + ii;
+                                uint global_idx =
+                                        by * blocks_2D.y * ni + ( tj + jj) * ni
+                                        + bx * blocks_2D.x + ti + ii;
 
-//                                Q[s - 1][tile_idx] = h_iter[global_idx] - h_old[global_idx];
-//                                h_old[global_idx] = h_iter[global_idx];
-//                            }
+                                Q[s - 1][tile_idx] = h_iter[global_idx] - h_old[global_idx];
+                                h_old[global_idx] = h_iter[global_idx];
+                            }
 
-//                    }//block x loop end
-//                }// block y loop end
+                    }//block x loop end
+                }// block y loop end
             }// scale n end
         }//by end
     }// bx end

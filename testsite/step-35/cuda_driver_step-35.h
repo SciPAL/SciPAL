@@ -30,6 +30,7 @@ Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hage
 
 //CUDA cufft
 #include <cufft.h>
+#include <fftw3.h>
 
 //shift for fft
 #include <cufftShiftInterface.h>
@@ -41,14 +42,14 @@ Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hage
 
 //Our stuff
 #include <step-35/cuda_kernel_wrapper_step-35.cu.h>
-#include "patch.h"
 #include "cuda_helper.h"
 #include "preprocessor_directives.h"
 #include "ADMMParams.h"
-#include <fftw3.h>
 #include <smre_problem.hh>
 
-//#include <csignal>
+// deal.II
+#include <deal.II/base/timer.h>
+
 
 namespace step35 {
 // We encapsulate each project into a dedicated namespace
@@ -59,15 +60,14 @@ namespace step35 {
 // Main class, sets up an instance of queue and info class. A number of threads is started which
 // each handles a cuda stream and processes items obtained by the queue. The main thread adds items
 // to the queue until everything is processed.
-template<typename Mdouble, ParallelArch c>
+template<typename Mdouble, typename BW >
 class CUDADriver {
 
+    static const ParallelArch c = BW::arch;
 public:
     //complex type: double2 for double, float2 for float
     //    typedef typename PrecisionTraits<Mdouble, c>::ComplexType complex;
     typedef CudaComplex<Mdouble> complex;
-
-    typedef blas BW;
 
     typedef  SciPAL::Vector<Mdouble, BW> Vector;
 
@@ -687,7 +687,7 @@ public:
             tmp2_d -= this->x_old;
             err = tmp2_d.l2_norm()/std::sqrt(tmp2_d.size());
             n_err_iter++;
-            if (n_err_iter > params.n_max_heun_steps)
+            if (n_err_iter >= params.n_max_heun_steps)
                 break;
         }
         std::cout << "    n Heun steps used : " << n_err_iter <<
@@ -800,6 +800,8 @@ public:
         step35::Kernels<Mdouble, BW::arch> kernel;
         Mdouble norm = 2*dykstra_Tol;  //norm of residuals
 
+        Mdouble time = 0;
+
         while (iterate)
         {
 
@@ -819,12 +821,13 @@ public:
             // Q_0 <- Q_full
             // initialize : d.h_init with global h_init
 
+            dealii::Timer timer;
+            timer.restart();
             // loop over subsets
             if(typeid(BW) == typeid(cublas))
             {
                 kernel.dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
                                                       Q_full.data(),
-                                                      this->writeable_e_d().data(),
                                                       this->sigma_noise,
                                                       dof_handler.pwidth(),
                                                       dof_handler.pheight(),
@@ -834,16 +837,15 @@ public:
             }
             else
             {
-                h_old = this->e_d();
                 kernel.dyadic_dykstra_fine_scale_part_cpu(h_iter.data(), h_old.data(),
                                                           Q_full.data(),
-                                                          this->writeable_e_d().data(),
                                                           this->sigma_noise,
                                                           dof_handler.pwidth(),
                                                           dof_handler.pheight(),
                                                           dof_handler.pdepth()//,
                                                           );
             }
+            time += timer.wall_time();
 
             //Convergence control.
             {
@@ -859,6 +861,7 @@ public:
         }// iterate end
         std::cout<<"    n Dykstra steps used : " << iter <<
                    ", norm of noise increment : "<< norm<< std::endl;
+        std::cout<<"cumulative dykstra time for fine scale sweeps : "<< time<<std::endl;
     }
 
 

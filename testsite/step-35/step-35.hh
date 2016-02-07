@@ -337,9 +337,8 @@ void step35::ImageIO::write_image(std::string path, dealii::Vector<PixelDataType
 // - management of run-time parameters by a simple text-based parameter file
 // - setting device parameters according to the user's parameters
 // - preprocessing and output of results
-template<typename T>
+template<typename T, typename BW>
 class ADMM {
-    typedef blas BW;
 public:
 
     ADMM(int argc, char *argv[], SciPAL::GPUInfo &g);
@@ -349,7 +348,7 @@ public:
     void create_psf();
 
 
-    void add_blur_and_gaussian_noise(step35::CUDADriver<T, gpu_cuda> &driver);
+    void add_blur_and_gaussian_noise(step35::CUDADriver<T, BW> &driver);
 
     // The ADMM algoritmh is put into a separate class which inherits from deal.II's base class
     // for iterative solvers. The advantage of this is, that we do not have to explain the design in detail
@@ -392,7 +391,7 @@ private:
     std::chrono::high_resolution_clock::time_point clock1;
     std::chrono::high_resolution_clock::time_point clock2;
 
-    void __run(step35::CUDADriver<T, gpu_cuda> &driver);
+    void __run(step35::CUDADriver<T, BW> &driver);
 
     ImageIO image_io;
 protected:
@@ -400,7 +399,7 @@ protected:
 
 
     template<typename Driver>
-    void set_initial_condition(Driver &driver, ParallelArch arch);
+    void set_initial_condition(Driver &driver);
 };
 }
 
@@ -411,9 +410,10 @@ protected:
 // @param argc : The number of command line arguments. This is always $\ge 1$, as by default the zeroth argument is the name of program itself.
 // @param argv : Pointer to the array of command line arguments.
 // @param g : Reference to the object containing the GPU info from the system.
-template<typename T>
-step35::ADMM<T>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
-    : gpuinfo(g) {
+template<typename T, typename BW>
+step35::ADMM<T, BW>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
+    : gpuinfo(g)
+{
     //DEBUG
     clock1 = std::chrono::high_resolution_clock::now();
 
@@ -530,15 +530,18 @@ step35::ADMM<T>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
     // At this point the toplevel run dir must exist.
     // Thus, we can change to it without any further sanity test.
     QDir::setCurrent(this->params.run_dir.absolutePath());
+
+    //set number of threads
+    omp_set_num_threads(params.n_omp_threads);
 }
 
 
 // @sect5{Function: set_initial_condition}
 //
 //
-template<typename T>
+template<typename T, typename BW>
 template<typename Driver>
-void step35::ADMM<T>::set_initial_condition(Driver &driver, ParallelArch arch)
+void step35::ADMM<T, BW>::set_initial_condition(Driver &driver)
 {
     int depth = dof_handler.n_dofs_z();
 
@@ -585,8 +588,8 @@ void step35::ADMM<T>::set_initial_condition(Driver &driver, ParallelArch arch)
 }
 //@sect5{Function: add_gaussian_noise}
 //@brief Simulates dataset by adding gaussian noise, the whole driver is given to used on device convolution
-template<typename T>
-void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cuda> &driver) {
+template<typename T, typename BW>
+void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriver<T, BW> &driver) {
     //Constant seed to get reproducable tests
     boost::mt19937 rng;
     //Seed rng
@@ -673,8 +676,8 @@ void step35::ADMM<T>::add_blur_and_gaussian_noise (step35::CUDADriver<T, gpu_cud
 // @sect5{Function: run}
 //
 // Read in settings and data and perform the algorithm
-template<typename T>
-void step35::ADMM<T>::run() {
+template<typename T, typename BW>
+void step35::ADMM<T, BW>::run() {
 
     std::cout << "Starting run" << std::endl;
 
@@ -700,7 +703,7 @@ void step35::ADMM<T>::run() {
     if ( params.do_approx ) {
         //Prepare the driver
         std::cout << "Setting up driver\n";
-        step35::CUDADriver<T, gpu_cuda> driver(cs,
+        step35::CUDADriver<T, BW> driver(cs,
                                                      #ifdef nUSE_DOF_HANDLER
                                                              image_io.pwidth, image_io.pheight, image_io.pdepth,
                                                      #else
@@ -708,7 +711,7 @@ void step35::ADMM<T>::run() {
                                                      #endif
                                                              params);
 
-        this->set_initial_condition(driver, gpu_cuda);
+        this->set_initial_condition(driver);
 
 
         //This function templates to whatever Dykstra Flavour we have chosen
@@ -727,8 +730,8 @@ void step35::ADMM<T>::run() {
 //@brief Second part of the run function, templatized
 //this enables a unified interface of the driver for exact and approximative method
 //but one has to split the run method in two functions
-template<typename T>
-void step35::ADMM<T>::__run (step35::CUDADriver<T, gpu_cuda> &driver)
+template<typename T, typename BW>
+void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 {
     //Used for shifted indexing
     int ti,tj,tk;

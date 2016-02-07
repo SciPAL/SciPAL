@@ -36,12 +36,10 @@ struct Kernels {
     void set_cs(T* cs_h, int maxnum);
 
     void dyadic_dykstra_fine_scale_part(T* h_iter, T* h_old, T* Q_full,
-                                        T *residual,
                                         const T g_noise,
                                         const int ni, const int nj, const int nk);
 
     void dyadic_dykstra_fine_scale_part_cpu(T* h_iter, T* h_old, T* Q_full,
-                                            T *residual,
                                             const T g_noise,
                                             const int ni, const int nj, const int nk);
 

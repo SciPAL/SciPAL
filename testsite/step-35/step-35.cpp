@@ -22,6 +22,9 @@ Copyright Stephan Kramer, Johannes Hagemann, Lutz Künneke, Jan Lebert 2014
 //CUDA
 #include <cuda_runtime.h>
 
+//omp
+#include <omp.h>
+
 //Our stuff
 #include <step-35/step-35.hh>
 //Where the preprocessor directives are defined
@@ -32,10 +35,12 @@ Copyright Stephan Kramer, Johannes Hagemann, Lutz Künneke, Jan Lebert 2014
 //argv[1] path to parameter file (optional)
 //argv[2] Device ID of the GPU (optional, default: 0)
 int main(int argc, char **argv) {
-    cublas::Init();
+    typedef blas BW;
+
+
+    BW::Init();
     srand(time(NULL));
     using namespace step35;
-
     // At the beginning we figure out
     // how many CUDA devices are available.
     int n_CUDA_devices;
@@ -64,13 +69,13 @@ int main(int argc, char **argv) {
     // especially reading the runtime parameters, and the information about the GPUs
     // which are available.
 #ifdef DOUBLE_PRECISION //set in preprocessor_directives.h
-    ADMM<double> admm_instance(argc, argv, gpu_info);
+    ADMM<double, BW> admm_instance(argc, argv, gpu_info);
 #else
-    ADMM<float> admm_instance(argc, argv, gpu_info);
+    ADMM<float, BW> admm_instance(argc, argv, gpu_info);
 #endif
     // Start the main routine
     admm_instance.run();
 
-    cublas::Shutdown();
+    BW::Shutdown();
     return EXIT_SUCCESS;
 }

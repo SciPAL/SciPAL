@@ -96,6 +96,9 @@ public:
     //Report interval of ADMM
     int report_interval;
 
+    // number of omp threads used for computation
+    int n_omp_threads;
+
     //Wether or not to use approximative projections
     bool do_approx;
     //Wether or not to simulate noise on a test image
@@ -267,6 +270,12 @@ void ADMMParams::declare(dealii::ParameterHandler &prm) {
                            "1",
                            dealii::Patterns::Integer(),
                            "Reporting progress in intervals of ... Iterations");
+
+        prm.declare_entry ("Number of OpenMP threads",
+                           "1",
+                           dealii::Patterns::Integer(),
+                           "");
+
     }
     prm.leave_subsection ();
 }
@@ -358,7 +367,7 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
         // this->max_it = prm.get_integer("maximum iterations");
 
         this->do_approx = prm.get_bool("approx");
-
+        this->n_omp_threads = prm.get_integer("Number of OpenMP threads");
         // this->tol = prm.get_double("tolerance");
     }
     prm.leave_subsection ();

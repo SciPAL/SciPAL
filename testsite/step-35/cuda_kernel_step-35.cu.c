@@ -539,8 +539,7 @@ struct DykstraStep {
 
     int  row, col, tIx, global_row, global_col, global_idx;
 
-    __device__ DykstraStep (int n_s, const T* residual,
-                            const int width)
+    __device__ DykstraStep (int n_s, const int width)
         :
           n_scales(n_s),
 
@@ -695,7 +694,6 @@ template<typename T, int offset_x, int offset_y>
 __global__ void
 __incomplete_dykstra_2D_fine_scales(
         T* h_iter, T* h_old, T* Q_full,
-        T *residual,
         const T g_noise,
         const int height, const int width, const int depth
         )
@@ -711,8 +709,7 @@ __incomplete_dykstra_2D_fine_scales(
                         0.000825881};
 
 
-    DykstraStep<T, offset_x, offset_y> dykstra( n_scales, residual,
-                                               width);
+    DykstraStep<T, offset_x, offset_y> dykstra( n_scales, width);
 
     T __shared__ ps_sum[N_PX_X_2D * N_PX_Y_2D];
 
@@ -737,7 +734,6 @@ __incomplete_dykstra_2D_fine_scales(
 template<typename T, ParallelArch arch>
 void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
         T* h_iter, T* h_old, T* Q_full,
-        T *residual,
         const T g_noise,
         const int ni, const int nj, const int nk)
 {
@@ -747,8 +743,8 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
     dim3 blocks_2D(N_PX_X_2D, N_PX_Y_2D);
 
 
-    __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,  h_old,  Q_full,
-                                                                           residual,
+    __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
+                                                                          h_old,  Q_full,
                                                                            g_noise,
                                                                            ni, nj, nk
                                                                            );
@@ -761,7 +757,6 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
 template<typename T, ParallelArch arch>
 void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part_cpu(
         T* h_iter, T* h_old, T* Q_full,
-        T *residual,
         const T g_noise,
         const int ni, const int nj, const int nk)
 {
@@ -781,9 +776,6 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part_cpu(
                         0.00760004,
                         0.002742,
                         0.000825881};
-
-    // FIXME: make number of OpenMP threads editable via prm file
-    omp_set_num_threads(8);
 
 #pragma omp parallel for
     for(uint bx = 0; bx  < grid_2D.x; bx++ )

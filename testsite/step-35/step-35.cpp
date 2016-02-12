@@ -35,7 +35,7 @@ Copyright Stephan Kramer, Johannes Hagemann, Lutz Künneke, Jan Lebert 2014
 //argv[1] path to parameter file (optional)
 //argv[2] Device ID of the GPU (optional, default: 0)
 int main(int argc, char **argv) {
-    typedef blas BW;
+    typedef cublas BW;
 
 
     BW::Init();

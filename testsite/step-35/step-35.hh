@@ -255,7 +255,8 @@ void step35::ImageIO::read_image(std::vector<T> & input_image,
 //@param mdepth number of layers in image stack
 //@param gnoise standard deviation of Gaussian noise
 template<typename PixelDataType>
-void step35::ImageIO::write_image(std::string path, dealii::Vector<PixelDataType> &in,
+void step35::ImageIO::write_image(std::string path,
+                                  dealii::Vector<PixelDataType> &in,
                                   const ImageDoFHandler &dof_handler, double gnoise,  bool use_anscombe)
 {
     int mwidth = dof_handler.n_dofs_x();
@@ -346,7 +347,6 @@ public:
 
     T _psf(T x, T y, T z, T sigma);
     void create_psf();
-
 
     void add_blur_and_gaussian_noise(step35::CUDADriver<T, BW> &driver);
 
@@ -489,7 +489,7 @@ step35::ADMM<T, BW>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
     // Create toplevel run directory
 
     this->params.run_dir.setPath( this->params.run_dir.absolutePath() +  QDir::separator() +
-    QString(QDateTime::currentDateTime().toString("ddd-yyyy-MM-dd/hh_mm_ss")
+    QString(QDateTime::currentDateTime().toString("yyyy-MM-dd/hh_mm_ss")
             ).remove("."));
 
     cwd.setPath(this->params.run_dir.absolutePath());
@@ -630,7 +630,7 @@ void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriver<T, BW>
               driver.generated_noise[xyz_pos] = var_nor();
                driver.im_h[xyz_pos] += driver.generated_noise[xyz_pos];
                //shift output of noise distribution to avoid negative numbers
-               gn_offset[xyz_pos] = 3*params.gnoise + driver.generated_noise[xyz_pos];
+               gn_offset[xyz_pos] = 6*params.gnoise + driver.generated_noise[xyz_pos];
                // Add offset so that we something when plotting the noise component alone.
 
                 //The simulated data is meant to represent a noisy image, which is naturally non-negative everywhere
@@ -644,7 +644,7 @@ void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriver<T, BW>
     driver.push_data();
 
     //Write the noisy image for control reasons
-    image_io.write_image("noise.tif", driver.im_h,
+    image_io.write_image("input.tif", driver.im_h,
                          // image_io.pheight, image_io.pwidth, image_io.pdepth,
                          dof_handler,
                          params.gnoise, params.anscombe);
@@ -920,10 +920,11 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 
               if (true)
             {
-                QString x_d_fname = QString ("e_d-%1d.tif").arg(iter);
+                QString x_d_fname = QString ("e_d-%1.tif").arg(iter, 6, 10, QChar('0'));
 
                 dealii::Vector<T> x_d_tmp(driver.e_d().size());
                 driver.e_d().push_to(x_d_tmp);
+                x_d_tmp.add(6*params.gnoise);
                 image_io.write_image(x_d_fname.toStdString(), x_d_tmp
                                      , dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
             }

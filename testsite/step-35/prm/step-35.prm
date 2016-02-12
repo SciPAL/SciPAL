@@ -2,7 +2,7 @@
 # ---------------------
 subsection Input
   # path to the .tif image
-  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_2048.tif
+  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024.tif
 end
 
 
@@ -26,25 +26,25 @@ subsection Solver control
   set Log frequency = 1
   set Log history   = false
   set Log result    = true
-  set Max steps     = 100
+  set Max steps     = 1000
   set Tolerance     = 1.e-10
 
 
   subsection Dykstra
     # Finish when |x_r - x_{r-1}| < tolerance
     set Dykstra tolerance        = 1e-4
-    set N max Dykstra iterations = 200
+    set N max Dykstra iterations = 100
   end
 
   subsection Heun
     set N max time step adaptions    = 10
     # Maximum number of Heun steps, number of iteration steps to compute the
     # reconstructed image for given noise.
-    set N max time steps             = 1
+    set N max time steps             = 100
 
     # Tolerance of the norm of the difference of two successive time step
     # attempts within a Heun step.
-    set Time step adaption tolerance = 1e-1
+    set Time step adaption tolerance = 1e-2
 
     # Tolerance of the norm of the difference of two successive Heun steps.
     set Tolerance                    = 1e-2
@@ -68,7 +68,7 @@ subsection input data
   # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
   # reasonably sampled on the lattice of pixels we simply assume that it is a
   # delta peak and consider the convolution operator as identity.
-  set PSF FWHM          = 9.4     #in new impl...consider factor of 2!  #
+  set PSF FWHM          = 18.8    #in new impl...consider factor of 2!  #
 
   # Regularisation type
   set Regularization method = TV
@@ -85,7 +85,7 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 242  
+  set gaussian noise = 726
   
  # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
 
@@ -110,7 +110,7 @@ subsection program flow control
   # Reporting progress in intervals of ... Iterations
   set report interval = 10
 
-  set Number of OpenMP threads = 2
+  set Number of OpenMP threads = 32
 
 end
 

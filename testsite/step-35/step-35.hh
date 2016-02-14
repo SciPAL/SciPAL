@@ -14,7 +14,8 @@
     You should have received a copy of the GNU Lesser General Public License
     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright  Lutz Künneke, Jan Lebert 2014
+Copyright  Lutz Künneke, Jan Lebert 2014-2015,
+           Stephan Kramer and Johannes Hagemann 2014-2016
 */
 
 #ifndef STEP35_HH
@@ -787,7 +788,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 
     {
         std::vector<T> zero_init(driver.x_d.size(), 0);
-        driver.x_d = zero_init;
+        driver.x_d = zero_init; //FIXME: try init with driver.im_h
         driver.z_d = zero_init;
     }
 

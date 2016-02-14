@@ -49,6 +49,7 @@ Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hage
 
 // deal.II
 #include <deal.II/base/timer.h>
+#include <thrust/reduce.h>
 
 
 namespace step35 {
@@ -801,6 +802,7 @@ public:
         Mdouble norm = 2*dykstra_Tol;  //norm of residuals
 
         Mdouble time = 0;
+        Mdouble mean = 0;
 
         while (iterate)
         {
@@ -847,6 +849,13 @@ public:
             }
             time += timer.wall_time();
 
+        //substract mean of noise
+        h_iter.push_to(e_h);
+
+        mean = std::accumulate(e_h.begin(),e_h.end(), 0.)/e_h.size();
+        h_iter += -mean;
+
+
             //Convergence control.
             {
                 h_init -= h_iter;
@@ -859,8 +868,9 @@ public:
                 iter++;
             }
         }// iterate end
+
         std::cout<<"    n Dykstra steps used : " << iter <<
-                   ", norm of noise increment : "<< norm<< std::endl;
+                   ", norm of noise increment : "<< norm <<" mean value of noise : "<<mean <<std::endl;
         std::cout<<"cumulative dykstra time for fine scale sweeps : "<< time<<std::endl;
     }
 

@@ -26,7 +26,7 @@ subsection Solver control
   set Log frequency = 1
   set Log history   = false
   set Log result    = true
-  set Max steps     = 1000
+  set Max steps     = 5000
   set Tolerance     = 1.e-10
 
 
@@ -85,7 +85,7 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 726
+  set gaussian noise = 242
   
  # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
 

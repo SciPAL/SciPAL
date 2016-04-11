@@ -593,6 +593,11 @@ public:
 
         // Add regularization
         step35::Kernels<Mdouble, BW::arch> kernel;
+//        kernel.L1_derivative(this->tmp2_d.data(),
+//                             x_old.data(),
+//                             reg_strength,
+//                             dof_handler.pwidth(),
+//                             dof_handler.pheight(), dof_handler.pdepth());
         kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
                              this->im_d().data(),
                              reg_strength,
@@ -766,9 +771,17 @@ public:
         // The former was anyway only a wrapper of the latter.
         convolution.vmult(tmp_d, this->x_d);
 
+        Mdouble mean = 0;
         // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
         this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
         this->writeable_e_d() -= tmp_d;
+
+//        //substract mean of noise
+//            this->writeable_e_d().push_to(e_h);
+
+//            mean = std::accumulate(e_h.begin(),e_h.end(), 0.)/e_h.size();
+//            this->writeable_e_d() += -mean;
+
 
         static const int n_scales = 10;
         static const int min_scale = 0;
@@ -802,7 +815,6 @@ public:
         Mdouble norm = 2*dykstra_Tol;  //norm of residuals
 
         Mdouble time = 0;
-        Mdouble mean = 0;
 
         while (iterate)
         {
@@ -822,6 +834,7 @@ public:
 
             // Q_0 <- Q_full
             // initialize : d.h_init with global h_init
+
 
             dealii::Timer timer;
             timer.restart();
@@ -849,11 +862,6 @@ public:
             }
             time += timer.wall_time();
 
-        //substract mean of noise
-        h_iter.push_to(e_h);
-
-        mean = std::accumulate(e_h.begin(),e_h.end(), 0.)/e_h.size();
-        h_iter += -mean;
 
 
             //Convergence control.

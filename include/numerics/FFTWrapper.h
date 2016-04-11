@@ -28,7 +28,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <complex>
 #include <iostream>
 //FFTs: FFTW and cuFFT
-#include <fftw3.h>
+#include "/usr/local/include/fftw3.h"
 #include <cufft.h>
 //deal.II
 #include <deal.II/base/parameter_handler.h>

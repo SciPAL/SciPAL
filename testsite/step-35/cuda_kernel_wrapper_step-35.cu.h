@@ -46,6 +46,9 @@ struct Kernels {
     void tv_derivative(T *dTV_du,
                        const T *A_image, const T *f, const T lambda,
                        const int ni, const int nj, const int nk);
+
+    void L1_derivative(T* dL1_du, const T* u, T lambda, const int height, const
+    int width, const int depth);
 };
 
 }

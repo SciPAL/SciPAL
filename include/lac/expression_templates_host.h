@@ -35,6 +35,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/expression_template_helper.h>
 
 #include <lac/OperandInfo.h>
+#include <lac/UnaryFunctions.h>
 
 
 //references:

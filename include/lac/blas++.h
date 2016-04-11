@@ -31,7 +31,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 
 //! Include implementations
-
+#include <base/PrecisionTraits.h>
 #include <lac/blas_wrapper.hh>
 #include <lac/cublas_wrapper.hh>
 

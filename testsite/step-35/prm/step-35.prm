@@ -2,7 +2,10 @@
 # ---------------------
 subsection Input
   # path to the .tif image
-  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024.tif
+  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024.tif
+  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024_n_0.05_fwhm_6.0.tif
+  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/irp_logo.tif
+  #set Image to reconstruct = /z/johannes/cuda_results/step-35/2016-04-08/11_34_14/control-000999.tif
 end
 
 
@@ -68,7 +71,7 @@ subsection input data
   # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
   # reasonably sampled on the lattice of pixels we simply assume that it is a
   # delta peak and consider the convolution operator as identity.
-  set PSF FWHM          = 18.8    #in new impl...consider factor of 2!  #
+  set PSF FWHM          = 9.4  #in new impl...consider factor of 2!  #
 
   # Regularisation type
   set Regularization method = TV
@@ -85,7 +88,7 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 242
+  set gaussian noise = 121
   
  # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
 
@@ -108,7 +111,7 @@ subsection program flow control
   set approx          = true
 
   # Reporting progress in intervals of ... Iterations
-  set report interval = 10
+  set report interval = 30
 
   set Number of OpenMP threads = 32
 
@@ -118,7 +121,7 @@ end
 subsection simulate dataset from real image
   # If set to false the input is treated as real data, if true input will be
   # treated as test image and blurring and noise are added
-  set simulate  = true
+  set simulate  = false
 
   # If false simulated noise has a constant seed, if true the seed is taken
   # from the clock

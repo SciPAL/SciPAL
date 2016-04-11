@@ -788,7 +788,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 
     {
         std::vector<T> zero_init(driver.x_d.size(), 0);
-        driver.x_d = zero_init; //FIXME: try init with driver.im_h
+        driver.x_d = driver.im_h; //FIXME: try init with driver.im_h
         driver.z_d = zero_init;
     }
 
@@ -816,10 +816,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
         //Update the Lagrange Multipliers
 
 
-        driver.update_lagrangian(
-                    1./
-                                 params.inv_gamma
-                                 ,
+        driver.update_lagrangian(1./params.inv_gamma,
                                  params.alpha2);
 
 

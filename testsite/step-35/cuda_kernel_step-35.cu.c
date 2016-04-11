@@ -612,13 +612,15 @@ struct DykstraStep {
             __syncthreads();
 
             int s_x = n_scales - j; // we loop trough the scales from coarse to fine
+//            int s_x = j-1; // we loop trough the scales from coarse to fine
             int s_y = s_x;
 
             this->sum_of_squares_subsets(s_x/*j-1*/, ps_sum);
 
             T weight =  // 0.25*
                     ICD_weights[ //
-                    n_scales-j]; //   j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+                    n_scales-j];
+//               j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
 
             h_new = this->project(s_x, //j-1 /* s_x*/,
                                   s_y, // j-1 /* s_y */,
@@ -1100,6 +1102,81 @@ void step35::Kernels<T, arch>::tv_derivative(T * dTV_du,
             }
         }
     }
+}
+
+//@setc5{Kernel: __L1_derivative}
+//@brief kernel for evaluation of the functional derivative of the L1
+// regularization functional.
+// This function is dimension-independent.
+// @param lambda : strength of regularization
+template<typename T>
+__global__ void
+__L1_derivative(T* dL1_du, const T* u, T lambda, const int height, const
+int width, const int depth)
+{
+    T margin= 1e-8;
+
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+
+    int global_row = blockDim.y*blockIdx.y + row;
+    int global_col = blockDim.x*blockIdx.x + col;
+
+    int site = global_row*width + global_col;
+
+    T x_k = u[site];
+
+    dL1_du[site] = lambda * (
+               x_k / sqrt(x_k * x_k + margin)
+                );
+}
+
+//@sect5{Function: tv_derivative}
+//@brief This is a wrapper for the __tv_derivative Kernel.
+//@param A pointer to the image
+//@param ni height of the image
+//@param nj width of the image
+//@param offseti offset in vertical direction
+//@param offsetj offset in horizontal direction
+//@param smin minimum frame size is $2^{smin}$
+template<typename T, ParallelArch arch>
+void step35::Kernels<T, arch>::L1_derivative(T * dL1_du,
+                                       const T *u,
+                                       const T lambda,
+                                       const int ni, const int nj, const int nk)
+{
+    int gridsi= ni/N_PX_X_2D;
+    int gridsj= nj/N_PX_Y_2D;
+    dim3 grid(gridsi,gridsj);
+    dim3 blocks(N_PX_X_2D, N_PX_Y_2D);
+
+    // IF CUDA
+    if (arch == gpu_cuda) {
+    __L1_derivative<T><<<grid,blocks>>> (dL1_du,
+                                         u,
+                                         lambda,
+                                         ni, nj, nk);
+    getLastCudaError("__tv_derivative<<<>>> execution failed\n");
+    cudaDeviceSynchronize();
+    }
+//    else
+//    {
+//        // ELSE
+//#pragma omp parallel for
+//        for(uint bx = 0; bx  < grid.x; bx++ )
+//        {
+//#pragma omp parallel for
+//            for(uint by = 0; by < grid.y; by++)
+//            {
+//                dim3 blockId(bx,by);
+//                __tv_derivative_cpu<T> (blocks, blockId, dTV_du,
+//                                        A_image,
+//                                        f,
+//                                        lambda,
+//                                        ni, nj, nk);
+//            }
+//        }
+//    }
 }
 
 

@@ -375,7 +375,7 @@ __forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
 
 
 template<typename T>
-__forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
+__forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s_x, int s_y, T * ps_sum)
 {
     int row = threadIdx.y;
     int col = threadIdx.x;
@@ -392,7 +392,7 @@ __forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
     *m_ps = x * x;
     __syncthreads();
 
-    int edge_x = pow_of_two(s);
+    int edge_x = pow_of_two(s_x);
 
     // Each line is processed by one warp
     for (int e = 2; e <= edge_x; e*= 2)
@@ -407,7 +407,7 @@ __forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
 
     __syncthreads();
 
-    int edge_y = pow_of_two(s);
+    int edge_y = pow_of_two(s_y);
 
     for (int e = 2; e <= edge_y; e*= 2) // add rows
     {
@@ -492,8 +492,8 @@ __forceinline__ __device__ T L2_norm(T * ps_sum)
 }
 
 #define N_SCALES_2D 6
-#define N_PX_X_2D 32
-#define N_PX_Y_2D 32
+#define N_PX_X_2D 64
+#define N_PX_Y_2D 16
 
 
 #define N_SCALES_1D 10
@@ -556,7 +556,7 @@ struct DykstraStep {
     }
 
     __forceinline__
-    __device__ void sum_of_squares_subsets(int s, T * ps_sum);
+    __device__ void sum_of_squares_subsets(int s_x, int s_y, T * ps_sum);
 
 
     __forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x,
@@ -603,7 +603,7 @@ struct DykstraStep {
         T h_old = h_old_in[this->global_idx];
         T h_new = T(0);
 
-        for (int j = 1; j <= this->n_scales; j++)         // loop over subsets
+        for (int j = 1; j < this->n_scales; j++)         // loop over subsets
         {
             h_old -= this->Q[j-1];
 
@@ -615,7 +615,7 @@ struct DykstraStep {
 //            int s_x = j-1; // we loop trough the scales from coarse to fine
             int s_y = s_x;
 
-            this->sum_of_squares_subsets(s_x/*j-1*/, ps_sum);
+            this->sum_of_squares_subsets(s_x, s_y, ps_sum);
 
             T weight =  // 0.25*
                     ICD_weights[ //
@@ -633,6 +633,61 @@ struct DykstraStep {
             this->Q[j-1] = h_new - h_old;
             h_old = h_new;
         }
+
+
+        return h_new; //  - h_init; // difference formed in on-chip registers
+    }
+
+    T __device__ sweep_fine_scales_rectangles (
+            T* h_old_in,  T* Q_full,
+            const T* ICD_weights, T* ps_sum, const T g_noise, bool flip_direction)
+    {
+        volatile T * m_ps = ps_sum + tIx;
+
+        Q[0] = Q_full[this->global_idx];
+
+        T h_old = h_old_in[this->global_idx];
+        T h_new = T(0);
+
+        for (int j = 1; j < this->n_scales; j++)         // loop over subsets
+        {
+            h_old -= this->Q[j-1];
+
+            *m_ps  = h_old;
+
+            __syncthreads();
+
+            int s_x = n_scales - j +1; // we loop trough the scales from coarse to fine
+//            int s_x = j-1; // we loop trough the scales from coarse to fine
+            int s_y = s_x - 2;
+
+            if(flip_direction == 1)
+              {
+               T tmp = s_y;
+               s_y = s_x;
+               s_x = tmp;
+              }
+
+            this->sum_of_squares_subsets(s_x, s_y, ps_sum);
+
+            T weight =  // 0.25*
+                    ICD_weights[ //
+                    n_scales-j];
+//               j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+
+            h_new = this->project(s_x, //j-1 /* s_x*/,
+                                  s_y, // j-1 /* s_y */,
+                                  ps_sum, // this->h[j-1]
+                                  h_old,
+                                  g_noise, weight);
+
+            __syncthreads();
+
+            this->Q[j-1] = h_new - h_old;
+            h_old = h_new;
+        }
+
+
         return h_new; //  - h_init; // difference formed in on-chip registers
     }
 
@@ -644,7 +699,7 @@ struct DykstraStep {
 //
 template<typename T, int offset_x, int offset_y>
 __forceinline__ __device__
-void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s, T * ps_sum)
+void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s_x, int s_y, T * ps_sum)
 {
     // Pointer to first element of a row which (i.e. the element) is processed by this thread.
     volatile T * m_ps = ps_sum + tIx;
@@ -657,7 +712,7 @@ void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s, T * ps_su
     *m_ps = x * x;
     __syncthreads();
 
-    int edge_x = pow_of_two(s);
+    int edge_x = pow_of_two(s_x);
 
     // Each line is processed by one warp
     for (int e = 2; e <= edge_x; e*= 2)
@@ -671,7 +726,7 @@ void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s, T * ps_su
 
     __syncthreads();
 
-    int edge_y = pow_of_two(s);
+    int edge_y = pow_of_two(s_y);
 
     for (int e = 2; e <= edge_y; e*= 2) // add rows
     {
@@ -726,9 +781,43 @@ __incomplete_dykstra_2D_fine_scales(
         return;
 
     // Projection on scales suitable for intra-threadblock processing.
-    h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_old, Q_full,
-                                                                        ICD_weights, ps_sum, g_noise);
+//    h_iter[dykstra.global_idx] =
+//            dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
 
+    T tmp = dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
+
+    // 1px subset projection
+
+        int j = n_scales;
+
+        tmp -= dykstra.Q[j-1];
+
+        *m_ps  = tmp;
+
+        __syncthreads();
+
+        int s_x = n_scales - j; // we loop trough the scales from coarse to fine
+//            int s_x = j-1; // we loop trough the scales from coarse to fine
+        int s_y = s_x;
+
+        dykstra.sum_of_squares_subsets(s_x, s_y, ps_sum);
+
+        T weight =  // 0.25*
+                ICD_weights[ //
+                n_scales-j];
+//               j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
+
+        T h_new = dykstra.project(s_x, //j-1 /* s_x*/,
+                              s_y, // j-1 /* s_y */,
+                              ps_sum, // this->h[j-1]
+                              tmp,
+                              g_noise, weight);
+
+        __syncthreads();
+
+        dykstra.Q[j-1] = h_new - tmp;
+
+    h_iter[dykstra.global_idx] = h_new;
 
 }
 

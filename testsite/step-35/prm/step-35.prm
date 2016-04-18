@@ -29,7 +29,7 @@ subsection Solver control
   set Log frequency = 1
   set Log history   = false
   set Log result    = true
-  set Max steps     = 60
+  set Max steps     = 1000
   set Tolerance     = 1.e-10
 
 
@@ -71,7 +71,7 @@ subsection input data
   # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
   # reasonably sampled on the lattice of pixels we simply assume that it is a
   # delta peak and consider the convolution operator as identity.
-  set PSF FWHM          = 9  #in new impl...consider factor of 2!  #
+  set PSF FWHM          = 0.001  #in new impl...consider factor of 2!  #
 
   # Regularisation type
   set Regularization method = TV
@@ -88,7 +88,7 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 870   #435#5%
+  set gaussian noise = 435   #435#5%
   
  # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
 

@@ -765,10 +765,8 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
     dealii::Vector<T> prev_image(input_image.size());
     prev_image = 0;
 
-    SciPAL::Vector<T, BW> res_tmp1, res_tmp2;
+    SciPAL::Vector<T, BW> res_tmp1;
 
-    //Residual of the current step, initialize as residual>tolerance
-    T res=2.0*params.solver_control.tolerance();
 
     //Log file
     std::ofstream gain_out("gain.txt");
@@ -784,7 +782,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
     //Iteration counter
     int iter = 0;
     //Will be used to store the constraint violations
-    T c1 = 0, c2 = 0;
+    T c1 = 0;
 
     {
         std::vector<T> zero_init(driver.x_d.size(), 0);
@@ -825,9 +823,8 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
         if ( iter <3 || (iter+1) % params.report_interval == 0 )
         {
             //Calculate the change in this step and check the constraints
-            res = 0;
             c1 = 0;
-            c2 = 0;
+
             driver.convolution.vmult(driver.tmp_d, driver.x_d); // conv2(driver.x_d.array().val(), driver.tmp_d.array().val());
             driver.get_data();
             //Calculate the change w.r.t. the last reported result
@@ -840,32 +837,21 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 
             c1 = res_tmp1.l2_norm();
 
-            // c2  = L2_norm (driver.z_h - driver.x_h);
-            res_tmp2 = driver.z_d;
-            res_tmp2 -= driver.x_d;
-            c2 = res_tmp2.l2_norm();
 
             // res = L2_norm (driver.x_h - prev_image);
-            res_tmp1 = driver.x_d;
-            res_tmp2 = prev_image;
-            res_tmp1 -= res_tmp2;
-            res = res_tmp1.l2_norm();
+            res_tmp1 = prev_image;
+            res_tmp1 -= driver.x_d;
+            T res = res_tmp1.l2_norm();
 
             c1 = c1/std::sqrt( (T)(dof_handler.n_dofs()) );
-            c2 = c2/std::sqrt( (T)(dof_handler.n_dofs()) );
-            res=res/std::sqrt( (T)(dof_handler.n_dofs()) ) + c1;
-
-            res_tmp1 = driver.generated_noise;
-            res_tmp1 -= driver.e_d();
-            T c3 = res_tmp1.l2_norm()/std::sqrt( (T)(dof_handler.n_dofs()) );
+            res = res/std::sqrt( (T)(dof_handler.n_dofs()) );
 
             // FIXME: vectors in drif.inf
 
             // std::copy(driver.x_h.begin(), driver.x_h.end(), prev_image.begin() );
             driver.x_d.push_to(prev_image);
-            gain_out << iter << " " << c1 << " " << c2 << " " <<  std::endl;
-            std::cout << "Iteration: " << iter << " | Constraint1 ||im - e - tmp||_2   : " << c1 << " | Constraint2 : ||x - z||_2  : "
-                      << c2 << ", L2-distance to generated noise : " << c3 << std::endl;
+            gain_out << iter << " " << c1 << " " << res << " " <<  std::endl;
+            std::cout << "Iteration: " << iter << " | Constraint1 ||im - e - tmp||_2   : " << c1 << ", ||x_n - x_n-1||_2  : " << res << std::endl;
 
 
             //Print the current estimate to a tiff file

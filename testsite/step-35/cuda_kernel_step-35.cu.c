@@ -640,7 +640,7 @@ struct DykstraStep {
 
     T __device__ sweep_fine_scales_rectangles (
             T* h_old_in,  T* Q_full,
-            const T* ICD_weights, T* ps_sum, const T g_noise, bool flip_direction)
+            const T* ICD_weights, T* ps_sum, const T g_noise, int flip_direction)
     {
         volatile T * m_ps = ps_sum + tIx;
 
@@ -752,8 +752,8 @@ __global__ void
 __incomplete_dykstra_2D_fine_scales(
         T* h_iter, T* h_old, T* Q_full,
         const T g_noise,
-        const int height, const int width, const int depth
-        )
+        const int height, const int width, const int depth,
+        int flip_direction)
 {
     const int n_scales = N_SCALES_2D;
 
@@ -781,10 +781,18 @@ __incomplete_dykstra_2D_fine_scales(
         return;
 
     // Projection on scales suitable for intra-threadblock processing.
-//    h_iter[dykstra.global_idx] =
-//            dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
+    if(flip_direction == 2)
+        h_iter[dykstra.global_idx] =
+            dykstra.sweep_fine_scales(h_old, Q_full,ICD_weights, ps_sum, g_noise);
 
-    T tmp = dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
+    if(flip_direction == 0)
+    {
+        h_iter[dykstra.global_idx] =
+            dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
+    }
+        else
+    {
+    T tmp = dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 1);
 
     // 1px subset projection
 
@@ -818,6 +826,7 @@ __incomplete_dykstra_2D_fine_scales(
         dykstra.Q[j-1] = h_new - tmp;
 
     h_iter[dykstra.global_idx] = h_new;
+    }
 
 }
 
@@ -828,6 +837,23 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
         const T g_noise,
         const int ni, const int nj, const int nk)
 {
+
+
+//    { //! projection on squares!!!!!!!!!!!!!!!!!!!!!!!
+//    int grid_2D_i= ni/32;
+//    int grid_2D_j= nj/32;
+//    dim3 grid_2D(grid_2D_i, grid_2D_j);
+//    dim3 blocks_2D(32, 32);
+
+
+//    __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
+//                                                                          h_old,  Q_full,
+//                                                                           g_noise,
+//                                                                           ni, nj, nk,
+//                                                                           2);
+//    }
+
+    {
     int grid_2D_i= ni/N_PX_X_2D;
     int grid_2D_j= nj/N_PX_Y_2D;
     dim3 grid_2D(grid_2D_i, grid_2D_j);
@@ -837,8 +863,26 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
     __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
                                                                           h_old,  Q_full,
                                                                            g_noise,
-                                                                           ni, nj, nk
-                                                                           );
+                                                                           ni, nj, nk,
+                                                                           0);
+    }
+
+    //! changed directions!!!!!!!!!!!!!!!!!!!!!!!
+   {
+   int grid_2D_j= ni/N_PX_X_2D;
+   int grid_2D_i= nj/N_PX_Y_2D;
+   dim3 grid_2D(grid_2D_i, grid_2D_j);
+   dim3 blocks_2D(N_PX_Y_2D, N_PX_X_2D);
+
+
+   __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
+                                                                         h_old,  Q_full,
+                                                                          g_noise,
+                                                                          ni, nj, nk,
+                                                                          1);
+   }
+
+
 
     getLastCudaError("__incomplete_dykstra_2D_fine_scales<T, 0, 0><<<>>> execution failed\n");
     cudaDeviceSynchronize();

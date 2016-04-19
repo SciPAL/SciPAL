@@ -372,6 +372,7 @@ public:
     protected:
         std::vector<T> prev_image; // (input_image.size(), T(0));
 
+
     };
 
 
@@ -379,6 +380,8 @@ private:
     SciPAL::GPUInfo & gpuinfo;
 
     ImageDoFHandler dof_handler;
+
+    dealii::Vector<T> x_h, e_h, im_h, generated_noise;
 
     //Array holding the signal
     // FIXME: store images in QImage. Applies to other attributes as well.
@@ -401,6 +404,26 @@ protected:
 
     template<typename Driver>
     void set_initial_condition(Driver &driver);
+
+    //@sect5{Function: push_data}
+    //@brief Push all data from host to device
+    template<typename Driver>
+    void push_data(Driver &driver) {
+        driver.writeable_im_d() = this->im_h;
+        driver.x_d = this->x_h;
+        driver.writeable_e_d() = this->e_h;
+
+    }
+
+    //@sect5{Function: get_data}
+    //@brief Pull all data from device to host
+    template<typename Driver>
+    void get_data(Driver &driver) {
+        driver.im_d().push_to(this->im_h);
+        driver.x_d.push_to(this->x_h);
+        driver.e_d().push_to(this->e_h);
+
+    }
 };
 }
 
@@ -414,6 +437,7 @@ protected:
 template<typename T, typename BW>
 step35::ADMM<T, BW>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
     : gpuinfo(g)
+
 {
     //DEBUG
     clock1 = std::chrono::high_resolution_clock::now();
@@ -560,20 +584,19 @@ void step35::ADMM<T, BW>::set_initial_condition(Driver &driver)
         for (int x=0; x<width; x++) {
             for (int y=0; y<height; y++) {
                 if ( z < depth && x < width && y < height )
-                    driver.im_h[z*__ext_width*__ext_height + x*__ext_height + y] =
+                    im_h[z*__ext_width*__ext_height + x*__ext_height + y] =
                             input_image[z*width*height + x*height + y];
             }
         }
     }
 
-    driver.x_h = driver.im_h;
+    x_h = im_h;
 
 //    if ( arch == gpu_cuda ) {
 
-        driver.writeable_im_d() = driver.im_h;
-        driver.x_d = driver.x_h;
-        driver.z_d = driver.z_h;
-        driver.writeable_e_d() = driver.e_h;
+        driver.writeable_im_d() = im_h;
+        driver.x_d = x_h;
+        driver.writeable_e_d() = e_h;
 
 //        cs_d = cs_vec;
 //        //Copy $c_s$ to constant CUDA memory
@@ -605,14 +628,14 @@ void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriver<T, BW>
    driver.convolution.vmult(driver.writeable_im_d(), driver.writeable_im_d() ); //
 
     //Push data from device to host
-    driver.get_data();
+    get_data(driver);
 
-    driver.generated_noise.reinit(driver.im_h);
+    generated_noise.reinit(im_h);
 
-    dealii::Vector<T> gn_offset(driver.generated_noise.size());
+    dealii::Vector<T> gn_offset(generated_noise.size());
     gn_offset = 0.;
 
-    driver.generated_noise = 0.;
+    generated_noise = 0.;
     //Now add gaussian noise
 #ifdef nUSE_DOF_HANDLER
     for (int z=0; z<image_io.pdepth; z++) {
@@ -628,24 +651,24 @@ void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriver<T, BW>
 #endif
 
 
-              driver.generated_noise[xyz_pos] = var_nor();
-               driver.im_h[xyz_pos] += driver.generated_noise[xyz_pos];
+              generated_noise[xyz_pos] = var_nor();
+               im_h[xyz_pos] += generated_noise[xyz_pos];
                //shift output of noise distribution to avoid negative numbers
-               gn_offset[xyz_pos] = 6*params.gnoise + driver.generated_noise[xyz_pos];
+               gn_offset[xyz_pos] = 6*params.gnoise + generated_noise[xyz_pos];
                // Add offset so that we something when plotting the noise component alone.
 
                 //The simulated data is meant to represent a noisy image, which is naturally non-negative everywhere
-                if (  driver.im_h[xyz_pos] < 0)
-                   driver.im_h[xyz_pos] = 0;
+                if (  im_h[xyz_pos] < 0)
+                   im_h[xyz_pos] = 0;
             }
         }
     }
 
     //Push data from host to device
-    driver.push_data();
+    push_data(driver);
 
     //Write the noisy image for control reasons
-    image_io.write_image("input.tif", driver.im_h,
+    image_io.write_image("input.tif", im_h,
                          // image_io.pheight, image_io.pwidth, image_io.pdepth,
                          dof_handler,
                          params.gnoise, params.anscombe);
@@ -689,6 +712,9 @@ void step35::ADMM<T, BW>::run() {
     // Debugging info about image sizes.
     image_io.print();
 
+    x_h.reinit(dof_handler.n_dofs());
+    e_h.reinit(dof_handler.n_dofs());
+    im_h.reinit(dof_handler.n_dofs());
 
     std::vector<T> cs;
 
@@ -755,7 +781,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 #endif
 
 
-    driver.get_data();
+    this->get_data(driver);
     //Simulates dataset by adding gaussian noise
     if( params.simulate ) {
         add_blur_and_gaussian_noise(driver);
@@ -782,16 +808,11 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
     //Iteration counter
     int iter = 0;
     //Will be used to store the constraint violations
-    T c1 = 0;
+    T residual = 0;
 
-    {
-        std::vector<T> zero_init(driver.x_d.size(), 0);
-        driver.x_d = driver.im_h; //FIXME: try init with driver.im_h
-        driver.z_d = zero_init;
-    }
+    driver.x_d = im_h; //FIXME: try init with im_h
 
-    // set initial conditions
-    driver.lag2 = driver.im_h;
+
 
     // FIXME: unsatisfying solution to disable the checking of the residual in the sc
     params.solver_control.clear_failure_criterion();
@@ -802,20 +823,18 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
     {
         // std::cout << "entering step " << iter << std::endl;
 
-
         //Argmin w.r.t. x
-   driver.x_step_adaptive(params);
-
+        driver.x_step_adaptive(params);
 
         //Argmin w.r.t. e, is equivalent to a projection   
         if ( params.gnoise > 0 )
-            driver.dykstra_gauss(params.rho1);
+            driver.dykstra_gauss(params.penalty_weight);
+
 
         //Update the Lagrange Multipliers
-
-
-        driver.update_lagrangian(1./params.inv_gamma,
-                                 params.alpha2);
+        // $ \Upsilon_1^{r+1} = \Upsilon_1^r + \alpha_1 \left( I - A*x - \epsilon \right) $ \n
+        driver.residual(driver.tmp_lag1, driver.im_d(), driver.e_d(), driver.x_d);
+        driver.lag1 =  (1./params.inv_gamma) * driver.tmp_lag1 + driver.lag1;
 
 
         //Report progress
@@ -823,35 +842,33 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
         if ( iter <3 || (iter+1) % params.report_interval == 0 )
         {
             //Calculate the change in this step and check the constraints
-            c1 = 0;
+            residual = 0;
 
             driver.convolution.vmult(driver.tmp_d, driver.x_d); // conv2(driver.x_d.array().val(), driver.tmp_d.array().val());
-            driver.get_data();
+            this->get_data(driver);
             //Calculate the change w.r.t. the last reported result
             //Calculate the violation of constraints
 
  // driver.im_d - driver.e_d - driver.tmp_d
-            // c1  = L2_norm (driver.im_h - driver.e_h - driver.tmp_h);
+            // c1  = L2_norm (im_h - driver.e_h - driver.tmp_h);
 
             driver.residual(res_tmp1, driver.im_d(), driver.e_d(), driver.x_d);
 
-            c1 = res_tmp1.l2_norm();
+            residual = res_tmp1.l2_norm();
 
-
-            // res = L2_norm (driver.x_h - prev_image);
             res_tmp1 = prev_image;
             res_tmp1 -= driver.x_d;
-            T res = res_tmp1.l2_norm();
+            T increment = res_tmp1.l2_norm();
 
-            c1 = c1/std::sqrt( (T)(dof_handler.n_dofs()) );
-            res = res/std::sqrt( (T)(dof_handler.n_dofs()) );
+            residual = residual/std::sqrt( (T)(dof_handler.n_dofs()) );
+            increment = increment/std::sqrt( (T)(dof_handler.n_dofs()) );
 
             // FIXME: vectors in drif.inf
 
-            // std::copy(driver.x_h.begin(), driver.x_h.end(), prev_image.begin() );
+            // std::copy(x_h.begin(), x_h.end(), prev_image.begin() );
             driver.x_d.push_to(prev_image);
-            gain_out << iter << " " << c1 << " " << res << " " <<  std::endl;
-            std::cout << "Iteration: " << iter << " | Constraint1 ||im - e - tmp||_2   : " << c1 << ", ||x_n - x_n-1||_2  : " << res << std::endl;
+            gain_out << iter << " " << residual << " " << increment << " " <<  std::endl;
+            std::cout << "Iteration: " << iter << " | Constraint1 ||im - e - tmp||_2   : " << residual << ", ||x_n - x_n-1||_2  : " << increment << std::endl;
 
 
             //Print the current estimate to a tiff file
@@ -859,11 +876,11 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
             {
                 // As name for the intermediate result we use what was given in the parameter file and append the zero-padded iteration counter.
                 QString img_out (QString(params.out_imagename.c_str()).replace(".", QString("-" +
-                                                                                            QString("%1").arg(iter, 6, 10, QChar('0'))
+    QString("%1").arg(iter, 6, 10, QChar('0'))
                                                                                                       )+"."));
 
                 // FMM version gives the wrong sign, hence : driver.z_h *= -1;
-                image_io.write_image(img_out.toStdString(), driver.z_h,
+                image_io.write_image(img_out.toStdString(), x_h,
                                      dof_handler, // image_io.pheight0, image_io.pwidth0, image_io.pdepth0,
                                      1.0,//params.gnoise
                                      params.anscombe);
@@ -893,14 +910,6 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
                 image_io.write_image(x_d_fname.toStdString(), x_d_tmp, dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
             }
 
-            if (false)
-            {
-                QString x_d_fname = QString ("z_d-%1d.tif").arg(iter);
-
-                dealii::Vector<T> x_d_tmp(driver.z_d.size());
-                driver.z_d.push_to(x_d_tmp);
-                image_io.write_image(x_d_fname.toStdString(), x_d_tmp, dof_handler, 1.0 /*dummy value for Gaussian noise*/, params.anscombe);
-            }
 
               if (true)
             {
@@ -922,7 +931,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
         iter++;
     } // End of main loop
 
-       image_io.write_image("final-" + params.out_imagename, driver.z_h,
+       image_io.write_image("final-" + params.out_imagename, x_h,
                             dof_handler,
                             // image_io.pheight0, image_io.pwidth0, image_io.pdepth0,
                             params.gnoise, params.anscombe);

@@ -68,112 +68,6 @@ void step35::Kernels<T, arch>::set_cs(T* cs_h, int maxnum) {
 //
 //Prior to the kernels we have to define the device functions that we need.
 
-//@sect5{Struct: SharedMemory}
-//Workaround as CUDA doesn't immediately support shared memory arrays in templated functions,
-//see <a href="http://docs.nvidia.com/cuda/cuda-samples/#simple-templates">CUDA Simple Templates example</a>.
-template <typename T>
-struct SharedMemory {
-    // Ensure that we won't compile any un-specialized types
-    __device__ T *getPointer() {
-        extern __device__ void error(void);
-        error();
-        return NULL;
-    }
-};
-
-//Float specialization
-template <>
-struct SharedMemory <float> {
-    __device__ float *getPointer() {
-        extern __shared__ float s_float[];
-        return s_float;
-    }
-};
-
-//Double specialization
-template <>
-struct SharedMemory <double> {
-    __device__ double *getPointer() {
-        extern __shared__ double s_double[];
-        return s_double;
-    }
-};
-
-//@sect5{Struct: __abs}
-//@brief Unary functions to calculate the absolute value for an element
-template <typename T>
-struct __abs : public thrust::unary_function<T,T> {
-    // Ensure that we won't compile any un-specialized types
-    __device__
-    T operator()(T x) {
-        extern __device__ void error(void);
-        error();
-        return NULL;
-    }
-};
-
-//Float specialization: use fabsf()
-template <>
-struct __abs <float> : public thrust::unary_function<float,float> {
-    __device__
-    float operator()(float x) {
-        return fabsf(x);
-    }
-};
-
-//Double specialization: use fabs()
-template <>
-struct __abs <double> : public thrust::unary_function<double,double> {
-    __device__
-    double operator()(double x) {
-        return fabs(x);
-    }
-};
-
-//@sect5{Struct: __element_norm_product}
-//@brief Unary functions to calculate $\frac{x\cdot y}{n}$ where $x,y$ are complex numbers and $n$ a constant factor.
-template <typename T>
-struct __element_norm_product {
-    __element_norm_product(T _n) {}
-    // Ensure that we won't compile any un-specialized types
-    __device__
-    T operator()(T x) {
-        extern __device__ void error(void);
-        error();
-        return NULL;
-    }
-};
-
-//Float specialization
-template <>
-struct __element_norm_product <float> {
-    cuFloatComplex normalization;
-
-    __element_norm_product(float _n) {
-        normalization = make_cuFloatComplex(1.0/_n, 0);
-    }
-
-    __host__ __device__
-    cuFloatComplex operator()(const cuFloatComplex& x, const cuFloatComplex& y) const {
-        return cuCmulf(cuCmulf(x, y), normalization);
-    }
-};
-
-//Double specialization
-template <>
-struct __element_norm_product <double> {
-    cuDoubleComplex normalization;
-
-    __element_norm_product(double _n) {
-        normalization = make_cuDoubleComplex(1.0/_n, 0);
-    }
-
-    __host__ __device__
-    cuDoubleComplex operator()(const cuDoubleComplex& x, const cuDoubleComplex& y) const {
-        return cuCmul(cuCmul(x, y), normalization);
-    }
-};
-
 
 //@sect5{Function: power_of_two}
 //@param x exponent
@@ -185,16 +79,6 @@ __device__ int pow_of_two(int x) {
     return 1 << x;
 }
 
-//@sect5{Function: mysign}
-//Sign function
-template<typename T>
-__device__ T mysign(T in)
-{
-    if ( in < (T)0)
-        return (T)(-1.0);
-    else
-        return (T)1;
-}
 
 
 // @sect5{Function: InverseErf}
@@ -253,243 +137,7 @@ __forceinline__ __device__ float MBG_erfinv(float x)
 //@param ni height of the image
 //@param nj width of the image
 //NOTICE: only 2D functionality
-template<typename T>
-__global__ void
-__dykstra(T *qg, T *A, int **cinfo, const int * q_offset, const int ni, const int nj) {
-    //Find out where I live
 
-    int k=0;
-    int border=0;
-    int *n=cinfo[4*blockIdx.x];
-    int *i=cinfo[4*blockIdx.x+1];
-    int *j=cinfo[4*blockIdx.x+2];
-    int numpatch=cinfo[4*blockIdx.x+3][0];
-
-    while ( k < numpatch ) {
-        if ( border+n[k]*n[k] > threadIdx.x )
-            break;
-        border+=n[k]*n[k];
-        k++;
-    }
-    if ( threadIdx.x - border >= n[k]*n[k] || k >= numpatch) {
-        //This is bad, exit
-        return;
-    }
-    //Allocate shared memory
-    SharedMemory<T> shared;
-    T* s_mem = shared.getPointer();
-    T* q=&(s_mem[0]); //takes first n2 sizeof(T) bytes
-    T* f=&(s_mem[blockDim.x]); //takes second third
-    T* e=&(s_mem[2*blockDim.x]); //takes last third
-
-    int is = (threadIdx.x-border)/n[k] + i[k];
-    int js = (threadIdx.x-border)%n[k] + j[k];
-
-    //Pixel index in the current in the global image
-    const int idx = is*nj + js;
-
-    //Fill shared memory with variables we later use
-    q[threadIdx.x] = qg[threadIdx.x+q_offset[blockIdx.x]];
-
-    f[threadIdx.x] = A[idx] - q[threadIdx.x];
-    e[threadIdx.x] = f[threadIdx.x]*f[threadIdx.x];
-    __syncthreads();
-
-    //m is the next power of 2 bigger than n divided by two
-    int m=n[k]*n[k];
-    int mmax=pow_of_two(floor(log2f((float)m)));
-    //Sum over all pixels in one frame
-    m=1;
-    while (m <= mmax) {
-        if (threadIdx.x - border + m < n[k]*n[k]) {
-            e[threadIdx.x] += e[threadIdx.x + m];
-        }
-        m = m << 1;
-        __syncthreads();
-    }
-
-    //$q = x_{r+1} - x_r$
-    q[threadIdx.x] = -f[threadIdx.x];
-    if (((T) cs[n[k]-1])*e[border] > 1.0) {
-        f[threadIdx.x] = f[threadIdx.x]/(sqrt(((T) cs[n[k]-1])*e[border]));
-    }
-
-    //Update global memory (image and q)
-    A[idx] = f[threadIdx.x];
-    qg[threadIdx.x+q_offset[blockIdx.x]] = q[threadIdx.x] + f[threadIdx.x];
-}
-
-
-
-template<typename T>
-__forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
-{
-    int row = threadIdx.y;
-    int col = threadIdx.x;
-    int tIx = row*blockDim.x + col;
-
-    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
-    volatile T * m_ps = ps_sum + tIx;
-
-    T x =  // 1.0; //
-            *m_ps;
-    __syncthreads();
-
-    *m_ps = x * x;
-    __syncthreads();
-
-    int edge_x = pow_of_two(s);
-
-
-    // ------------------
-    //    for (int e = edge_x; e>0; e/= 2)
-    //    {
-    //        int lane_id = col % (edge_x);
-
-    //        if (lane_id < e/2)
-    //        {
-    //            *m_ps += *(m_ps + e/2);
-    //            if (blockIdx.x == 0)
-    //                printf ("col : %d, e : %d, lane_id : %d \n", col, e, lane_id);
-    //        }
-
-    //__syncthreads();
-    //    }
-    // ------------------
-
-
-
-    // Each line is processed by one warp
-    for (int e = 2; e <= edge_x; e*= 2)
-    {
-        if ((col+e) % e == 0)
-        {
-            *m_ps += *(m_ps + e/2);
-            // if (*m_ps != e)
-            // printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
-        }
-        __syncthreads();
-    }
-
-}
-
-
-template<typename T>
-__forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s_x, int s_y, T * ps_sum)
-{
-    int row = threadIdx.y;
-    int col = threadIdx.x;
-    int tIx = row*blockDim.x + col;
-
-    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
-    volatile T * m_ps = ps_sum + tIx;
-
-    // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
-    T x = // 1.0; //
-            *m_ps;
-    __syncthreads();
-
-    *m_ps = x * x;
-    __syncthreads();
-
-    int edge_x = pow_of_two(s_x);
-
-    // Each line is processed by one warp
-    for (int e = 2; e <= edge_x; e*= 2)
-    {
-        if ((col+e) % e == 0)
-        {
-            *m_ps += *(m_ps + e/2);
-            //  printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
-        }
-        // __syncthreads();
-    }
-
-    __syncthreads();
-
-    int edge_y = pow_of_two(s_y);
-
-    for (int e = 2; e <= edge_y; e*= 2) // add rows
-    {
-        __syncthreads(); // Needed for some reason to ensure thread safety.
-        int neighbor = blockDim.x*(row + e/2) + col;
-        if ((row+e) % e == 0)
-        {
-            //            if (*m_ps != ps_sum[neighbor] /*&& row == 0 && col == 0*/)
-            //            {
-            //                printf("adding rows : ps_sum[%d] : %f, ps_sum[%d] : %f, e : %d\n", tIx, *m_ps, neighbor, ps_sum[neighbor], e);
-            //            }
-            *m_ps += ps_sum[neighbor];
-        }
-
-        __syncthreads();
-
-    }
-
-}
-
-
-template<typename T>
-__forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x, T data, T g_noise, T weight)
-{
-    int row = threadIdx.y;
-    int col = threadIdx.x;
-    int tIx = row*blockDim.x + col;
-
-    // FIXME: move into kernel
-    int edge_x = pow_of_two(s_x);
-    int edge_y = pow_of_two(s_y);
-
-    int ws_isx = blockDim.x*edge_y*(row/edge_y) +  edge_x*(col/edge_x);
-
-    T ws = (ps_sum[ws_isx]/(g_noise*g_noise)) * weight;
-    __syncthreads();
-
-    if (ws > 1.)
-        x *= 1.
-                / sqrt(ws);
-
-    // For debugging the 2D summation
-    if (false) //  ( blockIdx.x == blockIdx.y) && (ws != T(edge_x*edge_y)) ) //  && blockIdx.y == gridDim.y/2)
-        printf("ws_isx : %d, ws(%d, %d) : %f, x : %f, ps : %f\n ", ws_isx, col, row, ps_sum[ws_isx], x, T(edge_x*edge_y));
-
-    if(false) // ( blockIdx.x == 0) && (blockIdx.y == 0) && row == 0 && col == 0)
-        printf("weight[s=%d] : %f\n", s_x, weight);
-
-    return x;
-}
-
-
-template<typename T>
-__forceinline__ __device__ T L2_norm(T * ps_sum)
-{
-    int row = threadIdx.y;
-    int col = threadIdx.x;
-    int tIx = row*blockDim.x + col;
-
-
-    ps_sum[tIx] *= ps_sum[tIx]; // Compute squares of entries.
-    __syncthreads();
-
-    int k_max = blockDim.x*blockDim.y/2;
-
-    for (int k = k_max; k > 0; k/=2)
-    {
-        //  if (tIx == 0)  printf ("k in reduction : %d\n", k);
-        if (tIx < k)
-            ps_sum[tIx] += ps_sum[tIx+k];
-        __syncthreads();
-    }
-
-    T result = ps_sum[0];
-    __syncthreads();
-
-    // Maybe we need the following for debugging again someday.
-    if (false) // tIx == 0)
-        printf ("ps_sum[%d] in reduction : %f, blockDim.x : %d\n", tIx, result, blockDim.x);
-
-    return sqrt(result/(blockDim.x*blockDim.y)); // returns norm squared.
-}
 
 #define N_SCALES_2D 6
 #define N_PX_X_2D 64
@@ -556,10 +204,13 @@ struct DykstraStep {
     }
 
     __forceinline__
-    __device__ void sum_of_squares_subsets(int s_x, int s_y, T * ps_sum);
+    __device__
+    void sum_of_squares_subsets(int s_x, int s_y, T * ps_sum);
 
 
-    __forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x,
+    __forceinline__
+    __device__
+    T project(int s_x, int s_y, T * ps_sum, T x,
                                          T g_noise, T weight)
     {
         // FIXME: move into kernel
@@ -579,7 +230,9 @@ struct DykstraStep {
     }
 
 
-    bool __device__ out_of_bound(const int width, const int height) const
+    bool
+    __device__
+    out_of_bound(const int width, const int height) const
     {
         // Let threads working outside the computational domain idle.
         if (
@@ -746,7 +399,8 @@ void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s_x, int s_y
 
 
 
-
+// @sect4{Kernel}
+//
 template<typename T, int offset_x, int offset_y>
 __global__ void
 __incomplete_dykstra_2D_fine_scales(
@@ -789,6 +443,8 @@ __incomplete_dykstra_2D_fine_scales(
     {
         h_iter[dykstra.global_idx] =
             dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
+        h_old[dykstra.global_idx] = h_iter[dykstra.global_idx];
+        Q_full[dykstra.global_idx] = 0;
     }
         else
     {
@@ -830,7 +486,8 @@ __incomplete_dykstra_2D_fine_scales(
 
 }
 
-
+// @sect4{Wrapper Function}
+//
 template<typename T, ParallelArch arch>
 void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
         T* h_iter, T* h_old, T* Q_full,
@@ -866,7 +523,7 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
                                                                            ni, nj, nk,
                                                                            0);
     }
-
+    cudaDeviceSynchronize();
     //! changed directions!!!!!!!!!!!!!!!!!!!!!!!
    {
    int grid_2D_j= ni/N_PX_X_2D;
@@ -1088,7 +745,7 @@ __tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, c
 
 
 
-//@setc5{Kernel: __tv_derivative}
+//@setc5{Kernel: __tv_derivative_cpu}
 //@brief kernel for evaluation of the functional derivative of th TV regularization functional.
 template<typename T>
 inline void
@@ -1264,7 +921,7 @@ int width, const int depth)
                 );
 }
 
-//@sect5{Function: tv_derivative}
+//@sect5{Function: L1_derivative}
 //@brief This is a wrapper for the __tv_derivative Kernel.
 //@param A pointer to the image
 //@param ni height of the image
@@ -1318,9 +975,6 @@ void step35::Kernels<T, arch>::L1_derivative(T * dL1_du,
 //The functions which call the kernels
 
 
-
-
-
 //@sect5{Function: dyadic_dykstra}
 //@brief This is a wrapper for the __dyadyc_dykstra Kernel function.
 //@param A pointer to the image
@@ -1339,8 +993,4 @@ template class step35::Kernels<float, gpu_cuda>;
 template class step35::Kernels<double, gpu_cuda>;
 template class step35::Kernels<float, cpu>;
 template class step35::Kernels<double, cpu>;
-
-//void ImplCUDA<float>::apply<SDf, minus, SDf >(SDf&, SciPAL::DevBinaryExpr<SDf, minus, SDf > const&)", referenced from:
-
-//      void SciPAL::LAOOperations::apply<float, cublas, Vc, BinX<Vcblas, minus, Vcblas > >(Vcblas&, SciPAL::Expr<BinX<Vcblas, minus, Vcblas > > const&)
 

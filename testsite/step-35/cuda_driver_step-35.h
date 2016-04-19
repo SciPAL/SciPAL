@@ -77,9 +77,8 @@ private:
     Vector __im_d, __e_d;
 
 public:
-    Vector x_d, z_d, x_old;
+    Vector x_d, x_old;
 
-    dealii::Vector<Mdouble> x_h, e_h, z_h, im_h, generated_noise;
 
     // Access to noise contribution.
     const SciPAL::Vector<Mdouble,BW> & e_d() const { return __e_d; }
@@ -93,7 +92,7 @@ public:
     SciPAL::Vector<Mdouble,BW> & writeable_im_d() { return __im_d; }
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, BW> tmp_d, tmp2_d, lag1, lag2, tmp_haar2, tmp_lagr, tmp_haar, tmp_lag1, tmp_lag2;
+    SciPAL::Vector<Mdouble, BW> tmp_d, tmp2_d, lag1, heun_k_2, sol_diff, heun_k_1, tmp_lag1, x_tmp;
 
 
 
@@ -493,23 +492,17 @@ public:
                const ImageDoFHandler& dofs,
                const ADMMParams& params)
         :
-          x_h(dofs.n_dofs()),
-          e_h(dofs.n_dofs()),
-          z_h(dofs.n_dofs()),
-          im_h(dofs.n_dofs()),
           __e_d(dofs.n_dofs()),
           x_d(dofs.n_dofs()),
-          z_d(dofs.n_dofs()),
           __im_d(dofs.n_dofs()),
           //
           dof_handler(dofs),
           tmp_d(dofs.n_dofs()),
           tmp2_d(  dofs.n_dofs()),
           lag1(  dofs.n_dofs()),
-          lag2(  dofs.n_dofs()),
-          tmp_haar2(  dofs.n_dofs()),
-          tmp_haar(  dofs.n_dofs()),
-          tmp_lagr(  dofs.n_dofs()),
+          heun_k_2(  dofs.n_dofs()),
+          heun_k_1(  dofs.n_dofs()),
+          sol_diff(  dofs.n_dofs()),
           convolution(dofs.pdepth(),  dofs.pwidth(),  dofs.pheight(), params.psf_fwhm),
           n_max_dykstra_steps(params.n_max_dykstra_steps),
           dykstra_Tol(params.dykstra_Tol),
@@ -543,25 +536,7 @@ public:
 
     }
 
-    //@sect5{Function: push_data}
-    //@brief Push all data from host to device
-    void push_data() {
-        this->writeable_im_d() = this->im_h;
-        this->x_d = this->x_h;
-        this->z_d = this->z_h;
-        this->writeable_e_d() = this->e_h;
 
-    }
-
-    //@sect5{Function: get_data}
-    //@brief Pull all data from device to host
-    void get_data() {
-        this->im_d().push_to(this->im_h);
-        this->x_d.push_to(this->x_h);
-        this->z_d.push_to(this->z_h);
-        this->e_d().push_to(this->e_h);
-
-    }
 
     // Evaluation of the Euler-Lagrange equation for the minimization w.r.t.
     // to the primal variable, that is the image we want to reconstruct.
@@ -577,7 +552,7 @@ public:
                       const SciPAL::Vector<Mdouble, BW> & lag_1,
                       ADMMParams& params)
     {
-        const Mdouble rho1 = params.rho1;
+        const Mdouble rho1 = params.penalty_weight;
 
         const Mdouble reg_strength = params.reg_strength;
 
@@ -593,18 +568,33 @@ public:
 
         // Add regularization
         step35::Kernels<Mdouble, BW::arch> kernel;
-//        kernel.L1_derivative(this->tmp2_d.data(),
-//                             x_old.data(),
-//                             reg_strength,
-//                             dof_handler.pwidth(),
-//                             dof_handler.pheight(), dof_handler.pdepth());
-        kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
-                             this->im_d().data(),
-                             reg_strength,
-                             dof_handler.pwidth(),
-                             dof_handler.pheight(), dof_handler.pdepth());
+        switch(params.regType){
+        case l1:
+                    kernel.L1_derivative(this->tmp2_d.data(),
+                                         x_old.data(),
+                                         reg_strength,
+                                         dof_handler.pwidth(),
+                                         dof_handler.pheight(), dof_handler.pdepth());
+            break;
+        case l2:
+            tmp2_d = reg_strength * x_old;
+            break;
+        case TV:
+            kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
+                                 this->im_d().data(),
+                                 reg_strength,
+                                 dof_handler.pwidth(),
+                                 dof_handler.pheight(), dof_handler.pdepth());
 
-        this->tmp2_d *= params.rho2;
+            break;
+
+        case haar:
+            break;
+
+        default:
+            AssertThrow(false, dealii::ExcMessage("Unknown regularization type. Check parameter file."));
+        }
+
 
         dst -= this->tmp2_d;
     }
@@ -612,18 +602,6 @@ public:
 
     void x_step_adaptive(ADMMParams & params)
     {
-
-        const Mdouble rho1 = params.rho1;
-
-        const Mdouble reg_strength = params.reg_strength;
-
-
-        SciPAL::Vector<Mdouble, BW> & x_tmp = this->tmp_lag2;
-
-        SciPAL::Vector<Mdouble, BW> & k_1 = this->tmp_haar;
-        SciPAL::Vector<Mdouble, BW> & k_2 = this->tmp_haar2;
-
-        SciPAL::Vector<Mdouble, BW> & sol_diff = this->tmp_lagr;
 
         Mdouble err = 2*params.heun_Tol;
 
@@ -640,7 +618,7 @@ public:
             // Evaluate rhs of Euler-Lagrange for explicit Euler step.
             // This does not change over the course of the timestep adaption.
             // Hence, we have to compute it only once.
-            argmin_x_rhs(k_1, this->x_old, this->lag1, params);
+            argmin_x_rhs(heun_k_1, this->x_old, this->lag1, params);
 
 
             int dt_iter = 1;
@@ -651,20 +629,20 @@ public:
                 delta_t = 1./params.inv_gamma;
 
                 // Euler step for intermediate solution.
-                x_tmp = delta_t * k_1 + x_old;
+                x_tmp = delta_t * heun_k_1 + x_old;
 
                 // Evaluate rhs of Euler-Lagrange
-                argmin_x_rhs(k_2, x_tmp, this->lag1, params);
+                argmin_x_rhs(heun_k_2, x_tmp, this->lag1, params);
 
                 // The difference of the two solutions is given by the differnce of the derivatives
                 // and serves the timestep adaption.
-                sol_diff = k_2;
-                sol_diff -= k_1;
+                sol_diff = heun_k_2;
+                sol_diff -= heun_k_1;
                 sol_diff *= 0.5*delta_t;
 
                 // Heun step
-                k_2 += k_1;
-                this->x_d = Mdouble(0.5*delta_t) * k_2 + x_old;
+                heun_k_2 += heun_k_1;
+                this->x_d = Mdouble(0.5*delta_t) * heun_k_2 + x_old;
 
                 // this->z_d = this->x_d;
 
@@ -699,68 +677,10 @@ public:
         std::cout << "    n Heun steps used : " << n_err_iter <<
                   ", norm of solution increment : "<< err<< std::endl;
 
-
-        this->z_d = this->x_d;
     }
 
 
 
-    //@sect5{Function: x_step}
-    //@brief Performs approximative argmin with respect to $x$
-    // FIXME: component wise; to be removed 2016 02 06
-    void x_step(const Mdouble rho1,const Mdouble rho2)
-    {
-        step35::Kernels<Mdouble, BW::arch> kernel;
-
-        // the residual
-        //$\text{tmp}_d=I-e-A*x$
-        this->residual(tmp2_d, this->im_d(), this->e_d(), this->x_d);
-
-        // FIXME: do we need the following two doc lines?
-        //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
-        //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-
-        //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        tmp_d = rho1 * tmp2_d + lag1;
-
-        // conv2(tmp_d.data(), tmp_d.data());
-        // FIXME: inplace works?
-        convolution.vmult(tmp_d, tmp_d);
-
-        //$\text{tmp2}_d=z-x$
-        tmp2_d = this->z_d - this->x_d;
-
-
-        // FIXME: fuse expressions
-        //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        tmp2_d *= rho2;
-
-        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        tmp2_d += tmp_d;
-
-        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        tmp2_d -= lag2;
-
-        // THE FOLLOWING DOC EQ APPLIES TO HAVING DONE BEFORE : tmp2_d *= inf->gamma;
-        //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        //  this->x_d += tmp2_d;
-        this->x_d = this->inv_gamma * tmp2_d + this->x_d;
-    }
-
-    //@sect5{Function: update_lagrangian}
-    //@brief Update the lagrangian estimates
-    //$ \Upsilon_1^{r+1} = \Upsilon_1^r + \alpha_1 \left( I - A*x - \epsilon \right) $ \n
-    //$\Upsilon_2^{r+1} = \Upsilon_2^r + \alpha_2 \left( x - z \right) $
-    void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
-        step35::Kernels<Mdouble, BW::arch> kernel;
-
-        //Update the lagrangian estimates
-        residual(tmp_lag1, this->im_d(), this->e_d(), this->x_d);
-        lag1 =  alpha1 * tmp_lag1 + lag1;
-
-        tmp_lag2 = this->x_d - this->z_d;
-        lag2  = alpha2 * tmp_lag2 + lag2;
-    }
 
     //@sect5{Function: dykstra_gauss}
     //@brief Wrapper around the whole projection procedure

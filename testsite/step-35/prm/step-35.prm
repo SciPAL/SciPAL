@@ -2,9 +2,9 @@
 # ---------------------
 subsection Input
   # path to the .tif image
-  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024.tif
+  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_512.tif
   #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024_n_0.05_fwhm_6.0.tif
-  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/irp_logo_ideal.tif
+  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/irp_logo_ideal.tif
   #set Image to reconstruct = /z/johannes/cuda_results/step-35/2016-04-08/11_34_14/control-000999.tif
 end
 
@@ -71,10 +71,10 @@ subsection input data
   # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
   # reasonably sampled on the lattice of pixels we simply assume that it is a
   # delta peak and consider the convolution operator as identity.
-  set PSF FWHM          = 0.001  #in new impl...consider factor of 2!  #
+  set PSF FWHM          = 9.4  #in new impl...consider factor of 2!  #
 
   # Regularisation type
-  set Regularization method = TV
+  set Regularization method = l2  #l1, l2, TV, haar
 
   # enforces first constraint
   set alpha1                = 1
@@ -88,7 +88,7 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 435   #435#5%
+  set gaussian noise = 726   #435#5%
   
  # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
 
@@ -96,10 +96,8 @@ subsection input data
   set regularization        = 1.0
 
   # stabilises first constraint
-  set rho1                  = 0.99
+  set penalty_weight        = 0.99
 
-  # stabilises second constraint
-  set rho2                  = 1.0
 end
 
 

@@ -38,7 +38,7 @@ namespace step35 {
 //@param haar regularization by haar wavelet sparsity
 //@param sparse regularization by direct space sparsity
 //@param quadratic Minimize 2-Norm
-enum regularisationType {haar, sparse, quadratic, TV};
+enum regularisationType {haar, TV, l2, l1};
 
 // @sect4{Class: ADMMParams}
 //
@@ -61,9 +61,7 @@ public:
     //Second Lagrangian update parameter
     double alpha2;
     //First constraint quadratic weight
-    double rho1;
-    //Second constraint quadratic weight
-    double rho2;
+    double penalty_weight;
     //Regularization parameter, bigger is smoother
     double reg_strength;
     //Wether or not to use time seeded random numbers
@@ -201,14 +199,10 @@ void ADMMParams::declare(dealii::ParameterHandler &prm) {
 
 
 
-        prm.declare_entry ("rho1",
+        prm.declare_entry ("penalty_weight",
                            "6.192",
                            dealii::Patterns::Double(),
-                           "stabilises first constraint");
-        prm.declare_entry ("rho2",
-                           "1.8",
-                           dealii::Patterns::Double(),
-                           "stabilises second constraint");
+                           "strength of quadratic penalty term");
         prm.declare_entry ("alpha1",
                            "1.2",
                            dealii::Patterns::Double(),
@@ -221,8 +215,8 @@ void ADMMParams::declare(dealii::ParameterHandler &prm) {
                            "0",
                            dealii::Patterns::Double(),
                            "estimate of gaussian noise standard deviation. If simulate = true, will be used to add gaussian noise with standard deviation of ...");
-        prm.declare_entry ("Regularization method", "quadratic",
-                           dealii::Patterns::Selection("quadratic|haar|sparse|TV"),
+        prm.declare_entry ("Regularization method", "TV",
+                           dealii::Patterns::Selection("l1|l2|haar|TV"),
                            "Regularisation type");
         prm.declare_entry ("dim", "2",
                            dealii::Patterns::Integer(),
@@ -318,8 +312,8 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
 
         this->inv_gamma = 1./prm.get_double("Gamma");
 
-        this->rho1 = prm.get_double("rho1");
-        this->rho2 = prm.get_double("rho2");
+        this->penalty_weight = prm.get_double("penalty_weight");
+
         this->dim = prm.get_integer("dim");
 
         this->gnoise = prm.get_double("gaussian noise");
@@ -335,14 +329,14 @@ void ADMMParams::get(dealii::ParameterHandler &prm) {
 
         std::string temp_regType;
         temp_regType = prm.get("Regularization method");
-        if (strcmp(temp_regType.c_str(),"quadratic") == 0 ) {
-            this->regType = quadratic;
+        if (strcmp(temp_regType.c_str(),"l2") == 0 ) {
+            this->regType = l2;
         }
         else if (strcmp(temp_regType.c_str(),"haar") == 0 ) {
             this->regType = haar;
         }
-        else if (strcmp(temp_regType.c_str() ,"sparse") == 0 ) {
-            this->regType = sparse;
+        else if (strcmp(temp_regType.c_str() ,"l1") == 0 ) {
+            this->regType = l1;
         }
         else if (strcmp(temp_regType.c_str() ,"TV") == 0 ) {
             this->regType = TV;

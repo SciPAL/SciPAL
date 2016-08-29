@@ -2,7 +2,10 @@
 # ---------------------
 subsection Input
   # path to the .tif image
-  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_512.tif
+  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/checkerboard.tif
+  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/FT_dicty_200.tif
+  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/dicty_holo_50.tif
+  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_512.tif
   #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024_n_0.05_fwhm_6.0.tif
   #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/irp_logo_ideal.tif
   #set Image to reconstruct = /z/johannes/cuda_results/step-35/2016-04-08/11_34_14/control-000999.tif
@@ -71,7 +74,7 @@ subsection input data
   # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
   # reasonably sampled on the lattice of pixels we simply assume that it is a
   # delta peak and consider the convolution operator as identity.
-  set PSF FWHM          = 9.4  #in new impl...consider factor of 2!  #
+  set PSF FWHM          = 2 #in new impl...consider factor of 2!  #
 
   # Regularisation type
   set Regularization method = l2  #l1, l2, TV, haar
@@ -88,7 +91,8 @@ subsection input data
 
   # estimate of gaussian noise standard deviation. If simulate = true, will be
   # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 726   #435#5%
+  set gaussian noise = 20 #% 50 ph %14.15  % 200 ph
+  #435#5%
   
  # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
 

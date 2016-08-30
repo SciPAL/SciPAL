@@ -18,8 +18,9 @@ template<EType ExprType, typename E> struct ExprChooser;
 template<typename E>
 struct ExprChooser<unE, E>{
 
-    typedef DevUnaryExpr<typename E::L::DevType,
-    typename E::OpTag>      DevEType;
+    typedef DevUnaryExpr
+    <typename E::L::DevType,
+    typename E::OpTag> DevEType;
 
     typedef UnaryExpr<typename E::L::Type,
     typename E::OpTag>        HostEType;

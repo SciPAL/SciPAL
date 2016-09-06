@@ -59,6 +59,13 @@ struct GetMyType<SciPAL::ShapeData<T0> >
     typedef SciPAL::ShapeData<T0> Type;
 };
 
+
+template<typename T, typename BW>
+struct GetMyType<Literal<T, BW> >
+{
+    typedef Literal<T, BW> Type;
+};
+
 template<typename T, typename BW>
 struct GetMyType<Matrix<T, BW> >
 {
@@ -75,6 +82,12 @@ template<typename T, typename BW>
 struct GetMyType<SubVectorView<T, SciPAL::Vector<T, BW>, BW> >
 {
     typedef typename SubVectorView<T, SciPAL::Vector<T, BW>, BW >::MyShape Type;
+};
+
+template<typename T, typename BW>
+struct GetMyType<SubMatrixView<T, BW> >
+{
+    typedef typename SubMatrixView<T, BW >::MyShape Type;
 };
 
 

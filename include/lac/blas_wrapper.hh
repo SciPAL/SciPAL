@@ -27,8 +27,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <cblas.h>
 #endif
 
-
-
 //! deal.II components
 #include <deal.II/base/exceptions.h>
 #include <memory>
@@ -89,7 +87,7 @@ struct blas {
         //! Construct an array of length @p n.
         //! @param n : Number of elements to allocate.
         Data(size_t n_rows, size_t n_cols = 1)
-            : __data(), __n_el(0), leading_dim_elements(0)
+            : __data(0), __n_el(0), leading_dim_elements(0)
         {
             resize(n_rows, n_cols);
         }
@@ -172,11 +170,11 @@ public:
     //! @param ldb : leading dimension von B.
     template<typename T,  typename T2>
     static void SetMatrix(int rows, int cols, const T2 *const A,
-                   int lda, T *B, int ldb)
+                   int/* lda*/, T *B, int/* ldb*/)
     {
         //! cublasStatus status = cublasSetMatrix(rows, cols, sizeof(T),
         //!                                      A, lda, B, ldb);
-
+		//ToDo fix me for ld mismatch, check copying of views
         copy(rows*cols, (A), 1, reinterpret_cast< T2*>(B), 1);
 
         //! check_status(status);
@@ -631,6 +629,32 @@ public:
         //! check_status(status);
     }
 
+    static void gemv (char trans, int m, int n, float2 & alpha,
+                      const float2 * const A, int lda,
+                      const float2 * const x,  int incx, float2 & beta,
+                      float2 *y, int incy)
+    {
+        CBLAS_TRANSPOSE tr = ( ( (trans == 't') || (trans == 'T') ) ? CblasTrans : CblasNoTrans );
+        cblas_cgemv (CblasColMajor, tr, m, n, &alpha, A, lda, x, incx, &beta, y, incy);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+    }
+
+    static void gemv (char trans, int m, int n, double2 & alpha,
+                      const double2 * const A, int lda,
+                      const double2 * const x,  int incx, double2  & beta,
+                      double2 *y, int incy)
+    {
+        CBLAS_TRANSPOSE tr = ( ( (trans == 't') || (trans == 'T') ) ? CblasTrans : CblasNoTrans );
+        cblas_zgemv (CblasColMajor, tr, m, n, &alpha, A, lda, x, incx, &beta, y, incy);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+    }
+
     // @sect4{Funktion: ger}
     //!
     //! @param m : Anzahl Zeilen in Matrix A.
@@ -688,8 +712,9 @@ public:
                      const float * const A, int lda, const float * const B, int ldb,
                      float beta, float * C, int ldc)
     {
-        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : CblasNoTrans );
-        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : ( (transa == 'c') || (transa == 'C') ) ? CblasTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : ( (transb == 'c') || (transb == 'C') ) ? CblasTrans : CblasNoTrans );
+
 
         cblas_sgemm(CblasColMajor,
                     tr_a, tr_b,
@@ -710,8 +735,8 @@ public:
                      const double * const A, int lda, const double * const B, int ldb,
                      double beta, double * C, int ldc)
     {
-        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : CblasNoTrans );
-        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_a = ( ( (transa == 't') || (transa == 'T') ) ? CblasTrans : ( (transa == 'c') || (transa == 'C') ) ? CblasTrans : CblasNoTrans );
+        CBLAS_TRANSPOSE tr_b = ( ( (transb == 't') || (transb == 'T') ) ? CblasTrans : ( (transb == 'c') || (transb == 'C') ) ? CblasTrans : CblasNoTrans );
 
         cblas_dgemm(CblasColMajor, tr_a, tr_b, m, n, k, alpha,
                     A, lda, B, ldb,
@@ -867,6 +892,137 @@ public:
                       int incx, const double *y, int incy)
     {
         double result = cblas_ddot(n, x, incx, y, incy);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static std::complex<float> dot(int n, const std::complex<float> *x,
+                      int incx, const std::complex<float> *y, int incy)
+    {
+        std::complex<float> result;
+        cblas_cdotu_sub(n, x, incx, y, incy,&result);
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static std::complex<double> dot(int n, const std::complex<double> *x,
+                      int incx, const std::complex<double> *y, int incy)
+    {
+        std::complex<double> result;
+        cblas_zdotu_sub(n, x, incx, y, incy,&result);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static float2 dot(int n, const float2 *x,
+                      int incx, const float2 *y, int incy)
+    {
+        float2 result;
+        cblas_cdotu_sub(n, x, incx, y, incy,&result);
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static double2 dot(int n, const double2 *x,
+                      int incx, const double2 *y, int incy)
+    {
+        double2 result;
+        cblas_zdotu_sub(n, x, incx, y, incy,&result);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    // @sect4{Funktion: dotc}
+    //!
+    //! @param n : Anzahl Elemente.
+    //! @param x : Quellvektor x.
+    //! @param incx : Speicher Abstand zwischen Elemente in Vector x.
+    //! @param y : Zielvektor.
+    //! @param incy: Speicher Abstand zwischen Elemente in Vector y.
+
+    static float  dotc(int n, const float *x, int incx, const float *y, int incy)
+    {
+        float result = cblas_sdot(n, x, incx, y, incy);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static double dotc(int n, const double *x,
+                      int incx, const double *y, int incy)
+    {
+        double result = cblas_ddot(n, x, incx, y, incy);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static std::complex<float> dotc(int n, const std::complex<float> *x,
+                      int incx, const std::complex<float> *y, int incy)
+    {
+        std::complex<float> result;
+        cblas_cdotc_sub(n, x, incx, y, incy,&result);
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static std::complex<double> dotc(int n, const std::complex<double> *x,
+                      int incx, const std::complex<double> *y, int incy)
+    {
+        std::complex<double> result;
+        cblas_zdotc_sub(n, x, incx, y, incy,&result);
+
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static float2 dotc(int n, const float2 *x,
+                      int incx, const float2 *y, int incy)
+    {
+        float2 result;
+        cblas_cdotc_sub(n, x, incx, y, incy,&result);
+        //! cublasStatus status = cublasGetError();
+
+        //! check_status(status);
+
+        return result;
+    }
+
+    static double2 dotc(int n, const double2 *x,
+                      int incx, const double2 *y, int incy)
+    {
+        double2 result;
+        cblas_zdotc_sub(n, x, incx, y, incy,&result);
 
         //! cublasStatus status = cublasGetError();
 

@@ -141,13 +141,7 @@ public:
 
 // @sect3{General Operators}
 //
-//template <typename T, typename BW, template <typename, typename> class LAO >
-//inline
-//const BinaryExpr< LAO<T, BW>, SciPAL::plus,  LAO<T, BW> >
-//operator+(const LAO<T, BW> &e1, const LAO<T, BW> &e2)
-//{
-//    return BinaryExpr<LAO<T, BW>, SciPAL::plus, LAO<T, BW> >(e1, e2);
-//}
+
 
 template <typename T1, typename T2 >
 inline
@@ -184,14 +178,6 @@ operator *(const typename LAO<T, BW>::value_type e1,
     return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
 }
 
-//template <typename T, typename BW, template <typename, typename> class LAO >
-//inline
-//const BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >
-//operator *(const T e1, const  LAO<T, BW>& e2)
-//{
-//    return BinaryExpr<Literal<T, BW>, SciPAL::mult, LAO<T, BW> >(~Literal<T, BW>(e1), ~e2);
-//}
-
 template <typename T1, typename T2 >
 inline
 const BinaryExpr<T1, mult, T2>
@@ -217,64 +203,6 @@ operator || (const Expr<T1>& e1, const Expr<T2>& e2)
 {
     return BinaryExpr<T1, SciPAL::pdivide, T2 >(~e1, ~e2);
 }
-
-//template<typename T, typename BW>
-//struct SMSMmult : SciPAL::Expr<SMSMmult<T, BW> >  {
-
-//    const SubMatrixView<T, BW> &  l;
-//    const SubMatrixView<T, BW> &  r;
-
-//    SMSMmult (const SubMatrixView<T, BW> & A, const SubMatrixView<T, BW> & B): l(A), r(B){}
-
-//};
-
-//template<typename T, typename BW> struct SMSMTmult {
-//    const SubMatrixView<T, BW> &  l;
-//    const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > &  r;
-//    SMSMTmult (const SubMatrixView<T, BW> & A, const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & B): l(A), r(B){}
-//};
-
-
-//template<typename T, typename BW> struct SMTSMmult {
-//    const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > &  l;
-//    const SubMatrixView<T, BW> &  r;
-//    SMTSMmult (const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & A, const SubMatrixView<T, BW> & B): l(A), r(B){}
-//};
-
-//// @sect4{Operator: *}
-////! Multiplizieren von zwei SubMatrixView
-////! @param A:        ein SubMatrixView
-////! @param B:        ein SubMatrixView
-////!
-//template<typename T, typename BW>
-//inline SMSMmult<T, BW> operator * (const SubMatrixView<T, BW> & A, const SubMatrixView<T, BW> & B) {
-//    return SMSMmult<T, BW>(A, B);
-//}
-
-//// @sect4{Operator: *}
-////! Multiplizieren von zwei SubMatrixView
-////! @param A:        ein SubMatrixView
-////! @param B:        ein SubMatrixView
-////!
-//template<typename T, typename BW>
-//inline SMSMTmult<T, BW> operator * (const SubMatrixView<T, BW> & A,
-//                                    const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & B) {
-//    return SMSMTmult<T, BW>(A, B);
-//}
-
-
-
-//// @sect4{Operator: *}
-////! Multiplizieren von zwei SubMatrixView
-////! @param A:        ein SubMatrixView
-////! @param B:        ein SubMatrixView
-////!
-//template<typename T, typename BW>
-//inline SMTSMmult<T, BW> operator * (const UnaryExpr<SubMatrixView<T, BW>, expr_transpose > & A,
-//                                    const SubMatrixView<T, BW> & B) {
-//    return SMTSMmult<T, BW>(A, B);
-//}
-
 
 
 } // END namespace SciPAL

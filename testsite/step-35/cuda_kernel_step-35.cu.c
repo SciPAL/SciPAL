@@ -532,8 +532,6 @@ struct DykstraStep {
 
     // In contrast to the formulation as pseudo code we only need a constant number of @p h variables because they are computed incrementally.
 
-    // For the corrections we need the full history w.r.t. the number of levels in subset hierarchy.
-    T Q[N_SCALES_2D];
 
     int n_scales;
 
@@ -549,11 +547,7 @@ struct DykstraStep {
           global_row (blockDim.y*blockIdx.y + row + offset_y),
           global_col (blockDim.x*blockIdx.x + col + offset_x),
           global_idx (global_row*width + global_col)
-    {
-
-        for (int j = 1; j <= n_scales; j++)
-            Q[j-1] = 0;
-    }
+    {/*nothing to do*/}
 
     __forceinline__
     __device__ void sum_of_squares_subsets(int s, T * ps_sum);
@@ -579,7 +573,9 @@ struct DykstraStep {
     }
 
 
-    bool __device__ out_of_bound(const int width, const int height) const
+    bool
+    __device__
+    out_of_bound(const int width, const int height) const
     {
         // Let threads working outside the computational domain idle.
         if (
@@ -592,20 +588,20 @@ struct DykstraStep {
             return false;
     }
 
-    T __device__ sweep_fine_scales (
-            T* h_old_in,  T* Q_full,
-            const T* ICD_weights, T* ps_sum, const T g_noise)
+    T __device__
+    sweep_fine_scales ( T* h_old_in,  T* Q_full,
+                        const T* ICD_weights, T* ps_sum, const T g_noise, int image_size)
     {
         volatile T * m_ps = ps_sum + tIx;
 
-        Q[0] = Q_full[this->global_idx];
 
         T h_old = h_old_in[this->global_idx];
         T h_new = T(0);
 
         for (int j = 1; j <= this->n_scales; j++)         // loop over subsets
         {
-            h_old -= this->Q[j-1];
+            int Q_idx = this->global_idx + j*image_size;
+            h_old -= Q_full[Q_idx];
 
             *m_ps  = h_old;
 
@@ -628,7 +624,7 @@ struct DykstraStep {
 
             __syncthreads();
 
-            this->Q[j-1] = h_new - h_old;
+            Q_full[Q_idx] = h_new - h_old;
             h_old = h_new;
         }
         return h_new; //  - h_init; // difference formed in on-chip registers
@@ -725,7 +721,7 @@ __incomplete_dykstra_2D_fine_scales(
 
     // Projection on scales suitable for intra-threadblock processing.
     h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_old, Q_full,
-                                                                        ICD_weights, ps_sum, g_noise);
+                                                                        ICD_weights, ps_sum, g_noise, width*height);
 
 
 }

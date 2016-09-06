@@ -73,7 +73,7 @@ struct blas_pp {
 
     typedef SciPAL::RowVectorView<T, BW, Vector> SubRowVector;
 
-    typedef SciPAL::SubVectorView<T, BW, Vector>    SubVectorBase;
+    typedef SciPAL::SubVectorView<T, BW, Vector> SubVectorBase;
 };
 
 

@@ -1,3 +1,4 @@
+//@sect3{File: cusolverDn_wrapper.h}
 #ifndef CUSOLVERDN_WRAPPER_STEP43_HH
 #define CUSOLVERDN_WRAPPER_STEP43_HH
 
@@ -21,35 +22,35 @@ namespace SciPAL
 {
 static cusolverDnHandle_t cusolver_handle;
 
-// @sect3{struct cusolverDn: cusolverDn S,D,C,Z wrapper functions}
-//!
-//! We remove the type dependence of the function of cusolverDn by using C++'s polymorphism and templates.
-//! (...)
-//! For the numerical purpose of the functions have a look at the cusolverDn doc.
-//!
+// @sect4{struct cusolverDn: cusolverDn S,D,C,Z wrapper functions}
+//
+// We remove the type dependence of the function of cusolverDn by using C++'s polymorphism and templates.
+// For the numerical purpose of the functions have a look at the cusolverDn documentation.
+//
 
 struct cusolverDn
 {
 
-    // @sect4{Funktion: name}
-    //!
-    //! Return a string identifier. This is useful in the output of performance tests.
+    // @sect5{Funktion: name (cusolverDn)}
+    //
+    // Return a string identifier. This is useful in the output of performance tests.
     static inline std::string name () { return "cusolverDn"; }
 
-    //! Compile-time variable for identifying the side of PCIe bus this solver works on.
+    // Compile-time variable for identifying the side of PCIe bus this solver works on.
     static const ParallelArch arch = gpu_cuda;
 
     typedef typename archTraits<arch>::BlasType BW;
 
-    // @sect4{Funktion: check_status}
-    //!
-    //! Evaluate the @p cusolverStatus argument and throws
-    //! an exception in case an error occurs.
+    // @sect5{Funktion: check_status}
+    //
+    // Evaluate the @p cusolverStatus argument and throws
+    // an exception in case an error occurs.
+    //
+    // \param cusolverStatus : status flag returned by a cuSolver function
+    //
+#ifdef DEBUG
     static void  check_status(const cusolverStatus_t & status)
     {
-        //! The following is for tracking cusolverDn usage
-        //! std::cout << "Checking cusolver status" << std::endl;
-#ifdef DEBUG
         std::string cusolverDn_errors(" ");
 
         if (status != CUSOLVER_STATUS_SUCCESS)
@@ -87,14 +88,13 @@ struct cusolverDn
             Assert(false, dealii::ExcMessage(cusolverDn_errors.c_str() ) );
 #endif
         }
-#endif
     }
-
-    // @sect4{Funktion: Init}
-    //!
-    //! Initialize cusolverDn.
-    //! If it fails an exception is thrown. To get a more readable output
-    //! we use deal.II's Assert and AssertThrow macros.
+#endif
+    // @sect5{Funktion: Init}
+    //
+    // Initialize cusolverDn.
+    // If it fails an exception is thrown. To get a more readable output
+    // we use deal.II's Assert and AssertThrow macros.
     static void  Init()
     {
         cusolverStatus_t s = cusolverDnCreate(&cusolver_handle);
@@ -114,9 +114,9 @@ struct cusolverDn
     }
 
 
-    // @sect4{Funktion: Shutdown}
-    //!
-    //! Shut down cusolverDn. If it fails an exception is thrown.
+    // @sect5{Funktion: Shutdown}
+    //
+    // Shut down cusolverDn. If it fails an exception is thrown.
     static void Shutdown()
     {
 
@@ -137,11 +137,15 @@ struct cusolverDn
     }
 
     //---------------------------------------------------------
-    //SVD functions:
-    // Calculates the SVD for a Matrix A (m x n) with A=U*S*Vt for cublas matrices via cuSolver.
-    // The content of A is destroyed during the process.
-    // A is of matrix type s,d,c or z.  Correspondingly the vector of S is of type s or d.
-    // (...)
+    // @sect5{SVD functions (gpu)}
+    // @sect6{Function (gpu): SVD}
+    // Calculate singular-value-decomposition of $m \times n$ matrix $A$ of type s, d, c, z with
+    // $A=U \cdot S \cdot V^T$
+    // for cublas matrices via cuSolver. Correspondingly the vector of $S$ is of type s or d.
+    // \param A : input matrix, contents are overwritten during lapack function call
+    // \param U : output matrix of dimension $m \times \min(m,n)$, contains left singular vectors
+    // \param S : output vector of length $\min(m,n)$, contains singular values
+    // \param Vt : output matrix of dimension $\min(m,n) \times n$, contains right singular vectors
     template <typename T>
     static cusolverStatus_t SVD(SciPAL::Matrix<T, BW>&                                                  A,
                                 SciPAL::Matrix<T, BW>&                                                  U,
@@ -152,75 +156,80 @@ struct cusolverDn
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
 
-        // allocate space for U,S,Vt:
-        // dimension of S can be chosen to be min(m,n) (see cuSolver doc.)
-        // if m<n:  U   m x m matrix (quadratic)
-        //          S   m-dim vector
-        //          Vt  m x n matrix
-        // if m>=n: U   m x n matrix (quadratic)
-        //          S   n-dim vector
-        //          Vt  n x n matrix
+        // Allocate space for U,S,Vt:
+        // dimension of S can be chosen to be $\min(m,n)$ (see cuSolver documentation: http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-gesvd).
+        //
+        // if $m<n$:
+        // - U : $m \times m$ matrix (quadratic)
+        // - S : $m$-dim vector
+        // - Vt: $m \times n$ matrix
+        //
+        // if $m \geq n$:
+        // - U : $m \times n$ matrix
+        // - S : $n$-dim vector
+        // - Vt : $n \times n$ matrix (quadratic)
+
         U.reinit(m, min_mn);
         S.reinit(min_mn);
         Vt.reinit(min_mn, n);
 
-        // Workaround for the not-so-finished implementation of Nvidias SVD:
-        // CUDA svd function only accepts matrices with m>=n by now. (see cuSolver doc.)
-        // Hence, we first have to transpose a matrix A with m<n which leads to transposed and
-        // swapped matrices U and Vt. To get the desired results these have to be transposed
-        // and swapped explicitly in the end.
+        // Workaround for the not-so-finished implementation of NVidias SVD:
+        //
+        // Since the CUDA SVD function only accepts matrices with $m \geq n$ by now
+        // (see remarks of the cuSolver documentation http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-gesvd)
+        // we have to catch the case $m<n$ and transpose the matrix A. This leads to transposed and
+        // swapped matrices U and Vt. To get the desired results these matrices have to be
+        // transposed and swapped explicitly in the end.
 
-        // catch the case which does not work by now
+        // Catch the case which does not work by now:
         if(m < n)
         {
-            // define temporary workspaces:
+            // Define temporary workspaces:
             SciPAL::Matrix<T, BW> A_tmp(n, m);
             SciPAL::Matrix<T, BW> U_tmp;
             SciPAL::Matrix<T, BW> Vt_tmp;
 
-            // create Adjoint(A):
+            // Create Adjoint(A):
             A_tmp = SciPAL::adjoint(A);
 
-            // calculate SVD for Adjoint(A):
+            // Calculate the SVD for Adjoint(A):
             cusolverStatus_t stat = SVD(A_tmp, U_tmp, S, Vt_tmp);
 
-            // determine the desired U and Vt matrices:
+            // Determine the desired U and Vt matrices:
             U = SciPAL::adjoint<SciPAL::Matrix<T, BW> >(Vt_tmp);
-
-            BW::copy(m * n, U_tmp.data(), U_tmp.stride, A_tmp.data(), A_tmp.stride);                  // recycling A_tmp
-
-            Vt = SciPAL::adjoint<SciPAL::Matrix<T, BW> >(A_tmp);
+            Vt = SciPAL::adjoint<SciPAL::Matrix<T, BW> >(U_tmp);
 
             return stat;
         }
 
-        // --- device side SVD workspace and matrices
+        // Allocate device side SVD workspace:
         int Lwork = 0;
         int *devInfo;
         cudaMalloc((void**)(&devInfo),sizeof(int));
 
-        // get work size
+        // Get work size:
         cusolverStatus_t stat = cusolverDngesvd_bufferSize(m, n, &Lwork, T(0));
+#ifdef DEBUG
         check_status(stat);
-
-        // allocate work space
+#endif
+        // Allocate work space:
         SciPAL::Vector<T, BW> work(Lwork);
-
         SciPAL::Vector<typename SciPAL::VTraits<T, BW::arch>::NumberType, BW> Rwork(5 * min_mn);
 
-        // create full (but temporary) U matrix:
+        // Create full (but temporary) U matrix:
         SciPAL::Matrix<T, BW> U_tmp(m, m);
 
-        // do the SVD
+        // Do the SVD:
         stat = cusolverDngesvd('A', 'A', m, n, A.data(), A.leading_dim, S.data(), U_tmp.data(), U_tmp.leading_dim, Vt.data(), Vt.leading_dim,
                                work.data(), Lwork, Rwork.data(), devInfo);
         cudaDeviceSynchronize();
 
-        // check error information (see cusolver doc.)
+        // Check error information (see cuSolver documentation.):
+#ifdef DEBUG
         SVD_check_devInfo(stat, devInfo);
         check_status(stat);
-
-        // determine the desired U
+#endif
+        // Determine the desired U:
         // Later a view can used here.
         BW::copy(m * n, U_tmp.data(), U_tmp.stride, U.data(), U.stride);
 
@@ -228,8 +237,9 @@ struct cusolverDn
 
         return stat;
     }
-    // Calculates the SVD for a Matrix A (m x n) with A=U*S*Vt for cublas matrices via cuSolver.
-    // A is of matrix type s,d,c or z.  Correspondingly the vector of S is of type s or d.
+
+    // @sect6{Function (gpu): SVD (const A)}
+    // Same as above, but keeps A unchanged by creating a working copy A_tmp = A.
     template <typename T>
     static cusolverStatus_t SVD(const SciPAL::Matrix<T, BW>&                                            A,
                                 SciPAL::Matrix<T, BW>&                                                  U,
@@ -241,10 +251,16 @@ struct cusolverDn
     }
 
     //---------------------------------------------------------
-    //LUD functions:
-    // Calculates the LU decomposition for a Matrix A (m x n) with P*A=L*U for cublas matrices via cuSolver.
-    // The result is stored in A.
-    // A is of matrix type s,d,c or z.
+    // @sect5{LUD functions (gpu)}
+
+    // @sect6{Function (gpu): LUD}
+    // Calculate LU-decomposition of $m \times n$ Matrix $A$ of type s, d, c, z with $A=P^{-1}\cdot L\cdot U$.
+    //
+    // $P$ is a permutation matrix.
+    // $L$ is lower triangular (lower trapezoidal if $m > n$) with unit diagonal elements.
+    // $U$ is upper triangular (upper trapezoidal if $m < n$).
+    // \param A : input/output matrix, contains $L$ (except for its unit diagonal) and $U$ after function call.
+    // \param P : output vector, describes permutation matrix as pivot indices; for $1 \leq i \leq min(m,n)$, row $i$ of the matrix was interchanged with row $P(i)$.
     template <typename T>
     static cusolverStatus_t LUD(SciPAL::Matrix<T, BW>& A,
                                 SciPAL::Vector<int, BW>& P)
@@ -253,34 +269,41 @@ struct cusolverDn
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
 
-        // allocate space for P
+        // Allocate space for P
         P.reinit(min_mn);
 
-        // calculate LU factorization for A:
+        // Calculate LU factorization for A:
         int Lwork = 0;
         int *devInfo;
-
         cudaMalloc((void**)(&devInfo),sizeof(int));
 
-        // get work size
+        // Get work size:
         cusolverStatus_t stat = cusolverDngetrf_bufferSize(m, n, A.data(), A.leading_dim, &Lwork);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
 
-        // allocate work space
+        // Allocate work space:
         SciPAL::Vector<T, BW> work(Lwork);
 
-        // do the LU decomp
+        // Do the LU decomposition:
         stat = cusolverDngetrf(m, n, A.data(), A.leading_dim, work.data(), P.data(), devInfo);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
         cudaFree(devInfo);
 
         return stat;
     }
-    // Calculates the LU decomposition for a Matrix A (m x n) with P*A=L*U for cublas matrices via cuSolver.
-    // The content of A is destroyed during the process.
-    // A is of matrix type s,d,c or z.
+
+    // @sect6{Function (gpu): LUD (L,U seperate)}
+    // Same as above but explicitly copies the content of $A$ into matrices $L$ and $U$.
+    // \param A : input/output matrix, contains $L$ (except for its unit diagonal) and $U$ after function call.
+    // \param P : output vector, describes permutation matrix as pivot indices; for $1 \leq i \leq min(m,n)$, row $i$ of the matrix was interchanged with row $P(i)$.
+    // \param L : output matrix; lower triangular (lower trapezoidal if $m > n$) of dimension $m \times min(m,n)$ with unit diagonal elements.
+    // \param U : output matrix; upper triangular (upper trapezoidal if $m < n$) of dimension $min(m,n) \times n$.
     template <typename T>
     static cusolverStatus_t LUD(SciPAL::Matrix<T, BW>&          A,
                                 SciPAL::Vector<int, BW>&        P,
@@ -291,22 +314,23 @@ struct cusolverDn
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
 
-        // calculate LU factorization for A:
+        // Calculate LU factorization for A:
         cusolverStatus_t stat = LUD(A, P);
 
-        // allocate space for L,U
+        //Resize output:
         L.reinit(m, min_mn);
         U.reinit(min_mn, n);
 
-        // set the diagonal entries of L to 1.0
-        // copy strict lower triangular part of A into L
-        // copy upper triangular part of A into U
+        // Set the diagonal entries of L to 1.0,
+        // copy strict lower triangular part of A into L, and
+        // copy upper triangular part of A into U:
         lower_upper_triangle(A, L, U);
 
         return stat;
     }
-    // Calculates the LU decomposition for a Matrix A (m x n) with P*A=L*U for cublas matrices via cuSolver.
-    // A is of matrix type s,d,c or z.
+
+    // @sect6{Function (gpu): LUD (const A, L/U seperate)}
+    // Same as above, but keeps $A$ unchanged by creating a working copy A_tmp = A.
     template <typename T>
     static cusolverStatus_t LUD(const SciPAL::Matrix<T, BW>&    A,
                                 SciPAL::Vector<int, BW>&        P,
@@ -318,11 +342,21 @@ struct cusolverDn
     }
 
     //---------------------------------------------------------
-    //QRF functions:
-    // Calculates the QR decomposition for a Matrix A (m x n) with A=Q*R for cublas matrices via cuSolver.
-    // The result is stored in A.
-    // A is of matrix type s,d,c or z.
-    // work and Lwork are referenced in order to be reused in xxmqr
+    // @sect5{QRF functions (gpu)}
+
+    // @sect6{Function (gpu): QRF}
+    // Calculate QR-factorization of $m \times n$ Matrix $A$ of type s, d, c, z with $A=Q\cdot R$.
+
+    // $Q$ orthogonal matrix of dimension $m \times m$.
+    // $R$ is upper triangular matrix of dimension $m \times n$ (upper trapezoidal if $m < n$).
+
+    // Lapack doc: 'The matrix $Q$ is represented as a product of elementary reflectors $Q = H(1) H(2) ... H(k)$ , where $k = min(m,n)$.
+    // Each $H(i)$ has the form $H(i) = I - TAU \cdot v \cdot v^T$ where $TAU$ is a real scalar, and $v$ is a real vector with $v(1:i-1) = 0$ and $v(i) = 1; v(i+1:m)$ is stored on exit in $A(i+1:m,i)$, and $TAU$ in $TAU(i)$.'
+
+    // \param A : input/output matrix, contains vectors $v$ in its strict lower triangular part and $R$ after function call.
+    // \param TAU : output vector of length $min(m,n)$ contains the scalar factors of the elementary reflector.
+    //
+    // work and Lwork are referenced in order to be reused in xxmqr.
     template <typename T>
     static cusolverStatus_t QRF(SciPAL::Matrix<T, BW>&          A,
                                 SciPAL::Vector<T, BW>&          tau,
@@ -333,33 +367,39 @@ struct cusolverDn
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
 
-        // allocate space for tau
+        // Allocate space for tau:
         tau.reinit(min_mn);
 
         Lwork = 0;
         int *devInfo;
         cudaMalloc((void**)(&devInfo), sizeof(int));
 
-        // get work size
+        // Get work size:
         cusolverStatus_t stat = cusolverDngeqrf_bufferSize(m, n, A.data(), A.leading_dim, &Lwork);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
 
-        // allocate work space
+        // Allocate work space:
         work.reinit(Lwork);
 
-        // do the QR decomp
+        // Do the QR decomposition:
         stat = cusolverDngeqrf(m, n, A.data(), A.leading_dim, tau.data(), work.data(), Lwork, devInfo);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
 
         cudaFree(devInfo);
         return stat;
     }
 
-    // Calculates the QR decomposition for a Matrix A (m x n) with A=Q*R for cublas matrices via cuSolver.
-    // The content of A is destroyed during the process.
-    // A is of matrix type s,d,c or z.
+    // @sect6{Function (gpu): QRF (Q,R seperate)}
+    // Same as above but explicitly processec the output content of $A$ into matrices $Q$ and $R$.
+    // \param A : input/output matrix, contains vectors $v$ in its strict lower triangular part and $R$ after function call.
+    // \param Q : output vector, orthogonal matrix of dimension $m \times min(m,n)$.
+    // \param R : output matrix; upper triangular (upper trapezoidal if $m < n$) of dimension $min(m,n) \times n$.
     template <typename T>
     static cusolverStatus_t QRF(SciPAL::Matrix<T, BW>&          A,
                                 SciPAL::Matrix<T, BW>&          Q,
@@ -369,26 +409,25 @@ struct cusolverDn
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
 
-        // allocate space for Q,R
-        //Q.reinit(m, min_mn);
-        //R.reinit(min_mn, n);
+        // Allocate space for Q, R:
         Q.reinit(m, min_mn);
         R.reinit(min_mn, n);
 
+        // Allocate work space:
         SciPAL::Vector<T, BW> tau(1);
         SciPAL::Vector<T, BW> work(1);
         int Lwork;
 
+        // Do the QR decomposition:
         cusolverStatus_t stat = QRF(A, tau, work, Lwork);
 
-        //for (unsigned int i = 0; i < min_mn; i++)
-        //    Q(i, i, 1.0);
+        // Create an unit matrix:
+        //
+        // TO DO: This way is quite unefficient. Thus, find a better way. Deal.II IdentityMatrix did not work.
         for (unsigned int i = 0; i < min_mn; i++)
             Q(i, i, T(1));
 
-        // copy upper triangle part of A to R
-        //for(unsigned int i = 0; i < n; i++)
-        //    BW::copy(((i+1<min_mn)?i+1:min_mn), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
+        // Copy upper triangle part of A to R:
         for(unsigned int i = 0; i < n; i++)
             BW::copy(((i+1<min_mn)?i+1:min_mn), A.data() + i * A.leading_dim, A.stride, R.data() + i * R.leading_dim, R.stride);
 
@@ -397,17 +436,20 @@ struct cusolverDn
         int *devInfo;
         cudaMalloc((void**)(&devInfo), sizeof(int));
 
-        // compute Q from the Householder vectors stored in tau and the (strict) lower triangle part of A
+        // Compute Q from the Householder vectors stored in the (strict) lower triangle part of A and tau:
         // It seems, as if the parameters m and n are not the rows/columns of A but of C (or in this case Q). This is not what is written in the CUDA-documentation: http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-ormqr
         stat = cusolverDnormqr(CUBLAS_SIDE_LEFT, CUBLAS_OP_N, Q.n_rows(), Q.n_cols(), min_mn, A.data(), A.leading_dim, tau.data(), Q.data(), Q.leading_dim, work.data(), Lwork, devInfo);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
 
         cudaFree(devInfo);
         return stat;
     }
-    // Calculates the QR decomposition for a Matrix A (m x n) with A=Q*R for cublas matrices via cuSolver.
-    // A is of matrix type s,d,c or z.
+
+    // @sect6{Function (gpu): QRF (const A, Q/R seperate)}
+    // Same as above, but keeps $A$ unchanged by using a working copy A_tmp = A
     template <typename T>
     static cusolverStatus_t QRF(const SciPAL::Matrix<T, BW>&    A,
                                 SciPAL::Matrix<T, BW>&          Q,
@@ -418,13 +460,14 @@ struct cusolverDn
     }
 
     //---------------------------------------------------------
-    // LDL functions:
-    // Calculates the LDL decomposition for a Matrix A (n x n) with P*A*Pt=L*D*Lt or
-    // P*A*Pt=Lt*D*L=U*D*Ut for cublas matrices via cuSolver.
-    // It seems that the cusolver functions cusolverDn<X>sytrf do not work properly. Multiplying
+    // @sect5{LDL functions (gpu)}
+    // @sect6{Function (gpu): LDL}
+    // Calculates the LDL decomposition for a $n \times n$ matrix A with $P \cdot A \cdot P^T = L \cdot D \cdot L^T$ or
+    // $P \cdot A \cdot P^T = L^T \cdot D \cdot L = U \cdot D \cdot U^T$ for cublas matrices via cuSolver.
+    // It seems that the cuSolver functions cusolverDn<X>sytrf do not work properly. Multiplying
     // the output leads to a results different to the input. Possilby there is a mistake in the
     // the wrapper function.
-    // TODO: repair this wrapper function or wait until cusolverDn<X>sytrf works properly
+    // TO DO: repair this wrapper function or wait until cusolverDn<X>sytrf works properly.
     template <typename T>
     static cusolverStatus_t LDL(SciPAL::Matrix<T, BW>&      A,
                                 SciPAL::Vector<int, BW>&    P,
@@ -443,28 +486,31 @@ struct cusolverDn
 #endif
 #endif
 
-        // allocate space for P,L,D
+        // Allocate space for P,L,D:
         P.reinit(n);
         L.reinit(n, n);
         D.reinit(n, n);
 
-        // calculate QR factorization for A:
         int Lwork = 0;
         int *devInfo;
         cudaMalloc((void**)(&devInfo), sizeof(int));
 
-        // get work size
+        // Get work size:
         cusolverStatus_t stat = cusolverDnsytrf_bufferSize(n, A.data(), A.leading_dim, &Lwork);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
 
-        // allocate work space
+        // Allocate work space:
         SciPAL::Vector<T, BW> work(Lwork);
 
-        // do the LDL decomp
+        // Do the LDL decomposition:
         stat = cusolverDnsytrf(uplo, n, A.data(), A.leading_dim, P.data(), work.data(), Lwork, devInfo);
         cudaDeviceSynchronize();
+#ifdef DEBUG
         check_status(stat);
+#endif
 
         cudaFree(devInfo);
 
@@ -493,21 +539,29 @@ struct cusolverDn
     }
 
 private:
-    //Helper functions (move them to the Matrix class?):
-    // Does not yet supports leading dimension nor stride
+    //---------------------------------------------------------
+    // @sect5{Copy functions}
+    // @sect6{Function: lower_upper_triangle}
+    // Helper function. (TO DO: Move it to the Matrix class?) Copies lower and upper triangular
+    // (trapezoidal) parts of $A$ into $L$ and $U$ using cublas copy.
+    // TO DO: Does not yet supports leading dimension nor stride.
+    // \param A : input matrix of dimension $m \times n$.
+    // \param L : output matrix of dimension $m \times n$, contains strict lower triangular (trapezoidal) values of $A$ and unit diagonal.
+    // \param U : output matrix of dimension $m \times n$, contains upper triangular (trapezoidal) values of $A$.
     template <typename T>
     static void lower_upper_triangle(const SciPAL::Matrix<T, BW>& A, SciPAL::Matrix<T, BW>& L, SciPAL::Matrix<T, BW>& U)
     {
         // dimension of A
         unsigned int m = A.n_rows(), n = A.n_cols();
         unsigned int min_mn = (m<=n?m:n);
-        // set diagonal entries of L to 1.0
-        // copy strict lower triangular part of A into L
-        // copy upper triangular part of A into U
+
+        // Set diagonal entries of L to 1.0 (TO DO: This way is quite unefficient.),
+        // copy strict lower triangular part of A into L, and
+        // copy upper triangular part of A into U.
         for(unsigned int i = 0, ip1 = 1, im = 0; i < min_mn - 1; i++, ip1++, im += m)
         {
             unsigned int impip1 = im + ip1;
-            L(i, i, 1.0);
+            L(i, i, 1.0);                   // unefficient
             BW::copy(m - ip1, A.data() + impip1, 1, L.data() + impip1    , 1);
             BW::copy(    ip1, A.data() + im    , 1, U.data() + i * min_mn, 1);
         }
@@ -525,7 +579,10 @@ private:
     }
 
     //---------------------------------------------------------
-    //SVD cusolverDn-wrapper:
+    // @sect5{cusolverDn function wrappers}
+    // @sect6{Wrapper: SVD cusolverDn-wrapper}
+    // Wraps the general matrix svd cusolverDn function for the four types s, d, c and z.
+    // cuSolver doc: http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-gesvd
     inline static cusolverStatus_t cusolverDngesvd(char jobu, char jobvt, int m, int n, float *A, int lda, float *S, float *U, int ldu, float *VT, int ldvt, float *Work, int Lwork, float *rwork, int *devInfo)
     {
         return cusolverDnSgesvd(cusolver_handle, jobu, jobvt, m, n, A, lda, S, U, ldu, VT, ldvt, Work, Lwork, rwork, devInfo);
@@ -559,11 +616,10 @@ private:
     {
         return cusolverDnZgesvd_bufferSize(cusolver_handle, m, n, Lwork);
     }
-
+#ifdef DEBUG
     inline static void SVD_check_devInfo(cusolverStatus_t stat, int *devInfo)
     {
-        // check error information (see cusolver doc.)
-#ifdef DEBUG
+        // check error information (see cuSolver documentation)
         if(stat != CUSOLVER_STATUS_SUCCESS){
             std::cout << "cusolver crashed" << std::endl;
             std::cout << "device information:" << std::endl;
@@ -576,11 +632,12 @@ private:
             if(Info < 0)
                 std::cout << "\tthe " << -Info << "-th parameter is wrong" << std::endl;
         }
-#endif
     }
-
+#endif
     //---------------------------------------------------------
-    //LUD cusolverDn-wrapper:
+    // @sect6{Wrapper: LUD cusolverDn-wrapper}
+    // Wraps the general matrix LU decomposition cusolverDn function for the four types s, d, c and z.
+    // cuSolver doc: http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-getrf
     inline static cusolverStatus_t cusolverDngetrf(int m, int n, float *A, int lda, float *Workspace, int *devIpiv, int *devInfo)
     {
         return cusolverDnSgetrf(cusolver_handle, m, n, A, lda, Workspace, devIpiv, devInfo);
@@ -616,7 +673,9 @@ private:
     }
 
     //---------------------------------------------------------
-    //QRF cusolverDn-wrapper:
+    // @sect6{Wrapper: QRF cusolverDn-wrapper}
+    // Wraps the general matrix QR factorization cusolverDn function for the four types s, d, c and z.
+    // cuSolver doc: http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-geqrf
     inline static cusolverStatus_t cusolverDngeqrf(int m, int n, float *A, int lda, float *TAU, float *Workspace, int Lwork, int *devInfo)
     {
         return cusolverDnSgeqrf(cusolver_handle, m, n, A, lda, TAU, Workspace, Lwork, devInfo);
@@ -669,7 +728,9 @@ private:
     }
 
     //---------------------------------------------------------
-    //LDL cusolverDn-wrapper:
+    // @sect6{Wrapper: LDL cusolverDn-wrapper}
+    // Wraps the general matrix LDL decomposition cusolverDn function for the four types s, d, c and z.
+    // cuSolver doc: http://docs.nvidia.com/cuda/cusolver/index.html#cuds-lt-t-gt-sytrf
     inline static cusolverStatus_t cusolverDnsytrf(cublasFillMode_t uplo, int n, float *A, int lda, int *ipiv, float *work, int lwork, int *devInfo)
     {
         return cusolverDnSsytrf(cusolver_handle, uplo, n, A, lda, ipiv, work, lwork, devInfo);

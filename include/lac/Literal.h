@@ -20,7 +20,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #ifndef LITERAL_H
 #define LITERAL_H
 #include <lac/Expr.h>
-#include <lac/BlasVectorOperations.h>
 
 #include <base/ForewardDeclarations.h>
 
@@ -72,13 +71,15 @@ public:
 private:
      T val;
 };
+
+
 template <typename T, typename BW>
 template <typename X>
 Literal<T, BW> & Literal<T, BW>::operator =
 (const SciPAL::Expr<X> & e)
 {
-#ifdef DEBUG
-    std::cout << "line :" << __LINE__ << ", Vector<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
+#ifdef DEBUG_LITERAL
+    std::cout << "line :" << __LINE__ << ", Literal<T,BW>  " << __FUNCTION__<< "\n"  << std::endl;
 #endif
 
     SciPAL::LAOOperations::apply<T, BW>(*this, ~e);

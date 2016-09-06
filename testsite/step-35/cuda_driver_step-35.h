@@ -769,8 +769,8 @@ public:
         this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
         this->writeable_e_d() -= tmp_d;
 
-        static const int n_scales = 10;
-        static const int min_scale = 0;
+        static const int n_scales = 6;
+//        static const int min_scale = 0;
 
         typedef SciPAL::Vector<Mdouble, BW> Vc;
 
@@ -782,9 +782,10 @@ public:
 
         Vc h_init (this->e_d().size()); h_init = zero_init;
 
-        Vc Q_full (this->e_d().size()); Q_full = zero_init;
-        Vc Q_M (this->e_d().size()); Q_M = zero_init;
-
+        Vc Q_full (this->e_d().size() * (n_scales + 1) ); //Q_full = zero_init;
+        Q_full.set(0); //zero_init
+//        Vc Q_M (this->e_d().size()); Q_M = zero_init;
+        SciPAL::SubVectorView<Mdouble, BW, Vc> Q_0(Q_full, 0, this->e_d().size() );
         // $h_0 = h$;
         h_init = this->e_d();
         h_old = h_init;
@@ -806,7 +807,7 @@ public:
         {
 
             // Start with estimator for whole image
-            h_old -= Q_full;
+            h_old -= Q_0;
             h_init = h_old;
             h_iter = h_old;
             // assume single subset for a moment
@@ -815,7 +816,8 @@ public:
             // project
             h_iter *= this->sigma_noise/(L2_norm * std::sqrt(cs_weight) );
 
-            Q_full = h_iter - h_old;
+//            Q_full = h_iter - h_old;
+            Q_0 = h_iter - h_old;
             h_old = h_iter;
 
             // Q_0 <- Q_full

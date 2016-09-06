@@ -22,6 +22,8 @@
 #this is helpful to track down some compiler errors during the development process
 #DEFINES += DEV_DEBUGGING
 
+
+
 CONFIG += console \
     thread \
     debug_and_release# \
@@ -76,13 +78,7 @@ INCLUDEPATH += . ..
 #put here your non-standard libs
 LIBS +=
 
-   # The PRAK variable is used inside scipal_conf.pro.
-   # This file provides a basic configuration for compiling
-   # a cuda project which depends on CUDA, deal.II and SciPAL.
-   # It defines the rules for compiling the CUDA part. In this definition
-   # the variable CUDA_INCLUDES is evaluated. Therefore, we have to add project-specific
-   # includes BEFORE we include the general configuration.
-include($$SciPAL_DIR/config/scipal_conf.pro)
+
 
 # Depending an what is needed from deal.II we either have to include a full MPI-capable installation or the quick-and-easy default version
 # which only provides mltithreading for shared memory machines.
@@ -97,6 +93,14 @@ message("Load deal.II MPI config")
         include($$SciPAL_DIR/config/dealii_simple_conf.pro)
         }
     }
+
+   # The PRAK variable is used inside scipal_conf.pro.
+   # This file provides a basic configuration for compiling
+   # a cuda project which depends on CUDA, deal.II and SciPAL.
+   # It defines the rules for compiling the CUDA part. In this definition
+   # the variable CUDA_INCLUDES is evaluated. Therefore, we have to add project-specific
+   # includes BEFORE we include the general configuration.
+include($$SciPAL_DIR/config/scipal_conf.pro)
 
 message("g++ include paths :" $$INCLUDEPATH)
 message("g++ LD paths :" $$LD_LIBRARY_PATH)

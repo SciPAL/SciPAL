@@ -80,6 +80,21 @@ conf = open("../config/scipal_conf.pro","w")
 conf.writelines(conf_list)
 conf.close()
 
+conf = open("doc/options.136","r")
+conf_list = conf.readlines()
+conf.close()
+
+i = 0
+for line in conf_list:
+    if(string.find(line,"INCLUDE_PATH           =") != -1):
+        conf_list[i] = "INCLUDE_PATH           ="+str(dealii)+"/base "+str(dealii)+"/lac "+str(dealii)+"/ "+str(dir)+"/include\n";
+    i +=1;
+
+conf = open("doc/options.136","w")
+conf.writelines(conf_list)
+conf.close()
+
+
 
 ##further deal ii config
 #petsc

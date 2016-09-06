@@ -27,7 +27,6 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 namespace SciPAL {
 
-
 //! The <i>shape</i> of a linear algebra object (LAO) determines whether the LAO can be considered
 //! as matrix or vector. By separating the shape from the data of a LAO it is easy to <i>reshape</i>
 //! a LAO if necessary. The attributes are public for easy use in CUDA kernels.

@@ -44,9 +44,13 @@ struct divide {};
 struct pmult {};
 
 
-
 //! Tag for pointwise division
 struct pdivide {};
+
+
+//! Tag for tensor multiplication
+struct tmult {};
+
 
 }
 

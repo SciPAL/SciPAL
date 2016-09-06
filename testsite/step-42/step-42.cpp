@@ -270,8 +270,8 @@ void step42::MyFancySimulation::run()
 
 //    testcase.views();
 
-    testcase.stacks_of_LAOs();
-//    testcase.operator_precedence();
+//    testcase.stacks_of_LAOs();
+    testcase.operator_precedence();
 
     std::cout << "Done." << std::endl;
 }

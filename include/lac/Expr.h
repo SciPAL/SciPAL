@@ -35,7 +35,8 @@ struct Expr
 {
     typedef E Type;
 
-    const E &  operator~ () const {
+    const E &  operator~ () const
+    {
         return static_cast<const E&>(*this);
     }
 };

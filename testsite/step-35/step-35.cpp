@@ -158,7 +158,7 @@ void step35::SimulationManager<NumberType, BW>::output(int iter,
 //
 int main(int argc, char **argv)
 {
-    typedef cublas BW;
+    typedef blas BW;
 
     step35::SimulationManager<float, BW> sim_handler(argc, argv);
 

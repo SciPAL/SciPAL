@@ -22,21 +22,15 @@ Copyright Stephan Kramer, Johannes Hagemann,  Lutz Künneke, Jan Lebert 2014-201
 
 //std
 #include <stdio.h>
+
+#ifdef HAS_OPENMP
 #include <omp.h>
+#endif
 
 //CUDA
 #include <cuComplex.h>
 
-//Thrust
-#include <thrust/functional.h>
 
-#ifndef nUSE_CPP11
-#include <thrust/transform.h>
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
-#include <thrust/device_ptr.h>
-#include <thrust/fill.h>
-#endif
 
 
 //SciPAL
@@ -68,111 +62,7 @@ void step35::Kernels<T, arch>::set_cs(T* cs_h, int maxnum) {
 //
 //Prior to the kernels we have to define the device functions that we need.
 
-//@sect5{Struct: SharedMemory}
-//Workaround as CUDA doesn't immediately support shared memory arrays in templated functions,
-//see <a href="http://docs.nvidia.com/cuda/cuda-samples/#simple-templates">CUDA Simple Templates example</a>.
-template <typename T>
-struct SharedMemory {
-    // Ensure that we won't compile any un-specialized types
-    __device__ T *getPointer() {
-        extern __device__ void error(void);
-        error();
-        return NULL;
-    }
-};
 
-//Float specialization
-template <>
-struct SharedMemory <float> {
-    __device__ float *getPointer() {
-        extern __shared__ float s_float[];
-        return s_float;
-    }
-};
-
-//Double specialization
-template <>
-struct SharedMemory <double> {
-    __device__ double *getPointer() {
-        extern __shared__ double s_double[];
-        return s_double;
-    }
-};
-
-//@sect5{Struct: __abs}
-//@brief Unary functions to calculate the absolute value for an element
-template <typename T>
-struct __abs : public thrust::unary_function<T,T> {
-    // Ensure that we won't compile any un-specialized types
-    __device__
-    T operator()(T x) {
-        extern __device__ void error(void);
-        error();
-        return NULL;
-    }
-};
-
-//Float specialization: use fabsf()
-template <>
-struct __abs <float> : public thrust::unary_function<float,float> {
-    __device__
-    float operator()(float x) {
-        return fabsf(x);
-    }
-};
-
-//Double specialization: use fabs()
-template <>
-struct __abs <double> : public thrust::unary_function<double,double> {
-    __device__
-    double operator()(double x) {
-        return fabs(x);
-    }
-};
-
-//@sect5{Struct: __element_norm_product}
-//@brief Unary functions to calculate $\frac{x\cdot y}{n}$ where $x,y$ are complex numbers and $n$ a constant factor.
-template <typename T>
-struct __element_norm_product {
-    __element_norm_product(T _n) {}
-    // Ensure that we won't compile any un-specialized types
-    __device__
-    T operator()(T x) {
-        extern __device__ void error(void);
-        error();
-        return NULL;
-    }
-};
-
-//Float specialization
-template <>
-struct __element_norm_product <float> {
-    cuFloatComplex normalization;
-
-    __element_norm_product(float _n) {
-        normalization = make_cuFloatComplex(1.0/_n, 0);
-    }
-
-    __host__ __device__
-    cuFloatComplex operator()(const cuFloatComplex& x, const cuFloatComplex& y) const {
-        return cuCmulf(cuCmulf(x, y), normalization);
-    }
-};
-
-//Double specialization
-template <>
-struct __element_norm_product <double> {
-    cuDoubleComplex normalization;
-
-    __element_norm_product(double _n) {
-        normalization = make_cuDoubleComplex(1.0/_n, 0);
-    }
-
-    __host__ __device__
-    cuDoubleComplex operator()(const cuDoubleComplex& x, const cuDoubleComplex& y) const {
-        return cuCmul(cuCmul(x, y), normalization);
-    }
-};
 
 
 //@sect5{Function: power_of_two}
@@ -243,82 +133,6 @@ __forceinline__ __device__ float MBG_erfinv(float x)
 // which can only be called from inside a kernel.
 // <br>
 // Note that unlike device functions kernels cannot be members of class.
-
-//@sect5{Kernel: __dykstra}
-//@brief This Kernel provides the Gaussian Dykstra projection.
-//@param qg pointer to the q vectors in global memory
-//@param A path to the image
-//@param cinfo array of pointers where to find n,i,j and numpatch
-//@param q_offset array of offsets where to find first $q$ value for a threadblock
-//@param ni height of the image
-//@param nj width of the image
-//NOTICE: only 2D functionality
-template<typename T>
-__global__ void
-__dykstra(T *qg, T *A, int **cinfo, const int * q_offset, const int ni, const int nj) {
-    //Find out where I live
-
-    int k=0;
-    int border=0;
-    int *n=cinfo[4*blockIdx.x];
-    int *i=cinfo[4*blockIdx.x+1];
-    int *j=cinfo[4*blockIdx.x+2];
-    int numpatch=cinfo[4*blockIdx.x+3][0];
-
-    while ( k < numpatch ) {
-        if ( border+n[k]*n[k] > threadIdx.x )
-            break;
-        border+=n[k]*n[k];
-        k++;
-    }
-    if ( threadIdx.x - border >= n[k]*n[k] || k >= numpatch) {
-        //This is bad, exit
-        return;
-    }
-    //Allocate shared memory
-    SharedMemory<T> shared;
-    T* s_mem = shared.getPointer();
-    T* q=&(s_mem[0]); //takes first n2 sizeof(T) bytes
-    T* f=&(s_mem[blockDim.x]); //takes second third
-    T* e=&(s_mem[2*blockDim.x]); //takes last third
-
-    int is = (threadIdx.x-border)/n[k] + i[k];
-    int js = (threadIdx.x-border)%n[k] + j[k];
-
-    //Pixel index in the current in the global image
-    const int idx = is*nj + js;
-
-    //Fill shared memory with variables we later use
-    q[threadIdx.x] = qg[threadIdx.x+q_offset[blockIdx.x]];
-
-    f[threadIdx.x] = A[idx] - q[threadIdx.x];
-    e[threadIdx.x] = f[threadIdx.x]*f[threadIdx.x];
-    __syncthreads();
-
-    //m is the next power of 2 bigger than n divided by two
-    int m=n[k]*n[k];
-    int mmax=pow_of_two(floor(log2f((float)m)));
-    //Sum over all pixels in one frame
-    m=1;
-    while (m <= mmax) {
-        if (threadIdx.x - border + m < n[k]*n[k]) {
-            e[threadIdx.x] += e[threadIdx.x + m];
-        }
-        m = m << 1;
-        __syncthreads();
-    }
-
-    //$q = x_{r+1} - x_r$
-    q[threadIdx.x] = -f[threadIdx.x];
-    if (((T) cs[n[k]-1])*e[border] > 1.0) {
-        f[threadIdx.x] = f[threadIdx.x]/(sqrt(((T) cs[n[k]-1])*e[border]));
-    }
-
-    //Update global memory (image and q)
-    A[idx] = f[threadIdx.x];
-    qg[threadIdx.x+q_offset[blockIdx.x]] = q[threadIdx.x] + f[threadIdx.x];
-}
-
 
 
 template<typename T>
@@ -700,6 +514,7 @@ __incomplete_dykstra_2D_fine_scales(
         const int height, const int width, const int depth
         )
 {
+    #ifdef blb
     const int n_scales = N_SCALES_2D;
 
     // 2D
@@ -712,6 +527,7 @@ __incomplete_dykstra_2D_fine_scales(
 
 
     DykstraStep<T, offset_x, offset_y> dykstra( n_scales, width);
+
 
     T __shared__ ps_sum[N_PX_X_2D * N_PX_Y_2D];
 
@@ -729,7 +545,7 @@ __incomplete_dykstra_2D_fine_scales(
     h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_old, Q_full,
                                                                         ICD_weights, ps_sum, g_noise);
 
-
+#endif
 }
 
 
@@ -778,19 +594,20 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part_cpu(
                         0.00760004,
                         0.002742,
                         0.000825881};
+typedef unsigned int uint;
 
 #pragma omp parallel for
-    for(uint bx = 0; bx  < grid_2D.x; bx++ )
+    for(unsigned int bx = 0; bx  < grid_2D.x; bx++ )
     {
 #pragma omp parallel for private(Q, ps_sum)
-        for(uint by = 0; by < grid_2D.y; by++)
+        for(unsigned int by = 0; by < grid_2D.y; by++)
         {
             for(uint s = 1; s <= N_SCALES_2D; s++)
             {
 //                printf("bx: %d, by: %d, s:%d \n", bx, by, s);
-                uint s_x = N_SCALES_2D - s;
+                int s_x = N_SCALES_2D - s;
 
-                uint s_y = s_x;
+                int s_y = s_x;
 
                 uint edge_x = pow(2., s_x);
                 uint edge_y = pow(2., s_y);
@@ -956,7 +773,8 @@ __tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, c
 
 
 //@setc5{Kernel: __tv_derivative}
-//@brief kernel for evaluation of the functional derivative of th TV regularization functional.
+//@brief kernel for evaluation of the functional derivative of the TV regularization functional.
+// Any previous content of @p dTV_du gets overwritten.
 template<typename T>
 inline void
 __tv_derivative_cpu(dim3 blockDim, dim3 blockId, T* dTV_du, const T* u,
@@ -1088,10 +906,10 @@ void step35::Kernels<T, arch>::tv_derivative(T * dTV_du,
     {
         // ELSE
 #pragma omp parallel for
-        for(uint bx = 0; bx  < grid.x; bx++ )
+        for(unsigned int bx = 0; bx  < grid.x; bx++ )
         {
 #pragma omp parallel for
-            for(uint by = 0; by < grid.y; by++)
+            for(unsigned int by = 0; by < grid.y; by++)
             {
                 dim3 blockId(bx,by);
                 __tv_derivative_cpu<T> (blocks, blockId, dTV_du,

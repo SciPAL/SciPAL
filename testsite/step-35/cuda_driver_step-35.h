@@ -42,14 +42,13 @@ Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hage
 
 //Our stuff
 #include <step-35/cuda_kernel_wrapper_step-35.cu.h>
-#include "cuda_helper.h"
-#include "preprocessor_directives.h"
-#include "ADMMParams.h"
-#include <smre_problem.hh>
+#include <step-35/cuda_helper.h>
+#include <step-35/ADMMParams.h>
+#include <step-35/smre_problem.hh>
 
 // deal.II
 #include <deal.II/base/timer.h>
-#include <thrust/reduce.h>
+
 
 
 namespace step35 {
@@ -61,8 +60,140 @@ namespace step35 {
 // Main class, sets up an instance of queue and info class. A number of threads is started which
 // each handles a cuda stream and processes items obtained by the queue. The main thread adds items
 // to the queue until everything is processed.
+
+
+
+template<typename NumberType, typename BW >
+class CUDADriver : protected step35::Kernels<NumberType, BW::arch> {
+
+public:
+    //@sect5{Function: dykstra_gauss}
+    //@brief Wrapper around the whole projection procedure
+    //@param rho parameter for the first constraint
+    void dykstra_gauss(const NumberType rho)
+    {
+        // old dykstra_gauss and dykstra_gauss_global_mem merged.
+        // The former was anyway only a wrapper of the latter.
+        convolution.vmult(tmp_d, this->x_d);
+
+        NumberType mean = 0;
+        // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
+        this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
+        this->writeable_e_d() -= tmp_d;
+
+//        //substract mean of noise
+//            this->writeable_e_d().push_to(e_h);
+
+//            mean = std::accumulate(e_h.begin(),e_h.end(), 0.)/e_h.size();
+//            this->writeable_e_d() += -mean;
+
+
+        static const int n_scales = 10;
+        static const int min_scale = 0;
+
+        typedef SciPAL::Vector<NumberType, BW> Vc;
+
+        std::vector<NumberType> zero_init(this->e_d().size());
+
+        Vc h_iter (this->e_d().size()); h_iter = zero_init;
+
+        Vc h_old (this->e_d().size()); h_old = zero_init;
+
+        Vc h_init (this->e_d().size()); h_init = zero_init;
+
+        Vc Q_full (this->e_d().size()); Q_full = zero_init;
+        Vc Q_M (this->e_d().size()); Q_M = zero_init;
+
+        // $h_0 = h$;
+        h_init = this->e_d();
+        h_old = h_init;
+
+        NumberType cs_weight =  //9.46624e-07; // 1024x1024, 0.9, c_S
+                9.51511e-07; // 1024x1024, 0.9, c_Ss
+        //9.53509e-07; // 1024x1024, 0.1, c_Ss
+
+        int iter = 0;
+        bool iterate = true;
+
+        // FIXME: arch flag as template parameter in Kernels structure
+        step35::Kernels<NumberType, BW::arch> kernel;
+        NumberType norm = 2*dykstra_Tol;  //norm of residuals
+
+        NumberType time = 0;
+
+        while (iterate)
+        {
+
+            // Start with estimator for whole image
+            h_old -= Q_full;
+            h_init = h_old;
+            h_iter = h_old;
+            // assume single subset for a moment
+            NumberType L2_norm = h_old.l2_norm(); // i.e. sqrt(sum_of_squares)
+
+            // project
+            h_iter *= this->sigma_noise/(L2_norm * std::sqrt(cs_weight) );
+
+            Q_full = h_iter - h_old;
+            h_old = h_iter;
+
+            // Q_0 <- Q_full
+            // initialize : d.h_init with global h_init
+
+
+            dealii::Timer timer;
+            timer.restart();
+            // loop over subsets
+            if(typeid(BW) == typeid(cublas))
+            {
+                this->dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
+                                                      Q_full.data(),
+                                                      this->sigma_noise,
+                                                      dof_handler.pwidth(),
+                                                      dof_handler.pheight(),
+                                                      dof_handler.pdepth()//,
+//                                                      n_max_dykstra_steps, dykstra_Tol
+                                                      );
+            }
+            else
+            {
+                this->dyadic_dykstra_fine_scale_part_cpu(h_iter.data(), h_old.data(),
+                                                          Q_full.data(),
+                                                          this->sigma_noise,
+                                                          dof_handler.pwidth(),
+                                                          dof_handler.pheight(),
+                                                          dof_handler.pdepth()//,
+                                                          );
+            }
+            time += timer.wall_time();
+
+
+
+            //Convergence control.
+            {
+                h_init -= h_iter;
+                norm = h_init.l2_norm();
+
+                iterate = ( norm > dykstra_Tol &&
+                            iter < n_max_dykstra_steps);
+
+                iterate ? h_init = h_iter : this->writeable_e_d() = h_iter;
+                iter++;
+            }
+        }// iterate end
+
+        std::cout<<"    n Dykstra steps used : " << iter <<
+                   ", norm of noise increment : "<< norm <<" mean value of noise : "<<mean <<std::endl;
+        std::cout<<"cumulative dykstra time for fine scale sweeps : "<< time<<std::endl;
+    }
+
+
+};
+
+
+
 template<typename Mdouble, typename BW >
-class CUDADriver {
+class CUDADriverMurks {
 
     static const ParallelArch c = BW::arch;
 public:
@@ -488,7 +619,7 @@ public:
     // @param dofs DoFHandler, provides information about image size.
     // @param params the list of runtime parameters
     // FIXME: cs_h must some a reference to some decent type not a raw pointer
-    CUDADriver(std::vector<Mdouble> & cs_h,
+    CUDADriverMurks(std::vector<Mdouble> & cs_h,
                // FIXME: use ImageStack class developed for SOFI and ask that for nx, ny, nz, if needed
                const ImageDoFHandler& dofs,
                const ADMMParams& params)
@@ -530,7 +661,7 @@ public:
 
     //@sect5{Destructor: CUDADriver}
     //Signal all threads to end, calls queue destructor
-    ~CUDADriver () {
+    ~CUDADriverMurks () {
 
 
 
@@ -567,10 +698,10 @@ public:
     // to the primal variable, that is the image we want to reconstruct.
     // The mathematical expression is
     // \f{eqnarray}{ \text{dst}
-    //                 & = &
-    //                        A^T*\left\lbrack     \rho_1 \left(I-e-A*x\right) +\Upsilon_1      \right\rbrack
-    //                        -
-    //                        \rho_2 \frac{\delta J}{\delta x}(x_{old}) \,.
+    //       & = &
+    //        A^T*\left\lbrack     \rho_1 \left(I-e-A*x\right) +\Upsilon_1      \right\rbrack
+    //         -
+    //        \rho_2 \frac{\delta J}{\delta x}(x_{old}) \,.
     //             \f}
     void argmin_x_rhs(SciPAL::Vector<Mdouble, BW> & dst,
                       const SciPAL::Vector<Mdouble, BW> & x_old,
@@ -704,64 +835,6 @@ public:
     }
 
 
-
-    //@sect5{Function: x_step}
-    //@brief Performs approximative argmin with respect to $x$
-    // FIXME: component wise; to be removed 2016 02 06
-    void x_step(const Mdouble rho1,const Mdouble rho2)
-    {
-        step35::Kernels<Mdouble, BW::arch> kernel;
-
-        // the residual
-        //$\text{tmp}_d=I-e-A*x$
-        this->residual(tmp2_d, this->im_d(), this->e_d(), this->x_d);
-
-        // FIXME: do we need the following two doc lines?
-        //$\text{tmp}_d=\left(I-e-A*x\right)*\rho_1$
-        //$\text{tmp}_d=\left((im-e-A*x\right)*\rho_1+\Upsilon_1$
-
-        //$\text{tmp}_d=A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        tmp_d = rho1 * tmp2_d + lag1;
-
-        // conv2(tmp_d.data(), tmp_d.data());
-        // FIXME: inplace works?
-        convolution.vmult(tmp_d, tmp_d);
-
-        //$\text{tmp2}_d=z-x$
-        tmp2_d = this->z_d - this->x_d;
-
-
-        // FIXME: fuse expressions
-        //$\text{tmp2}_d=\left((z-x\right)*\rho_2$
-        tmp2_d *= rho2;
-
-        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)$
-        tmp2_d += tmp_d;
-
-        //$\text{tmp2}_d=\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2$
-        tmp2_d -= lag2;
-
-        // THE FOLLOWING DOC EQ APPLIES TO HAVING DONE BEFORE : tmp2_d *= inf->gamma;
-        //$x=x+\left(\left(z-x\right)*\rho_2+A*\left(\left(I-e-A*x\right)*\rho_1+\Upsilon_1\right)-\Upsilon_2\right)*\gamma$
-        //  this->x_d += tmp2_d;
-        this->x_d = this->inv_gamma * tmp2_d + this->x_d;
-    }
-
-    //@sect5{Function: update_lagrangian}
-    //@brief Update the lagrangian estimates
-    //$ \Upsilon_1^{r+1} = \Upsilon_1^r + \alpha_1 \left( I - A*x - \epsilon \right) $ \n
-    //$\Upsilon_2^{r+1} = \Upsilon_2^r + \alpha_2 \left( x - z \right) $
-    void update_lagrangian(Mdouble alpha1, Mdouble alpha2) {
-        step35::Kernels<Mdouble, BW::arch> kernel;
-
-        //Update the lagrangian estimates
-        residual(tmp_lag1, this->im_d(), this->e_d(), this->x_d);
-        lag1 =  alpha1 * tmp_lag1 + lag1;
-
-        tmp_lag2 = this->x_d - this->z_d;
-        lag2  = alpha2 * tmp_lag2 + lag2;
-    }
-
     //@sect5{Function: dykstra_gauss}
     //@brief Wrapper around the whole projection procedure
     //@param rho parameter for the first constraint
@@ -882,10 +955,6 @@ public:
         std::cout<<"cumulative dykstra time for fine scale sweeps : "<< time<<std::endl;
     }
 
-
-    //@sect5{Function: m_smoothing}
-    //@brief Smoothing step
-    //@param gamma Strength of the regularization, small choices render the algorithm unstable
 
 };
 } // namespace step35 END

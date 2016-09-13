@@ -16,7 +16,7 @@
 Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 */
 
-#include <src/cuda/scipal_kernels.cu>
+// #include <src/cuda/scipal_kernels.cu>
 
 #include <step-35/cuda_kernel_step-35.cu.c>
 

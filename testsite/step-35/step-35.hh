@@ -14,7 +14,8 @@
     You should have received a copy of the GNU Lesser General Public License
     along with SciPAL.  If not, see <http://www.gnu.org/licenses/>.
 
-Copyright  Lutz Künneke, Jan Lebert 2014
+Copyright  Lutz Künneke, Jan Lebert 2014-2015,
+           Stephan Kramer and Johannes Hagemann 2014-2016
 */
 
 #ifndef STEP35_HH
@@ -63,273 +64,6 @@ Copyright  Lutz Künneke, Jan Lebert 2014
 
 namespace step35 {
 
-// @sect4{Class: ImageIO}
-//
-// The input and output of the raw data and the results is managed by a separate class.
-// Although this program is primarily used for image processing
-// encapsulating the I/O in a class of its own allows to add further types of usages
-// while leaving the actual solver untouched.
-class ImageIO {
-
-public:
-    template<typename T>
-    void read_image(std::vector<T> &input_image,
-                    std::vector<T> &image_as_read,
-                    ImageDoFHandler & dof_handler,
-                    const std::string path,
-                    const double gnoise,
-                    bool use_anscombe=false);
-
-    template<typename PixelDataType>
-    void write_image(std::string path,
-                     dealii::Vector<PixelDataType> & in,
-                     const ImageDoFHandler & dof_handler,
-                     double gnoise,
-                     bool use_anscombe=false);
-
-// protected:
-    //TIFF options, will be saved to make the output identical to the input
-    int sampleperpixel, width, height, photom, bps, depth;
-
-    //Input buffer for uint16 tiff image
-    uint16* buf_in;
-    //pwidth: width after convolution with point spread function
-    //pwidth0: width after padding on next multiple of 32
-    // FIXME : pwidth0, pheight0 never got padded. This is in ImageInfo, cf. ext_*
-
-    //int pwidth; // , pwidth0;
-
-    //pheight: height after convolution with point spread function
-    //pheight0: height after padding on next multiple of 32
-
-    // int pheight; //, pheight0;
-
-    //pdepth: depth after convolution with psf
-    //pdepth0: depth after padding on next multiple of 32
-
-    // int pdepth; // , pdepth0;
-
-    int default_strip_size;
-
-    void print() const
-    {
-        std::cout << "state of ImageIO:\n"
-                  << "--------------------"
-                  << "samples per pixel : " << sampleperpixel << " \n"
-                  << "width : " << width << "\n"
-                  // << "pwidth : " << pwidth << "\n"
-                 //  << "pwidth0 : " << pwidth0 << "\n"
-                  << "height : "<< height <<"\n"
-                //  << "pheight : "<< pheight <<"\n"
-                 //  << "pheight0 : "<< pheight0 <<"\n"
-                  << "default_strip_size : " << default_strip_size <<"\n" << std::endl;
-    }
-
-};
-
-//@sect5{Function: read_image}
-//
-// Since the image defines the computational domain we also pass in the dof_handler and initialize it there.
-// @brief Read tiff directory as 2D or 3D image
-// @param path: path to the tiff directory
-// @param gnoise standard deviation of Gaussian noise
-template<typename T>
-void step35::ImageIO::read_image(std::vector<T> & input_image,
-                                 std::vector<T> & image_as_read,
-                                 ImageDoFHandler & dof_handler,
-                                 const std::string input_file, const double gnoise,  bool use_anscombe)
-{
-    std::cout << "Reading in image : " << input_file.c_str() << std::endl;
-
-    // The first we need for reading a tif file is a TIFF object.
-    // Since the TIFF library is implemented in plain C we have to declare a
-    // raw pointer to it ...
-    TIFF *tif_in;
-
-    // and instantiate the object by opening the path to the tif file.
-    tif_in=TIFFOpen(input_file.c_str(), "r");
-
-    // Then, we have to get the information about the amount of data to read.
-    TIFFGetField(tif_in,TIFFTAG_SAMPLESPERPIXEL,&sampleperpixel);
-    TIFFGetField(tif_in,TIFFTAG_IMAGEWIDTH,&width);
-    TIFFGetField(tif_in,TIFFTAG_IMAGELENGTH,&height);
-    TIFFGetField(tif_in,TIFFTAG_PHOTOMETRIC,&photom);
-    TIFFGetField(tif_in,TIFFTAG_BITSPERSAMPLE,&bps);
-
-    // By looking up the number of entries in the tif directory we get the depth
-    depth=0;
-    do
-    {
-        depth++;
-    }
-    while ( TIFFReadDirectory(tif_in) );
-
-
-    // pdepth=depth;
-    // pdepth0=depth;
-   // pwidth=width;
-   // pheight=height;
-    // pwidth0=pwidth;
-    // pheight0=pheight;
-
-    default_strip_size = TIFFDefaultStripSize(tif_in, /*p*/width /*mwidth*/ *sampleperpixel);
-
-    // FIXME: is this stil true? Is Haar really only for squares?
-    // Since our Haar wavelet implementation only works on quadratic images we need a computatonal domain which is quadratic.
-    // pwidth=std::max(pwidth, pheight);
-    // pheight=std::max(pwidth, pheight);
-
-    // Immediately after reading the dimensions of the image stack we can initialize the @p dof_handler;
-    dealii::Point<3> bounding_box( width, height, depth);
-    int padding_multiplier = 32;
-    dof_handler.reinit(bounding_box, padding_multiplier);
-
-
-
-
-    //reinit the tif
-    tif_in=TIFFOpen(input_file.c_str(), "r");
-    buf_in=(uint16*)_TIFFmalloc(sizeof(uint16)*width);
-
-    // FIXME: use math-aware Vectors not containers
-#ifdef nUSE_DOF_HANDLER
-    input_image.resize(pwidth * pheight * pdepth, T(0));
-#else
-    input_image.resize(dof_handler.n_dofs() /*reinit to padded size*/);
-#endif
-
-    image_as_read.resize(input_image.size(), T(0));
-
-    std::cout << "Image sizes right after reading : \n";
-    this->print();
-    int dd=0;
-    do
-    {
-        for (int y=0; y<height; y++) {
-            if(TIFFReadScanline(tif_in,buf_in,y,0) < 0) {
-                std::cerr << "reading error\n";
-                return;
-            }
-            for (int x=0; x<width; x++) {
-#ifdef nUSE_DOF_HANDLER
-                int xyz_pos = dd*pwidth*pheight+x*pheight+y;
-#else
-                int global_index = dof_handler.global_index(x, y, dd);
-                int xyz_pos = global_index;
-#endif
-                std::ostringstream message("index mismatch; ");
-                        message << xyz_pos << " != " << global_index << std::ends;
-//                AssertThrow(xyz_pos == global_index, dealii::ExcMessage(
-//                                message.str().c_str()
-//                                ) );
-
-                // FIXME: Anscombe trafo is not an IO operation. Move somewher else.
-                if (use_anscombe)
-                {
-                    //Do the anscombe transformation
-                    input_image[xyz_pos]=sqrt(buf_in[x]+3.0/8.0)*gnoise;
-                }
-                else {
-                    input_image[xyz_pos]=buf_in[x];
-                }
-#ifdef READ_IMG_DEBUG
-                if (x%465==0)
-                    printf("I(%d, %d, %d) : %f, buf: %d", x, y, dd, image[xyz_pos], buf_in[x]);
-#endif
-            }
-        }
-        std::cout << "Reading tiff layer " << dd << std::endl;
-        dd++;
-    } while ( TIFFReadDirectory(tif_in) );
-
-      TIFFClose(tif_in);
-}
-
-
-//@sect5{Function: write_image}
-//@brief write image to a .tif file
-//@param path path to image includign filename
-//@param in what to read with dimensions pheight, pwidth
-//@param mheight output height
-//@param mwidth output width
-//@param mdepth number of layers in image stack
-//@param gnoise standard deviation of Gaussian noise
-template<typename PixelDataType>
-void step35::ImageIO::write_image(std::string path,
-                                  dealii::Vector<PixelDataType> &in,
-                                  const ImageDoFHandler &dof_handler, double gnoise,  bool use_anscombe)
-{
-    int mwidth = dof_handler.n_dofs_x();
-
-    int mheight = dof_handler.n_dofs_y();
-
-    int mdepth = dof_handler.n_dofs_z();
-
-    uint16* pbuf=(uint16*)_TIFFmalloc(sizeof(uint16)*mwidth);
-    TIFF *imout=TIFFOpen(path.c_str(),"w");
-    bps=16;
-
-    TIFFSetField(imout, TIFFTAG_ROWSPERSTRIP, default_strip_size);
-    TIFFSetField(imout, TIFFTAG_IMAGEWIDTH, mwidth);  // set the width of the image
-    TIFFSetField(imout, TIFFTAG_IMAGELENGTH, mheight);    // set the height of the image
-    TIFFSetField(imout, TIFFTAG_SAMPLESPERPIXEL, sampleperpixel);   // set number of channels per pixel
-    TIFFSetField(imout, TIFFTAG_BITSPERSAMPLE, bps);    // set the size of the channels
-    TIFFSetField(imout, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image->
-    TIFFSetField(imout, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-    TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, photom);
-    TIFFSetField(imout, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-    TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-
-    for (int z=0; z<mdepth; z++)
-    {
-        for (int y=0; y<mheight; y++)
-        {
-            for (int x=0; x<mwidth; x++)
-            {
-                #ifdef nUSE_DOF_HANDLER
-                int xyz_pos = z*pheight*pwidth+x*pheight+y;
-#else
-                int xyz_pos = dof_handler.global_index(x, y, z);
-#endif
-                PixelDataType intensity_value_xyz = in[xyz_pos]; //FIXME think about negative values
-                if ( intensity_value_xyz > 0 )
-                {    // FIXME: reenable Anscombe trafo
-                    if (use_anscombe)
-                    {
-                        // Inverse anscombe transformation
-                        pbuf[x]= (uint16) round((intensity_value_xyz
-                                               *intensity_value_xyz)/gnoise);
-                    }
-                    else
-                        pbuf[x]= (uint16)round(intensity_value_xyz);
-                }
-                else
-                    pbuf[x]=0;
-            }
-            if (TIFFWriteScanline(imout, pbuf, y, 1) < 0) {
-                std::cerr << "writing error" << std::endl;
-                break;
-            }
-        }
-        if ( z < mdepth-1 ) {
-            // Prepare next layer
-            TIFFWriteDirectory(imout);
-            TIFFSetField(imout, TIFFTAG_ROWSPERSTRIP, default_strip_size); // TIFFDefaultStripSize(tif, mwidth*sampleperpixel));
-            TIFFSetField(imout, TIFFTAG_IMAGEWIDTH, mwidth);  // set the width of the image
-            TIFFSetField(imout, TIFFTAG_IMAGELENGTH, mheight);    // set the height of the image
-            TIFFSetField(imout, TIFFTAG_SAMPLESPERPIXEL, sampleperpixel);   // set number of channels per pixel
-            TIFFSetField(imout, TIFFTAG_BITSPERSAMPLE, bps);    // set the size of the channels
-            TIFFSetField(imout, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image->
-            TIFFSetField(imout, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-            TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, photom);
-            TIFFSetField(imout, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
-            TIFFSetField(imout, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-        }
-    }
-    TIFFClose(imout);
-    _TIFFfree(pbuf);
-}
-
 
 //@sect4{Class: ADMM}
 //
@@ -348,7 +82,7 @@ public:
     T _psf(T x, T y, T z, T sigma);
     void create_psf();
 
-    void add_blur_and_gaussian_noise(step35::CUDADriver<T, BW> &driver);
+    void add_blur_and_gaussian_noise(step35::CUDADriverMurks<T, BW> &driver);
 
     // The ADMM algoritmh is put into a separate class which inherits from deal.II's base class
     // for iterative solvers. The advantage of this is, that we do not have to explain the design in detail
@@ -391,7 +125,7 @@ private:
     std::chrono::high_resolution_clock::time_point clock1;
     std::chrono::high_resolution_clock::time_point clock2;
 
-    void __run(step35::CUDADriver<T, BW> &driver);
+    void __run(step35::CUDADriverMurks<T, BW> &driver);
 
     ImageIO image_io;
 protected:
@@ -532,7 +266,9 @@ step35::ADMM<T, BW>::ADMM(int argc, char *argv[], SciPAL::GPUInfo &g)
     QDir::setCurrent(this->params.run_dir.absolutePath());
 
     //set number of threads
+#ifdef HAS_OPENMP
     omp_set_num_threads(params.n_omp_threads);
+#endif
 }
 
 
@@ -589,7 +325,7 @@ void step35::ADMM<T, BW>::set_initial_condition(Driver &driver)
 //@sect5{Function: add_gaussian_noise}
 //@brief Simulates dataset by adding gaussian noise, the whole driver is given to used on device convolution
 template<typename T, typename BW>
-void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriver<T, BW> &driver) {
+void step35::ADMM<T, BW>::add_blur_and_gaussian_noise (step35::CUDADriverMurks<T, BW> &driver) {
     //Constant seed to get reproducable tests
     boost::mt19937 rng;
     //Seed rng
@@ -703,7 +439,7 @@ void step35::ADMM<T, BW>::run() {
     if ( params.do_approx ) {
         //Prepare the driver
         std::cout << "Setting up driver\n";
-        step35::CUDADriver<T, BW> driver(cs,
+        step35::CUDADriverMurks<T, BW> driver(cs,
                                                      #ifdef nUSE_DOF_HANDLER
                                                              image_io.pwidth, image_io.pheight, image_io.pdepth,
                                                      #else
@@ -731,7 +467,7 @@ void step35::ADMM<T, BW>::run() {
 //this enables a unified interface of the driver for exact and approximative method
 //but one has to split the run method in two functions
 template<typename T, typename BW>
-void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
+void step35::ADMM<T, BW>::__run (step35::CUDADriverMurks<T, BW> &driver)
 {
     //Used for shifted indexing
     int ti,tj,tk;
@@ -787,7 +523,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
 
     {
         std::vector<T> zero_init(driver.x_d.size(), 0);
-        driver.x_d = zero_init;
+        driver.x_d = driver.im_h; //FIXME: try init with driver.im_h
         driver.z_d = zero_init;
     }
 
@@ -815,10 +551,7 @@ void step35::ADMM<T, BW>::__run (step35::CUDADriver<T, BW> &driver)
         //Update the Lagrange Multipliers
 
 
-        driver.update_lagrangian(
-                    1./
-                                 params.inv_gamma
-                                 ,
+        driver.update_lagrangian(1./params.inv_gamma,
                                  params.alpha2);
 
 

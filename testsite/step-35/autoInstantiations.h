@@ -1,3 +1,1 @@
-// The following 2 instantiations are automatically generated [2016-08-29 16:56:46.950226]:
-template void ImplCUDA<SciPAL::CudaComplex<float> >::apply<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::pmult, SciPAL::ShapeData<SciPAL::CudaComplex<float> > >(SciPAL::ShapeData<SciPAL::CudaComplex<float> >&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::pmult, SciPAL::ShapeData<SciPAL::CudaComplex<float> > > const&);
-template void ImplCUDA<float>::apply<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> >(SciPAL::ShapeData<float>&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> > const&);
+// void ImplCUDA<float>::apply<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> >(SciPAL::ShapeData<float>&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> > const&);

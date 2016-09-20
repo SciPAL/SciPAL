@@ -103,6 +103,8 @@ subsection input data
   # stabilises first constraint
   set penalty_weight        = 0.99
 
+  # stabilises second constraint
+  set rho2                  = 1.0
 end
 
 

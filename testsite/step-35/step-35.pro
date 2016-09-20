@@ -152,24 +152,25 @@ message("Load deal.II MPI config")
 # Enter project specific source and header files here
 SOURCES += \
     step-35.cpp \
-    cuda_kernel_step-35.cu \
-    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_1D_IP_impl.cu \
-    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_1D_IP.cu \
-    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_2D_IP_impl.cu \
-    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_2D_IP.cu \
-    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_3D_IP_impl.cu \
-    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_3D_IP.cu \
-    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_1D_OP_impl.cu \
-    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_1D_OP.cu \
-    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_2D_OP_impl.cu \
-    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_2D_OP.cu \
-    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_3D_OP_impl.cu \
-    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_3D_OP.cu \
-    ./cufftShift/Src/CXX/cufftShift_1D.cpp \
-    ./cufftShift/Src/CXX/cufftShift_2D.cpp\
-    ./cufftShift/Src/CXX/cufftShift_3D.cpp\
-    ./cufftShift/Src/cuUtils/configGPU.cpp\
-    ./cufftShift/Src/cxxUtils/PrintMemory.cpp
+    cuda_kernel_step-35.cu
+#\
+#    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_1D_IP_impl.cu \
+#    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_1D_IP.cu \
+#    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_2D_IP_impl.cu \
+#    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_2D_IP.cu \
+#    ./cufftShift/Src/CUDA/Interfaces/in-place/cufftShift_3D_IP_impl.cu \
+#    ./cufftShift/Src/CUDA/Kernels/in-place/cufftShift_3D_IP.cu \
+#    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_1D_OP_impl.cu \
+#    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_1D_OP.cu \
+#    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_2D_OP_impl.cu \
+#    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_2D_OP.cu \
+#    ./cufftShift/Src/CUDA/Interfaces/out-of-place/cufftShift_3D_OP_impl.cu \
+#    ./cufftShift/Src/CUDA/Kernels/out-of-place/cufftShift_3D_OP.cu \
+#    ./cufftShift/Src/CXX/cufftShift_1D.cpp \
+#    ./cufftShift/Src/CXX/cufftShift_2D.cpp\
+#    ./cufftShift/Src/CXX/cufftShift_3D.cpp\
+#    ./cufftShift/Src/cuUtils/configGPU.cpp\
+#    ./cufftShift/Src/cxxUtils/PrintMemory.cpp
  #\
     #$$SciPAL_DIR/include/numerics/propagation_kernels.cu
 
@@ -178,10 +179,8 @@ HEADERS += \
     cuda_driver_step-35.hh \
     cuda_kernel_wrapper_step-35.cu.h \
     cuda_kernel_step-35.cu.c \
-    patch.h \
     cuda_helper.h \
     ADMMParams.h \
-    preprocessor_directives.h \
     step-35.hh \
     smre_problem.hh \
     *.h* \

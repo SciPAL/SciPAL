@@ -27,6 +27,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <lac/UnaryFunctions.h>
 #include <base/ForewardDeclarations.h>
 #include <lac/expression_templates_device.h>
+#include <lac/UnaryFunctions.h>
 #include <base/PrecisionTraits.h>
 #include <base/CudaComplex.h>
 #include <lac/OperandInfo.h>
@@ -44,13 +45,14 @@ public:
     typedef typename PrecisionTraits<T, gpu_cuda>::ComplexType NumberType2;
     typedef typename PrecisionTraits<T, gpu_cuda>::NumberType NumberType;
 
+    template <typename X, typename op>
+    static void apply(SciPAL::ShapeData<T> & d_dst,
+                      const SciPAL::DevUnaryExpr<X, op> & Ax);
+
     template <typename L, typename op, typename R>
     static void apply(SciPAL::ShapeData<T>& d_dst,
                       const SciPAL::DevBinaryExpr<L, op, R> & Ax);
 
-    template <typename X, typename op>
-    static void apply(SciPAL::ShapeData<T> & d_dst,
-                      const SciPAL::DevUnaryExpr<X, op> & Ax);
 private:
 };
 
@@ -60,13 +62,15 @@ public:
     typedef typename PrecisionTraits<T, cpu>::ComplexType NumberType2;
     typedef typename PrecisionTraits<T, cpu>::NumberType  NumberType;
 
+    template <typename X, typename op>
+    static void apply(SciPAL::ShapeData<T> & d_dst,
+                      const SciPAL::DevUnaryExpr<X, op> & Ax);
+
     template <typename L, typename op, typename R>
     static void apply(SciPAL::ShapeData<T> & d_dst,
                       const  SciPAL::DevBinaryExpr<L, op, R> & Ax);
 
-    template <typename X, typename op>
-    static void apply(SciPAL::ShapeData<T> & d_dst,
-                      const SciPAL::DevUnaryExpr<X, op> & Ax);
+
 
 
 

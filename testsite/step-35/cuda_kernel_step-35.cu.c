@@ -510,7 +510,7 @@ __incomplete_dykstra_2D_fine_scales(
         const int height, const int width, const int depth
         )
 {
-    #ifdef blb
+
     const int n_scales = N_SCALES_2D;
 
     // 2D
@@ -541,7 +541,7 @@ __incomplete_dykstra_2D_fine_scales(
     h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_old, Q_full,
                                                                         ICD_weights, ps_sum, g_noise, width*height);
 
-#endif
+
 }
 
 

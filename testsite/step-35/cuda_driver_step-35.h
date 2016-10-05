@@ -165,8 +165,7 @@ public:
 
 
 
-            //Convergence control.
-            {
+            //Convergence control.            {
                 h_init -= h_iter;
                 norm = h_init.l2_norm();
 

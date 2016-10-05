@@ -19,7 +19,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 #ifndef GPUINFO_H
 #define GPUINFO_H
-
+#include <iostream>
 namespace SciPAL {
 
 // @sect3{Class: GPUInfo}

@@ -143,17 +143,43 @@ private:
 }; //end struct
 
 
+//! @sect4{Function: conj(__z)
+//!returns complex conjugate of z, template function & specialized implementations
 
 __host__ __device__ static __forceinline__
 CudaComplex<double> conj_impl(const CudaComplex<double>& a)
-{CudaComplex<double> tmp; tmp/*.Number*/ = cuConj(a/*.Number*/); return tmp;}
+{
+	CudaComplex<double> tmp; 
+	tmp = cuConj(a); 
+	return tmp;
+}
+
+__host__ __device__ static __forceinline__
+double conj_impl(const double& a)
+{return a;}
 
 __host__ __device__ static __forceinline__
 CudaComplex<float> conj_impl(const CudaComplex<float>& a)
-{CudaComplex<float> tmp; tmp/*.Number*/ = cuConjf(a/*.Number*/); return tmp;}
+{
+	CudaComplex<float> tmp; 
+	tmp = cuConjf(a); 
+	return tmp;
+}
 
-// abs(__z):  Returns the magnitude of __z.
+__host__ __device__ static __forceinline__
+float conj_impl(const float& a)
+{return a;}
 
+
+template<typename T>
+__host__ __device__ __forceinline__
+CudaComplex<T>
+conj(const CudaComplex<T>& __z)
+{ return conj_impl(__z);}
+
+
+//! @sect4{Function: abs(__z)}
+//! Returns the magnitude of __z.
 template<typename T> T abs_impl(const T a);
 
 
@@ -442,12 +468,6 @@ CudaComplex<T> operator/( const T& val, const CudaComplex<T>& a)
     return tmp;
 }
 
-template<typename T>
-__host__ __device__ __forceinline__
-CudaComplex<T>
-conj(const CudaComplex<T>& __z)
-{ return conj_impl(__z);}
-
 
 // arg(__z): Returns the phase angle of __z.
 template<typename T>
@@ -474,7 +494,7 @@ CudaComplex<T> cos(const CudaComplex<T>& __z)
 {
     const T __x = __z.real();
     const T __y = __z.imag();
-    return CudaComplex<T>(cos(__x) * cosh(__y), -sin(__x) * sinh(__y));
+    return CudaComplex<T>(std::cos(__x) * std::cosh(__y), -std::sin(__x) * std::sinh(__y));
 }
 // cosh(__z): Returns the hyperbolic cosine of __z.
 template<typename T>
@@ -555,11 +575,13 @@ CudaComplex<T> sqrt(const CudaComplex<T>&__z)
     }
 }
 
+
 // tan(__z):  Return the complex tangent of __z.
 template<typename T>
 __host__ __device__ __forceinline__
 CudaComplex<T> tan(const CudaComplex<T>& __z)
 { return sin(__z) / cos(__z); }
+
 
 // tanh(__z): Returns the hyperbolic tangent of __z.
 template<typename T>
@@ -567,17 +589,10 @@ __host__ __device__ __forceinline__
 CudaComplex<T> tanh(const CudaComplex<T>& __z)
 { return sinh(__z) / cosh(__z); }
 
+
 // pow(__x, __y): Returns the complex power base of __x
 //                raised to the __y-th power.  The branch
 //                cut is on the negative axis.
-template<typename T>
-__host__ __device__ __forceinline__
-CudaComplex<T> pow(const CudaComplex<T>& __z, int __n)
-{
-    return __n < 0
-            ? T(1.0)/pow(__z, -__n)
-            : pow(__z, __n);
-}
 
 template<typename T>
 __host__ __device__ __forceinline__
@@ -590,10 +605,21 @@ CudaComplex<T> pow(const CudaComplex<T>& __x, const T& __y)
     return polar(std::exp(__y * __t.real()), __y * __t.imag());
 }
 
+
+template<typename T>
+__host__ __device__ __forceinline__
+CudaComplex<T> pow(const CudaComplex<T>& __z, int __n)
+{
+    return __n < 0
+            ? T(1.0)/pow(__z, -__n)
+            : pow(__z, __n);
+}
+
+
 template<typename T>
 __host__ __device__ __forceinline__
 CudaComplex<T> pow(const CudaComplex<T>& __x, const CudaComplex<T>& __y)
-{ return __x == T() ? T() : exp(__y * log(__x)); }
+{ return __x == CudaComplex<T>() ? CudaComplex<T>() : exp(__y * log(__x)); }
 
 template<typename T>
 __host__ __device__ __forceinline__
@@ -668,6 +694,9 @@ template<typename _Tp, typename _CharT, class _Traits>
     return __os << __s.str();
   }
 
+
 } //end namespace SciPAL
+
+
 #endif // CUDACOMPLEX_H
 

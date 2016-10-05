@@ -97,7 +97,7 @@ struct ExprTree {
     eval(const SciPAL::ShapeData<SciPAL::CudaComplex<T> > & Ax, int i)
     {
         // printf("%s ", __PRETTY_FUNCTION__); printf("shape data : Ex[%d] : %g\n", i, Ax.data_ptr[i] );
-        return Ax.data_ptr[i];
+        return Ax.view_begin[i];
     }
 
     __host__
@@ -106,7 +106,7 @@ struct ExprTree {
     static T eval(const SciPAL::ShapeData<T> & Ax, int i)
     {
         // printf("%s ", __PRETTY_FUNCTION__); printf("shape data : Ex[%d] : %g\n", i, Ax.data_ptr[i] );
-        return Ax.data_ptr[i];
+        return Ax.view_begin[i];
     }
 
     //! Specialization for literals. Retrieve the value.

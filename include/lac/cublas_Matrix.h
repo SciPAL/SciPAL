@@ -131,7 +131,10 @@ public:
 
     void reinit(int n_rows, int n_cols);
 
-    void swap(Matrix& other) {
+    
+    void swap(Matrix& other)
+    {	
+	Assert(false, dealii::ExcMessage("Seems not to be working, disabled... - Holger"));
         this->storage.swap(other);
         this->MyShape::swap(other);
     }
@@ -152,6 +155,28 @@ public:
                  this->data(), inc_this);
         return *this;
     }
+	//! ToDo: rewrite with shapes
+    //! Generate a deep copy of @p other
+    Matrix<T, BW> & operator = (const SubMatrixView<T, BW> & other)
+    {
+        this->reinit(other.n_rows_active(), other.n_cols_active());
+        int inc_src  = 1;
+        int inc_this = 1;
+        // TODO: i guess this could be optimized by checking the number of rows and cols
+        // and therefore copying row or colwise to minimize the number of function calls
+
+        // Matrix stored col major, so copy columnwise:
+        for(unsigned int c = 0; c < other.n_cols_active(); c++)
+        {
+            BW::copy(other.n_rows_active(),
+                     other.view_begin + c * other.leading_dim(),
+                     inc_src,
+                     this->data() + c * this->leading_dim,
+                     inc_this);
+        }
+        return *this;
+    }
+
 
     //! Generate a deep copy of @p other with different blas_wrapper_type
     template <typename BW2>
@@ -190,10 +215,41 @@ public:
     template<typename X>
     Matrix & operator= (const ::SciPAL::Expr<X> & e);
 
-//     Matrix<T, BW> & operator =
-//     (const typename ::SciPAL::BlasMatExp<T, BW>::sMMaM& e);
-
+#ifndef nUSE_GENERIC_ADDITION
+    // ToDO test if working correct
+    template<typename X>
+    Matrix & operator+= (const ::SciPAL::Expr<X> & e);
+#else
+    //! A += B
     Matrix<T, BW> & operator += (const Matrix<T, BW> & other);
+
+    //! A += a * B * C * D
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::Matrix<T, BW>>>& expr);
+
+    //! A += a * adjoint(B) * C * D
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::Matrix<T, BW>>>& expr);
+
+    //! A += a * B * C * adjoint(D)
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>>>& expr);
+
+    //! A += a * B * C * transpose(D)
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_transpose>>>& expr);
+
+    //! A += trans(B) * C
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_transpose>, mult, SciPAL::Matrix<T, BW>>& expr);
+
+    //! A += B * trans(C)
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>, mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_transpose>>& expr);
+    //! A += B * adjoint(C)
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>, mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>>& expr);
+
+    //! A += adjoint(B) * C
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>, mult, SciPAL::Matrix<T, BW>>& expr);
+
+
+    //! A += B * C
+    Matrix<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>, mult, SciPAL::Matrix<T, BW>>& expr);
+#endif
 
     Matrix<T, BW> & operator -= (const Matrix<T, BW> & other);
 
@@ -236,11 +292,11 @@ public:
 
 
 
-    size_t n_rows() const { return this->MyShape::n_rows_active(); }
+    inline size_t n_rows() const { return this->MyShape::n_rows_active(); }
 
-    size_t n_cols() const { return this->MyShape::n_cols_active(); }
+    inline size_t n_cols() const { return this->MyShape::n_cols_active(); }
 
-    void print() const;
+    void print(std::ostream &Output = std::cout) const;
 
     T operator () (const unsigned int i, const unsigned int j) const;
 
@@ -251,7 +307,7 @@ public:
     T sum() const;
 
     inline MyShape & shape() { return *this; }
-
+	inline const MyShape & shape() const { return *this; }
 
 private:
 
@@ -308,46 +364,15 @@ SciPAL::Matrix<T, BW>::Matrix(const unsigned int n_rows,
 
 }
 
-
-
-// Has this ever been used?
-/*
-template<typename T, typename BW>
-SciPAL::Matrix<T, BW>::Matrix(int n_rows, int n_cols,
-                                const Matrix<T, BW> & src_data)
-                                    :
-                                    storage(n_rows, n_cols),
-                                    MyShape(this->data(), n_rows, n_cols)
-{
-    const std::vector<T> tmp(n_rows*n_cols, 0);
-
-    BW::SetMatrix(n_rows, n_cols, &tmp[0], n_rows,
-                  this->data(), n_rows);
-
-    Array<T, BW> & self = *this;
-
-    self = src_data;
-}
-*/
-
-//! Assign the result of a linear algebraic expression to a matrix and allocate the matrix before.
-//! @param e : Expressino to evaluate.
-//template<typename T, typename BW>
-//template<typename X>
-//SciPAL::Matrix<T, BW>::Matrix (const ::SciPAL::Expr<X> & e)
-//{
-//    ::SciPAL::LAOOperations::apply(*this, ~e);
-//}
-
 //! Assign the result of a linear algebraic expression to a matrix.
-//! @param e : Expressino to evaluate.
+//! @param e : Expression to evaluate.
 template<typename T, typename BW>
 template<typename X>
 SciPAL::Matrix<T, BW> & SciPAL::Matrix<T, BW>::operator =
 //(const typename ::SciPAL::BlasMatExp<T, BW>::sMMaM& e)
 (const ::SciPAL::Expr<X> & e)
 {
-#ifdef DEBUG
+#ifdef DEBUG_MATRIX
     std::cout << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
     print_expr_info(__PRETTY_FUNCTION__);
 #endif
@@ -379,8 +404,6 @@ SciPAL::Matrix<T, BW>::Matrix(const Matrix<T, BW> & other)
     *this = other;
 }
 
-
-
 //! Copy ctor with constructs a matrix from an another (host-side) matrix.
 //! @param other : Matrix which serves as source.
 template<typename T, typename BW>
@@ -398,8 +421,6 @@ void SciPAL::Matrix<T, BW>::reinit(int n_rows, int n_cols)
                          0, n_cols,
                          1 /*unit stride*/);
 }
-
-
 
 //! Initialize a matrix from an identity matrix.
 //! @param Id : identity matrix which provides the information about the size of the matrix.
@@ -465,6 +486,132 @@ SciPAL::Matrix<T, BW>::operator = (const FullMatrixAccessor<T2> & src_matrix)
 
     return *this;
 }
+#ifdef nUSE_GENERIC_ADDITION
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::Matrix<T, BW>>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = expr.l;
+    const Mtx & A = expr.r.l.l;
+    const Mtx & B = expr.r.l.r;
+    const Mtx & C = expr.r.r;
+
+    Assert((this->n_rows() == A.n_rows())
+           && (this->n_cols() == C.n_cols()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_cols()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MM_M)."));
+    Assert(B.n_cols()==C.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MM_M)."));
+
+    if (A.n_cols() > B.n_cols())
+    {
+        Mtx tmp(A.n_rows(), B.n_cols());
+        tmp = alpha * A * B;
+        *this = tmp * C + *this;
+    }
+    else
+    {
+        Mtx tmp(B.n_rows(), C.n_cols());
+        tmp = B * C;
+        *this = alpha * A * tmp + *this;
+    }
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::Matrix<T, BW>>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = expr.l;
+    const Mtx & A = expr.r.l.l.l;
+    const Mtx & B = expr.r.l.r;
+    const Mtx & C = expr.r.r;
+
+    Assert((this->n_rows() == A.n_cols())
+           && (this->n_cols() == C.n_cols()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_rows()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MaM_M)."));
+    Assert(B.n_cols()==C.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MaM_M)."));
+
+    Mtx tmp(A.n_cols(), B.n_cols());
+    tmp = SciPAL::adjoint(A) * B;
+    *this = alpha * tmp * C + *this;
+
+    return *this;
+}
+
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = expr.l;
+    const Mtx & A = expr.r.l.l;
+    const Mtx & B = expr.r.l.r;
+    const Mtx & C = expr.r.r.l;
+
+    Assert((this->n_rows() == A.n_rows())
+           && (this->n_cols() == C.n_rows()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_cols()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MaM_M)."));
+    Assert(B.n_cols()==C.n_cols(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MaM_M)."));
+
+    Mtx tmp(B.n_rows(), C.n_rows());
+    tmp = B * SciPAL::adjoint(C);
+    *this = alpha * A * tmp + *this;
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<Literal<T, BW>, mult, SciPAL::BinaryExpr<SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>,  mult, SciPAL::Matrix<T, BW>>,  mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_transpose>>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    T alpha = expr.l;
+    const Mtx & A = expr.r.l.l;
+    const Mtx & B = expr.r.l.r;
+    const Mtx & C = expr.r.r.l;
+
+    Assert((this->n_rows() == A.n_rows())
+           && (this->n_cols() == C.n_rows()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_cols()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MaM_M)."));
+    Assert(B.n_cols()==C.n_cols(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(s_MaM_M)."));
+
+    Mtx tmp(B.n_rows(), C.n_rows());
+    tmp = B * SciPAL::transpose(C);
+    *this = alpha * A * tmp + *this;
+
+    return *this;
+}
 
 // @sect4{Operator: +=}
 //!
@@ -492,6 +639,133 @@ SciPAL::Matrix<T, BW>::operator += (const Matrix<T, BW> & other)
 
     return *this;
 }
+
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+//! A += trans(B) * C
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_transpose>, mult, SciPAL::Matrix<T, BW>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    const Mtx & A = expr.l.l;
+    const Mtx & B = expr.r;
+
+    Assert((this->n_rows() == A.n_cols())
+           && (this->n_cols() == B.n_cols()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_rows()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(MtM)."));
+
+    *this = SciPAL::transpose(A) * B + *this;
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+//! A += adjoint(B) * C
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>, mult, SciPAL::Matrix<T, BW>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    const Mtx & A = expr.l.l;
+    const Mtx & B = expr.r;
+
+    Assert((this->n_rows() == A.n_cols())
+           && (this->n_cols() == B.n_cols()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_rows()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(MaM)."));
+
+    *this = SciPAL::adjoint(A) * B + *this;
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+//! A += B * C
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>, mult, SciPAL::Matrix<T, BW>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    const Mtx & A = expr.l;
+    const Mtx & B = expr.r;
+
+    Assert((this->n_rows() == A.n_rows())
+           && (this->n_cols() == B.n_cols()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_cols()==B.n_rows(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(MM)."));
+
+    *this = A * B + *this;
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+//! A += B * trans(C)
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>, mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_transpose>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    const Mtx & A = expr.l;
+    const Mtx & B = expr.r.l;
+
+    Assert((this->n_rows() == A.n_rows())
+           && (this->n_cols() == B.n_rows()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_cols()==B.n_cols(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(MtM)."));
+
+    *this = A * SciPAL::transpose(B) + *this;
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Incremental, element-wise addition of two matrices.
+//! @param other : Matrix to add. Must have the same dimensions.
+//! A += B * adjoint(C)
+template<typename T, typename BW>
+SciPAL::Matrix<T, BW> &
+SciPAL::Matrix<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::Matrix<T, BW>, mult, SciPAL::UnaryExpr<SciPAL::Matrix<T, BW>, SciPAL::expr_adjoint>>& expr)
+{
+    typedef ::SciPAL::Matrix<T, BW> Mtx;
+
+    const Mtx & A = expr.l;
+    const Mtx & B = expr.r.l;
+
+    Assert((this->n_rows() == A.n_rows())
+           && (this->n_cols() == B.n_rows()),
+           dealii::ExcMessage("Dimension mismatch"));
+
+    Assert(A.n_cols()==B.n_cols(), dealii::ExcMessage("Input matrix dimensions do not match in operator+=(MaM)."));
+
+    *this = A * SciPAL::adjoint(B) + *this;
+
+    return *this;
+}
+#endif 
 
 
 // @sect4{Operator: -=}
@@ -661,22 +935,6 @@ SciPAL::Matrix<T, BW>::mmult(Matrix<T, BW>& dst, const Matrix<T, BW>& src) const
     dst.reinit(this->n_rows(), src.n_cols());
 
     this->scaled_mmult_add_scaled(dst, src, false, false);
-    //    T alpha = 1;
-    //    T beta = 0;
-
-    //    int lda = this->n_rows();
-    //    int ldb = src.n_rows(); /* == this->n_cols() !!! */
-    //    int ldc = dst.n_rows();
-
-    //    BW::gemm('n', 'n',
-    //             this->n_rows() /* cublas doc : m == n_rows of op(A)*/,
-    //             dst.n_cols()   /* cublas doc : n == n_cols of op(B), i.e. n_cols of C */,
-    //             this->n_cols() /* cublas doc : k == n_cols of op(A), i.e. n_rows of op(B)*/,
-    //             alpha,
-    //             this->data(), lda,
-    //             src.data(), ldb,
-    //             beta,
-    //             dst.data(), ldc);
 }
 
 //! matrix-matrix multiplication to produce a Submatrix from the product of two matrices.
@@ -829,6 +1087,22 @@ T
 SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c) const
 {
+#ifdef DEBUG_MATRIX
+    if (r > this->n_rows())
+    {
+        std::cerr << "Out of range: Row " << r << " is wanted out of a " << this->n_rows() << "x" << this->n_cols() << " matrix." << std::endl;
+        std::cerr << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
+        //print_expr_info(__PRETTY_FUNCTION__);
+        std::exit(-1);
+    }
+    else if (c > this->n_cols())
+    {
+        std::cerr << "Out of range: Column " << c << " is wanted out of a " << this->n_rows() << "x" << this->n_cols() << " matrix." << std::endl;
+        std::cerr << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
+        //print_expr_info(__PRETTY_FUNCTION__);
+        std::exit(-1);
+    }
+#endif
     int lead_dim = this->leading_dim;
     const T * tmp_d =  & this->data()[c*lead_dim+r];
     T entry;
@@ -851,6 +1125,22 @@ void
 SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
                                       const unsigned int c, T data)
 {
+#ifdef DEBUG_MATRIX
+    if (r > this->n_rows())
+    {
+        std::cerr << "Out of range: Row " << r << " should be written in of a " << this->n_rows() << "x" << this->n_cols() << " matrix." << std::endl;
+        std::cerr << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
+        //print_expr_info(__PRETTY_FUNCTION__);
+        Assert(false, dealii::ExcMessage("see above"));
+    }
+    else if (c > this->n_cols())
+    {
+        std::cerr << "Out of range: Column " << c << " should be written in of a " << this->n_rows() << "x" << this->n_cols() << " matrix." << std::endl;
+        std::cerr << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
+        //print_expr_info(__PRETTY_FUNCTION__);
+        Assert(false, dealii::ExcMessage("see above"));
+    }
+#endif
     int lead_dim = this->leading_dim;
     T * tmp_d =  & this->data()[c*lead_dim+r];
     T * p_e = &data;
@@ -862,14 +1152,14 @@ SciPAL::Matrix<T, BW>::operator () (const unsigned int r,
 
 // @sect4{Function: Matrix::print}
 //!
-//! Dump a matrix to the screen. In case of device matrices their content gets copied back to the host before sendign it to std::cout.
+//! Dump a matrix to a stream. In case of device matrices their content gets copied back to the host before sendign it to the stream.
 template<typename T, typename BW>
 void
-SciPAL::Matrix<T, BW>::print() const
+SciPAL::Matrix<T, BW>::print(std::ostream& Output) const
 {
     //! T numerical_zero = 2.5e-16;
 
-    std::cout << "Matrix dims : " << this->n_rows() << " "
+    Output << "#Matrix dims : " << this->n_rows() << " "
               << this->n_cols() << std::endl;
 
     int n_el = this->n_rows() * this->n_cols();
@@ -881,19 +1171,17 @@ SciPAL::Matrix<T, BW>::print() const
     for (uint r = 0; r < this->n_rows(); ++r)
     {
         for (uint c = 0; c < this->n_cols(); ++c)
-            std::cout << std::setprecision(4) << std::fixed << std::setw(15) <<
-//                       std::setprecision (1) << std::scientific <<
+            Output << //std::setprecision(15) << std::fixed << std::setw(15) <<
+                       std::setprecision (20) << std::scientific <<
                          //!(std::abs(tmp[c*this->n_rows() + r])> numerical_zero
                          //!           ?
                          tmp[c*this->n_rows() + r]
                          //!                 : 0.)
                       << " ";
-        std::cout <<";" << std::endl;
+        Output /*<<";"*/ << std::endl;
 
     }
-
     delete [] tmp;
-
 }
 
 #endif

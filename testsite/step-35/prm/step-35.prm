@@ -1,133 +1,22 @@
 # Listing of Parameters
 # ---------------------
-subsection Input
-  # path to the .tif image
-  set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/checkerboard.tif
-  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/FT_dicty_200.tif
-  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/dicty_holo_50.tif
-  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_512.tif
-  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/monk_1024_n_0.05_fwhm_6.0.tif
-  #set Image to reconstruct = /scratch/johannes/SciPAL/testsite/step-35/prm/irp_logo_ideal.tif
-  #set Image to reconstruct = /z/johannes/cuda_results/step-35/2016-04-08/11_34_14/control-000999.tif
-end
+# Whether to use GPU acceleration for the SMRE.
+# cpu: do it on the CPU (implies OpenMP)
+# cuda: use your GPU (default).
+set Architecture             = cuda
+set Number of OpenMP threads = 1
 
+# Specify a directory where the results of the test are to be stored. This can
+# be either an absolute path or path relative to the directory where the
+# program has been started. The default is a subdirectory called
+# results-<date> where <date> will be replaced by the date at which the
+# program has been started. this simplifies keeping the projects directory
+# clean. A prm file generated with the default values for the parameters gives
+# an example.
+set Run directory            = /scratch/johannes/cuda_results/step-35
 
-subsection Output
-  # Specify a directory where the results of the test are to be stored. This
-  # can be either an absolute path or path relative to the directory where the
-  # program has been started. The default is subdir called results-<date>
-  # where <date> will be replaced by the date at which the program has been
-  # started. this simplifies keeping the projects directory clean
-  set Run directory = /z/johannes/cuda_results/step-35/
-
-  # If true, preliminary results of the output image are saved to the run
-  # directory.
-  set control       = true
-
-  # Where should we put the ouput image? Will be a tiff image
-  set output image  = control.tif
-end
-
-subsection Solver control
-  set Log frequency = 1
-  set Log history   = false
-  set Log result    = true
-  set Max steps     = 1000
-  set Tolerance     = 1.e-10
-
-
-  subsection Dykstra
-    # Finish when |x_r - x_{r-1}| < tolerance
-    set Dykstra tolerance        = 1e-4
-    set N max Dykstra iterations = 100
-  end
-
-  subsection Heun
-    set N max time step adaptions    = 10
-    # Maximum number of Heun steps, number of iteration steps to compute the
-    # reconstructed image for given noise.
-    set N max time steps             = 100
-
-    # Tolerance of the norm of the difference of two successive time step
-    # attempts within a Heun step.
-    set Time step adaption tolerance = 1e-2
-
-    # Tolerance of the norm of the difference of two successive Heun steps.
-    set Tolerance                    = 1e-2
-  end
-
-end
-
-
-subsection input data
-  # Principal parameter. Allowed range : (0,1). Default : 0.9. The higher the
-  # more accurate.
-  set Alpha quantile        = 0.9 # not used
-
-  # Do an Anscombe Transformation on input image
-  set Anscombe              = false
-
-  # Stabilization parameter. Similar to a pseudo-timestep. The smaller, the
-  # more stable but also the more slower the convergence.
-  set Gamma                 = 8e-3
-
-  # Full-width half-maximum of the PSF. In case of a PSF to narrow to be
-  # reasonably sampled on the lattice of pixels we simply assume that it is a
-  # delta peak and consider the convolution operator as identity.
-  set PSF FWHM          = 2 #in new impl...consider factor of 2!  #
-
-  # Regularisation type
-  set Regularization method = l2  #l1, l2, TV, haar
-
-  # enforces first constraint
-  set alpha1                = 1
-
-  # enforces second constraint
-  set alpha2                = 2
-
-  # Dimension of the images (if TIFF-stack process each slice individually if
-  # dim = 2)
-  set dim                   = 2
-
-  # estimate of gaussian noise standard deviation. If simulate = true, will be
-  # used to add gaussian noise with standard deviation of ...
-  set gaussian noise = 20 #% 50 ph %14.15  % 200 ph
-  #435#5%
-  
- # for holo  #726 #15%    484 #10%  #242 #5%                     # default: 0
-
-  # intensity of regularisation
-  set regularization        = 1.0
-
-  # stabilises first constraint
-  set penalty_weight        = 0.99
-
-end
-
-
-subsection program flow control
-  # largest patch edge length if not using small dykstra in approximation
-  set MRdepth         = 15 #not used
-
-  # do a small Dykstra in approximation
-  set approx          = true
-
-  # Reporting progress in intervals of ... Iterations
-  set report interval = 30
-
-  set Number of OpenMP threads = 32
-
-end
-
-
-subsection simulate dataset from real image
-  # If set to false the input is treated as real data, if true input will be
-  # treated as test image and blurring and noise are added
-  set simulate  = true
-
-  # If false simulated noise has a constant seed, if true the seed is taken
-  # from the clock
-  set time seed = false
-end
-
-
+# If set to true, the results of the run will be stored in a subdirectory of a
+# given run directory which is named after the date and time at the start of
+# the program. This allows to group runs without overwriting previous
+# results.
+set Use time tag             = true

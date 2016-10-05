@@ -55,7 +55,7 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
     int size = d_dst.n_elements_active;
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
-    __apply<T, X><<<blocks, threads_per_block>>>(d_dst.data_ptr, Ax, size);
+    __apply<T, X><<<blocks, threads_per_block>>>(d_dst.view_begin, Ax, size);
 
     gpuErrchk( cudaPeekAtLastError() );
     gpuErrchk( cudaDeviceSynchronize() );
@@ -72,7 +72,7 @@ ImplOpenMP<T>::apply(SciPAL::ShapeData<T> &d_dst,
 {
     #pragma omp parallel for
     for(int i = 0; i < d_dst.n_elements_active ; i++)
-     __apply_element<T, X, op>(d_dst.data_ptr, Ax, i);
+     __apply_element<T, X, op>(d_dst.view_begin, Ax, i);
 }
 /////////////////////////////////////////
 //Binary Function
@@ -127,7 +127,7 @@ ImplCUDA<T>::apply(SciPAL::ShapeData<T> &d_dst,
     int blocks = (size + threads_per_block - 1) / threads_per_block;
 
     __apply<T, L, op, R><<<blocks, threads_per_block>>>
-                        (d_dst.data_ptr, Ax, size);
+                        (d_dst.view_begin, Ax, size);
 
     gpuErrchk( cudaPeekAtLastError() );
     gpuErrchk( cudaDeviceSynchronize() );
@@ -143,7 +143,7 @@ ImplOpenMP<T>::apply(SciPAL::ShapeData<T> & d_dst,
 {
     #pragma omp parallel for
     for(int i = 0; i < d_dst.n_elements_active; i++)
-     __apply_element<T, L, op, R>(d_dst.data_ptr, Ax, i);
+     __apply_element<T, L, op, R>(d_dst.view_begin, Ax, i);
 
 }
 

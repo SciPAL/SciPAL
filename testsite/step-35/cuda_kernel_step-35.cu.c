@@ -22,21 +22,15 @@ Copyright Stephan Kramer, Johannes Hagemann,  Lutz Künneke, Jan Lebert 2014-201
 
 //std
 #include <stdio.h>
+
+#ifdef HAS_OPENMP
 #include <omp.h>
+#endif
 
 //CUDA
 #include <cuComplex.h>
 
-//Thrust
-#include <thrust/functional.h>
 
-#ifndef nUSE_CPP11
-#include <thrust/transform.h>
-#include <thrust/sort.h>
-#include <thrust/execution_policy.h>
-#include <thrust/device_ptr.h>
-#include <thrust/fill.h>
-#endif
 
 
 //SciPAL
@@ -69,6 +63,8 @@ void step35::Kernels<T, arch>::set_cs(T* cs_h, int maxnum) {
 //Prior to the kernels we have to define the device functions that we need.
 
 
+
+
 //@sect5{Function: power_of_two}
 //@param x exponent
 //@return $2^x$ for $x \ge 0$. For $x < 0$ returns 0.
@@ -79,6 +75,16 @@ __device__ int pow_of_two(int x) {
     return 1 << x;
 }
 
+//@sect5{Function: mysign}
+//Sign function
+template<typename T>
+__device__ T mysign(T in)
+{
+    if ( in < (T)0)
+        return (T)(-1.0);
+    else
+        return (T)1;
+}
 
 
 // @sect5{Function: InverseErf}
@@ -128,20 +134,180 @@ __forceinline__ __device__ float MBG_erfinv(float x)
 // <br>
 // Note that unlike device functions kernels cannot be members of class.
 
-//@sect5{Kernel: __dykstra}
-//@brief This Kernel provides the Gaussian Dykstra projection.
-//@param qg pointer to the q vectors in global memory
-//@param A path to the image
-//@param cinfo array of pointers where to find n,i,j and numpatch
-//@param q_offset array of offsets where to find first $q$ value for a threadblock
-//@param ni height of the image
-//@param nj width of the image
-//NOTICE: only 2D functionality
 
+template<typename T>
+__forceinline__ __device__ void L2_norm_on_sub_rows(int s, T * ps_sum)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
+    volatile T * m_ps = ps_sum + tIx;
+
+    T x =  // 1.0; //
+            *m_ps;
+    __syncthreads();
+
+    *m_ps = x * x;
+    __syncthreads();
+
+    int edge_x = pow_of_two(s);
+
+
+    // ------------------
+    //    for (int e = edge_x; e>0; e/= 2)
+    //    {
+    //        int lane_id = col % (edge_x);
+
+    //        if (lane_id < e/2)
+    //        {
+    //            *m_ps += *(m_ps + e/2);
+    //            if (blockIdx.x == 0)
+    //                printf ("col : %d, e : %d, lane_id : %d \n", col, e, lane_id);
+    //        }
+
+    //__syncthreads();
+    //    }
+    // ------------------
+
+
+
+    // Each line is processed by one warp
+    for (int e = 2; e <= edge_x; e*= 2)
+    {
+        if ((col+e) % e == 0)
+        {
+            *m_ps += *(m_ps + e/2);
+            // if (*m_ps != e)
+            // printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
+        }
+        __syncthreads();
+    }
+
+}
+
+
+template<typename T>
+__forceinline__ __device__ void sum_of_squares_on_2D_subsets(int s, T * ps_sum)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+    // Pointer to first element of a row which (i.e. the element) is processed by this thread.
+    volatile T * m_ps = ps_sum + tIx;
+
+    // For debugging the 2D summation set to 1. Then each scale results in a power of 4 as the partial sum over the pixels of the subset.
+    T x = // 1.0; //
+            *m_ps;
+    __syncthreads();
+
+    *m_ps = x * x;
+    __syncthreads();
+
+    int edge_x = pow_of_two(s);
+
+    // Each line is processed by one warp
+    for (int e = 2; e <= edge_x; e*= 2)
+    {
+        if ((col+e) % e == 0)
+        {
+            *m_ps += *(m_ps + e/2);
+            //  printf("PS_%d(%d, %d) : %f, e/2 : %d, tIx : %d\n", e, row, col, *m_ps, e/2, tIx);
+        }
+        // __syncthreads();
+    }
+
+    __syncthreads();
+
+    int edge_y = pow_of_two(s);
+
+    for (int e = 2; e <= edge_y; e*= 2) // add rows
+    {
+        __syncthreads(); // Needed for some reason to ensure thread safety.
+        int neighbor = blockDim.x*(row + e/2) + col;
+        if ((row+e) % e == 0)
+        {
+            //            if (*m_ps != ps_sum[neighbor] /*&& row == 0 && col == 0*/)
+            //            {
+            //                printf("adding rows : ps_sum[%d] : %f, ps_sum[%d] : %f, e : %d\n", tIx, *m_ps, neighbor, ps_sum[neighbor], e);
+            //            }
+            *m_ps += ps_sum[neighbor];
+        }
+
+        __syncthreads();
+
+    }
+
+}
+
+
+template<typename T>
+__forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x, T data, T g_noise, T weight)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+    // FIXME: move into kernel
+    int edge_x = pow_of_two(s_x);
+    int edge_y = pow_of_two(s_y);
+
+    int ws_isx = blockDim.x*edge_y*(row/edge_y) +  edge_x*(col/edge_x);
+
+    T ws = (ps_sum[ws_isx]/(g_noise*g_noise)) * weight;
+    __syncthreads();
+
+    if (ws > 1.)
+        x *= 1.
+                / sqrt(ws);
+
+    // For debugging the 2D summation
+    if (false) //  ( blockIdx.x == blockIdx.y) && (ws != T(edge_x*edge_y)) ) //  && blockIdx.y == gridDim.y/2)
+        printf("ws_isx : %d, ws(%d, %d) : %f, x : %f, ps : %f\n ", ws_isx, col, row, ps_sum[ws_isx], x, T(edge_x*edge_y));
+
+    if(false) // ( blockIdx.x == 0) && (blockIdx.y == 0) && row == 0 && col == 0)
+        printf("weight[s=%d] : %f\n", s_x, weight);
+
+    return x;
+}
+
+
+template<typename T>
+__forceinline__ __device__ T L2_norm(T * ps_sum)
+{
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+    int tIx = row*blockDim.x + col;
+
+
+    ps_sum[tIx] *= ps_sum[tIx]; // Compute squares of entries.
+    __syncthreads();
+
+    int k_max = blockDim.x*blockDim.y/2;
+
+    for (int k = k_max; k > 0; k/=2)
+    {
+        //  if (tIx == 0)  printf ("k in reduction : %d\n", k);
+        if (tIx < k)
+            ps_sum[tIx] += ps_sum[tIx+k];
+        __syncthreads();
+    }
+
+    T result = ps_sum[0];
+    __syncthreads();
+
+    // Maybe we need the following for debugging again someday.
+    if (false) // tIx == 0)
+        printf ("ps_sum[%d] in reduction : %f, blockDim.x : %d\n", tIx, result, blockDim.x);
+
+    return sqrt(result/(blockDim.x*blockDim.y)); // returns norm squared.
+}
 
 #define N_SCALES_2D 6
-#define N_PX_X_2D 64
-#define N_PX_Y_2D 16
+#define N_PX_X_2D 32
+#define N_PX_Y_2D 32
 
 
 #define N_SCALES_1D 10
@@ -180,8 +346,6 @@ struct DykstraStep {
 
     // In contrast to the formulation as pseudo code we only need a constant number of @p h variables because they are computed incrementally.
 
-    // For the corrections we need the full history w.r.t. the number of levels in subset hierarchy.
-    T Q[N_SCALES_2D];
 
     int n_scales;
 
@@ -197,20 +361,13 @@ struct DykstraStep {
           global_row (blockDim.y*blockIdx.y + row + offset_y),
           global_col (blockDim.x*blockIdx.x + col + offset_x),
           global_idx (global_row*width + global_col)
-    {
-
-        for (int j = 1; j <= n_scales; j++)
-            Q[j-1] = 0;
-    }
+    {/*nothing to do*/}
 
     __forceinline__
-    __device__
-    void sum_of_squares_subsets(int s_x, int s_y, T * ps_sum);
+    __device__ void sum_of_squares_subsets(int s, T * ps_sum);
 
 
-    __forceinline__
-    __device__
-    T project(int s_x, int s_y, T * ps_sum, T x,
+    __forceinline__ __device__ T project(int s_x, int s_y, T * ps_sum, T x,
                                          T g_noise, T weight)
     {
         // FIXME: move into kernel
@@ -245,20 +402,20 @@ struct DykstraStep {
             return false;
     }
 
-    T __device__ sweep_fine_scales (
-            T* h_old_in,  T* Q_full,
-            const T* ICD_weights, T* ps_sum, const T g_noise)
+    T __device__
+    sweep_fine_scales ( T* h_old_in,  T* Q_full,
+                        const T* ICD_weights, T* ps_sum, const T g_noise, int image_size)
     {
         volatile T * m_ps = ps_sum + tIx;
 
-        Q[0] = Q_full[this->global_idx];
 
         T h_old = h_old_in[this->global_idx];
         T h_new = T(0);
 
-        for (int j = 1; j < this->n_scales; j++)         // loop over subsets
+        for (int j = 1; j <= this->n_scales; j++)         // loop over subsets
         {
-            h_old -= this->Q[j-1];
+            int Q_idx = this->global_idx + j*image_size;
+            h_old -= Q_full[Q_idx];
 
             *m_ps  = h_old;
 
@@ -268,7 +425,7 @@ struct DykstraStep {
 //            int s_x = j-1; // we loop trough the scales from coarse to fine
             int s_y = s_x;
 
-            this->sum_of_squares_subsets(s_x, s_y, ps_sum);
+            this->sum_of_squares_subsets(s_x/*j-1*/, ps_sum);
 
             T weight =  // 0.25*
                     ICD_weights[ //
@@ -283,64 +440,9 @@ struct DykstraStep {
 
             __syncthreads();
 
-            this->Q[j-1] = h_new - h_old;
+            Q_full[Q_idx] = h_new - h_old;
             h_old = h_new;
         }
-
-
-        return h_new; //  - h_init; // difference formed in on-chip registers
-    }
-
-    T __device__ sweep_fine_scales_rectangles (
-            T* h_old_in,  T* Q_full,
-            const T* ICD_weights, T* ps_sum, const T g_noise, int flip_direction)
-    {
-        volatile T * m_ps = ps_sum + tIx;
-
-        Q[0] = Q_full[this->global_idx];
-
-        T h_old = h_old_in[this->global_idx];
-        T h_new = T(0);
-
-        for (int j = 1; j < this->n_scales; j++)         // loop over subsets
-        {
-            h_old -= this->Q[j-1];
-
-            *m_ps  = h_old;
-
-            __syncthreads();
-
-            int s_x = n_scales - j +1; // we loop trough the scales from coarse to fine
-//            int s_x = j-1; // we loop trough the scales from coarse to fine
-            int s_y = s_x - 2;
-
-            if(flip_direction == 1)
-              {
-               T tmp = s_y;
-               s_y = s_x;
-               s_x = tmp;
-              }
-
-            this->sum_of_squares_subsets(s_x, s_y, ps_sum);
-
-            T weight =  // 0.25*
-                    ICD_weights[ //
-                    n_scales-j];
-//               j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
-
-            h_new = this->project(s_x, //j-1 /* s_x*/,
-                                  s_y, // j-1 /* s_y */,
-                                  ps_sum, // this->h[j-1]
-                                  h_old,
-                                  g_noise, weight);
-
-            __syncthreads();
-
-            this->Q[j-1] = h_new - h_old;
-            h_old = h_new;
-        }
-
-
         return h_new; //  - h_init; // difference formed in on-chip registers
     }
 
@@ -352,7 +454,7 @@ struct DykstraStep {
 //
 template<typename T, int offset_x, int offset_y>
 __forceinline__ __device__
-void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s_x, int s_y, T * ps_sum)
+void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s, T * ps_sum)
 {
     // Pointer to first element of a row which (i.e. the element) is processed by this thread.
     volatile T * m_ps = ps_sum + tIx;
@@ -365,7 +467,7 @@ void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s_x, int s_y
     *m_ps = x * x;
     __syncthreads();
 
-    int edge_x = pow_of_two(s_x);
+    int edge_x = pow_of_two(s);
 
     // Each line is processed by one warp
     for (int e = 2; e <= edge_x; e*= 2)
@@ -379,7 +481,7 @@ void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s_x, int s_y
 
     __syncthreads();
 
-    int edge_y = pow_of_two(s_y);
+    int edge_y = pow_of_two(s);
 
     for (int e = 2; e <= edge_y; e*= 2) // add rows
     {
@@ -399,16 +501,16 @@ void DykstraStep<T, offset_x, offset_y>::sum_of_squares_subsets(int s_x, int s_y
 
 
 
-// @sect4{Kernel}
-//
+
 template<typename T, int offset_x, int offset_y>
 __global__ void
 __incomplete_dykstra_2D_fine_scales(
         T* h_iter, T* h_old, T* Q_full,
         const T g_noise,
-        const int height, const int width, const int depth,
-        int flip_direction)
+        const int height, const int width, const int depth
+        )
 {
+
     const int n_scales = N_SCALES_2D;
 
     // 2D
@@ -421,6 +523,7 @@ __incomplete_dykstra_2D_fine_scales(
 
 
     DykstraStep<T, offset_x, offset_y> dykstra( n_scales, width);
+
 
     T __shared__ ps_sum[N_PX_X_2D * N_PX_Y_2D];
 
@@ -435,82 +538,19 @@ __incomplete_dykstra_2D_fine_scales(
         return;
 
     // Projection on scales suitable for intra-threadblock processing.
-    if(flip_direction == 2)
-        h_iter[dykstra.global_idx] =
-            dykstra.sweep_fine_scales(h_old, Q_full,ICD_weights, ps_sum, g_noise);
+    h_iter[dykstra.global_idx] /* *m_ps_2*/ = dykstra.sweep_fine_scales(h_old, Q_full,
+                                                                        ICD_weights, ps_sum, g_noise, width*height);
 
-    if(flip_direction == 0)
-    {
-        h_iter[dykstra.global_idx] =
-            dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 0);
-        h_old[dykstra.global_idx] = h_iter[dykstra.global_idx];
-        Q_full[dykstra.global_idx] = 0;
-    }
-        else
-    {
-    T tmp = dykstra.sweep_fine_scales_rectangles(h_old, Q_full,ICD_weights, ps_sum, g_noise, 1);
-
-    // 1px subset projection
-
-        int j = n_scales;
-
-        tmp -= dykstra.Q[j-1];
-
-        *m_ps  = tmp;
-
-        __syncthreads();
-
-        int s_x = n_scales - j; // we loop trough the scales from coarse to fine
-//            int s_x = j-1; // we loop trough the scales from coarse to fine
-        int s_y = s_x;
-
-        dykstra.sum_of_squares_subsets(s_x, s_y, ps_sum);
-
-        T weight =  // 0.25*
-                ICD_weights[ //
-                n_scales-j];
-//               j-1]; // /sqrt(1.0*j); // n_scales - (j)]; // cs[j-1];
-
-        T h_new = dykstra.project(s_x, //j-1 /* s_x*/,
-                              s_y, // j-1 /* s_y */,
-                              ps_sum, // this->h[j-1]
-                              tmp,
-                              g_noise, weight);
-
-        __syncthreads();
-
-        dykstra.Q[j-1] = h_new - tmp;
-
-    h_iter[dykstra.global_idx] = h_new;
-    }
 
 }
 
-// @sect4{Wrapper Function}
-//
+
 template<typename T, ParallelArch arch>
 void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
         T* h_iter, T* h_old, T* Q_full,
         const T g_noise,
         const int ni, const int nj, const int nk)
 {
-
-
-//    { //! projection on squares!!!!!!!!!!!!!!!!!!!!!!!
-//    int grid_2D_i= ni/32;
-//    int grid_2D_j= nj/32;
-//    dim3 grid_2D(grid_2D_i, grid_2D_j);
-//    dim3 blocks_2D(32, 32);
-
-
-//    __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
-//                                                                          h_old,  Q_full,
-//                                                                           g_noise,
-//                                                                           ni, nj, nk,
-//                                                                           2);
-//    }
-
-    {
     int grid_2D_i= ni/N_PX_X_2D;
     int grid_2D_j= nj/N_PX_Y_2D;
     dim3 grid_2D(grid_2D_i, grid_2D_j);
@@ -520,26 +560,8 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part(
     __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
                                                                           h_old,  Q_full,
                                                                            g_noise,
-                                                                           ni, nj, nk,
-                                                                           0);
-    }
-    cudaDeviceSynchronize();
-    //! changed directions!!!!!!!!!!!!!!!!!!!!!!!
-   {
-   int grid_2D_j= ni/N_PX_X_2D;
-   int grid_2D_i= nj/N_PX_Y_2D;
-   dim3 grid_2D(grid_2D_i, grid_2D_j);
-   dim3 blocks_2D(N_PX_Y_2D, N_PX_X_2D);
-
-
-   __incomplete_dykstra_2D_fine_scales<T, 0, 0><<<grid_2D, blocks_2D>>> (h_iter,
-                                                                         h_old,  Q_full,
-                                                                          g_noise,
-                                                                          ni, nj, nk,
-                                                                          1);
-   }
-
-
+                                                                           ni, nj, nk
+                                                                           );
 
     getLastCudaError("__incomplete_dykstra_2D_fine_scales<T, 0, 0><<<>>> execution failed\n");
     cudaDeviceSynchronize();
@@ -568,19 +590,20 @@ void step35::Kernels<T, arch>::dyadic_dykstra_fine_scale_part_cpu(
                         0.00760004,
                         0.002742,
                         0.000825881};
+typedef unsigned int uint;
 
 #pragma omp parallel for
-    for(uint bx = 0; bx  < grid_2D.x; bx++ )
+    for(unsigned int bx = 0; bx  < grid_2D.x; bx++ )
     {
 #pragma omp parallel for private(Q, ps_sum)
-        for(uint by = 0; by < grid_2D.y; by++)
+        for(unsigned int by = 0; by < grid_2D.y; by++)
         {
             for(uint s = 1; s <= N_SCALES_2D; s++)
             {
 //                printf("bx: %d, by: %d, s:%d \n", bx, by, s);
-                uint s_x = N_SCALES_2D - s;
+                int s_x = N_SCALES_2D - s;
 
-                uint s_y = s_x;
+                int s_y = s_x;
 
                 uint edge_x = pow(2., s_x);
                 uint edge_y = pow(2., s_y);
@@ -745,8 +768,9 @@ __tv_derivative(T* dTV_du, const T* u, const T* f, T lambda, const int height, c
 
 
 
-//@setc5{Kernel: __tv_derivative_cpu}
-//@brief kernel for evaluation of the functional derivative of th TV regularization functional.
+//@setc5{Kernel: __tv_derivative}
+//@brief kernel for evaluation of the functional derivative of the TV regularization functional.
+// Any previous content of @p dTV_du gets overwritten.
 template<typename T>
 inline void
 __tv_derivative_cpu(dim3 blockDim, dim3 blockId, T* dTV_du, const T* u,
@@ -878,10 +902,10 @@ void step35::Kernels<T, arch>::tv_derivative(T * dTV_du,
     {
         // ELSE
 #pragma omp parallel for
-        for(uint bx = 0; bx  < grid.x; bx++ )
+        for(unsigned int bx = 0; bx  < grid.x; bx++ )
         {
 #pragma omp parallel for
-            for(uint by = 0; by < grid.y; by++)
+            for(unsigned int by = 0; by < grid.y; by++)
             {
                 dim3 blockId(bx,by);
                 __tv_derivative_cpu<T> (blocks, blockId, dTV_du,
@@ -921,7 +945,7 @@ int width, const int depth)
                 );
 }
 
-//@sect5{Function: L1_derivative}
+//@sect5{Function: tv_derivative}
 //@brief This is a wrapper for the __tv_derivative Kernel.
 //@param A pointer to the image
 //@param ni height of the image
@@ -975,6 +999,9 @@ void step35::Kernels<T, arch>::L1_derivative(T * dL1_du,
 //The functions which call the kernels
 
 
+
+
+
 //@sect5{Function: dyadic_dykstra}
 //@brief This is a wrapper for the __dyadyc_dykstra Kernel function.
 //@param A pointer to the image
@@ -993,4 +1020,8 @@ template class step35::Kernels<float, gpu_cuda>;
 template class step35::Kernels<double, gpu_cuda>;
 template class step35::Kernels<float, cpu>;
 template class step35::Kernels<double, cpu>;
+
+//void ImplCUDA<float>::apply<SDf, minus, SDf >(SDf&, SciPAL::DevBinaryExpr<SDf, minus, SDf > const&)", referenced from:
+
+//      void SciPAL::LAOOperations::apply<float, cublas, Vc, BinX<Vcblas, minus, Vcblas > >(Vcblas&, SciPAL::Expr<BinX<Vcblas, minus, Vcblas > > const&)
 

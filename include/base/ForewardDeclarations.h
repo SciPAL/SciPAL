@@ -34,8 +34,9 @@ template<typename, typename> class SubMatrixView;
 template<typename, typename> class Vector;
 template<typename, typename, typename> class SubVectorView;
 template<typename, typename, typename> class ColVectorView;
-//    template<typename, typename> class ColVectorViewM;
-//wrapper for simple numeric factors
+template<typename, typename, typename> class RowVectorView;
+
+//!wrapper for simple numeric factors
 template<typename T, typename BW> struct Literal;
 template<typename T> struct DevLiteral;
 
@@ -62,7 +63,30 @@ template<typename OpTag, typename T> struct  binary;
 //! This structure provides the functions for evaluating the expression tree in array arithmetic.
 //!
 template <typename T> struct ExprTree;
+
+template <typename T, ParallelArch arch> struct VTraits;
+
+template< typename T, typename BW> struct BlasVecExp;
+template< typename T, typename BW> struct BlasMatExp;
+
+namespace LAOOperations{
+template <typename T, typename BW>
+static void apply(Literal<T, BW> &result,
+                  const typename BlasVecExp<T, BW>::scalar_product& expr);
+
+template<typename E, typename X, typename T, typename BW>
+static void apply(E, const SciPAL::Expr<X> &);
+
+}
+
 } // end namespace SciPAL
+
+//namespace dealii {
+//template <typename Number> class Vector;
+//template <typename number> class FullMatrix;
+//template<typename _T> class FullMatrixAccessor;
+
+//}
 
 template<typename T> struct ComplexAdapter;
 
@@ -77,6 +101,10 @@ typedef double2 cuDoubleComplex;
 template<typename> class FullMatrixAccessor;
 
 void print_expr_info(QString expr_name);
+
+
+
+template<typename T, typename BW> struct blas_pp;
 
 #endif // FOREWARDDECLARATIONS_H
 

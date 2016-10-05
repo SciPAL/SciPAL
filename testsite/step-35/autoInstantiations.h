@@ -1,11 +1,1 @@
-// The following 1 instantiations are automatically generated [2015-11-18 12:40:25.304453]:
-template void ImplCUDA<float>::apply<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> >(SciPAL::ShapeData<float>&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> > const&);
-// The following 2 instantiations are automatically generated [2015-12-23 10:19:30.369611]:
-template void ImplCUDA<SciPAL::CudaComplex<float> >::apply<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::pmult, SciPAL::ShapeData<SciPAL::CudaComplex<float> > >(SciPAL::ShapeData<SciPAL::CudaComplex<float> >&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::pmult, SciPAL::ShapeData<SciPAL::CudaComplex<float> > > const&);
-template void ImplCUDA<float>::apply<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::expr_abs<float> >(SciPAL::ShapeData<float>&, SciPAL::DevUnaryExpr<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::expr_abs<float> > const&);
-// The following 3 instantiations are automatically generated [2016-02-05 10:57:13.055661]:
-template void ImplOpenMP<float>::apply<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> >(SciPAL::ShapeData<float>&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> > const&);
-template void ImplOpenMP<SciPAL::CudaComplex<float> >::apply<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::pmult, SciPAL::ShapeData<SciPAL::CudaComplex<float> > >(SciPAL::ShapeData<SciPAL::CudaComplex<float> >&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::pmult, SciPAL::ShapeData<SciPAL::CudaComplex<float> > > const&);
-template void ImplOpenMP<float>::apply<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::expr_abs<float> >(SciPAL::ShapeData<float>&, SciPAL::DevUnaryExpr<SciPAL::ShapeData<SciPAL::CudaComplex<float> >, SciPAL::expr_abs<float> > const&);
-// The following 1 instantiations are automatically generated [2016-04-18 22:16:37.490493]:
-template void ImplCUDA<float>::apply<SciPAL::DevLiteral<float>, SciPAL::mult, SciPAL::ShapeData<float> >(SciPAL::ShapeData<float>&, SciPAL::DevBinaryExpr<SciPAL::DevLiteral<float>, SciPAL::mult, SciPAL::ShapeData<float> > const&);
+// void ImplCUDA<float>::apply<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> >(SciPAL::ShapeData<float>&, SciPAL::DevBinaryExpr<SciPAL::ShapeData<float>, SciPAL::minus, SciPAL::ShapeData<float> > const&);

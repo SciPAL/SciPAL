@@ -27,7 +27,7 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 //SciPAL implementation for expression templates
 
-#include <deal.II/lac/vector.h>
+//#include <deal.II/lac/vector.h>
 
 #include <lac/Array.h>
 #include <lac/Shape.h>
@@ -101,9 +101,30 @@ public:
                  int r_begin, int c);
 
     Vector(const Matrix<T, BW> & src,
-                 int r_begin, int c);
+           int r_begin, int c);
+
+    Vector(const Matrix<T, BW> & src,
+           int c_begin, int r, bool col);
 
     Vector(const Vector<T, BW> & other)
+        :
+          dealii::Subscriptor(),
+          MyShape()
+    {
+        *this = other;
+    }
+
+    template<typename T_src>
+    Vector(const ColVectorView<T, BW, const T_src> & other)
+        :
+          dealii::Subscriptor(),
+          MyShape()
+    {
+        *this = other;
+    }
+
+    template<typename T_src>
+    Vector(const RowVectorView<T, BW, const T_src> & other)
         :
           dealii::Subscriptor(),
           MyShape()
@@ -163,7 +184,9 @@ public:
                               this->stride);
         }
 
-        std::cout<<__FUNCTION__<<std::endl;
+#ifdef DEBUG_VECTOR
+        std::cout << __FUNCTION__ << std::endl;
+#endif
         return *this;
     }
 
@@ -176,7 +199,13 @@ public:
     Vector<T, BW> & operator = (const T value);
 
     template<typename T_src>
-    Vector<T, BW> & operator = (const SubVectorView<T, BW, T_src> & other);
+    Vector<T, BW> & operator = (const SubVectorView<T, BW, const T_src> & other);
+
+    template<typename T_src>
+    Vector<T, BW> & operator = (const RowVectorView<T, BW, const T_src> & other);
+
+    template<typename T_src>
+    Vector<T, BW> & operator = (const ColVectorView<T, BW, const T_src> & other);
 
     template<typename T_src>
     Vector<T, BW> & operator = (const dealii::Vector<T_src> & other);
@@ -186,6 +215,11 @@ public:
 
 
     Vector<T, BW> & operator += (const Vector<T, BW> & other);
+
+    Vector<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::Literal<T, BW>, SciPAL::mult, Vector<T, BW>>& expr);
+
+    template<typename T_src>
+    Vector<T, BW> & operator += (const SciPAL::BinaryExpr<SciPAL::Literal<T, BW>, SciPAL::mult, ColVectorView<T, BW, T_src>>& expr);
 
     template<typename T_src>
     Vector<T, BW> & operator += (const SubVectorView<T, BW, T_src> & other);
@@ -228,11 +262,15 @@ public:
 
     size_t n_cols() const { return this->MyShape::n_cols; }
 
-    T operator () (int k) const;
+    T operator () (size_t k) const;
+
+    void operator ()(size_t k, const T value);
 
     T& operator [](size_t el);
 
     inline MyShape & shape() { return *this; }
+
+    inline const MyShape & shape() const {return *this; }
 
     void set(int k,const T value);
 
@@ -241,6 +279,8 @@ public:
     void add(int k,const T value);
 
     // additional functions
+    unsigned int get_amax() const;
+
     bool all_zero();
 
     void add(const Vector<T, BW> & other);
@@ -254,10 +294,6 @@ public:
     void equ(T alpha, const Vector<T, BW> & other);
     void equ(T alpha, const Vector<T, BW> & other, T beta, const Vector<T, BW> & other2);
 
-protected:
-    //! A Vector is just the hull for adding array math operations to
-    //! a 1D array. Therefore, the stride is always 1.
-   //static const int _stride = 1;
 
 };
 }
@@ -287,23 +323,6 @@ SciPAL::Vector<T, BW>::Vector(size_t n_elements)
       MyShape(0, n_elements, /*n_rows*/
               0, 1 /*n_cols*/)
 {}
-
-//FIX ME hasn't been used
-// @sect4{Konstruktor: Vector(n,raw_data)}
-//!
-//! Konstruktor fuer n-elementigen Vector, dessen Inhalt aus einem Array-Objekt kommen
-//! @param n_elements : Groesse des Vectors
-//! @param raw_data : Pointer auf ein Array Objekt
-
-//template<typename T, typename BW>
-//SciPAL::Vector<T, BW>::Vector(size_t n_elements,
-//                              const Shape)
-//    :
-//    MyShape(n_elements, 1, n_elements/*TO DO: leading dim*/)
-//{
-//    *this = raw_data;
-//}
-
 
 // @sect4{Konstruktor: Vector(FullMatrixAccessor,r_begin,c)}
 //!
@@ -351,9 +370,8 @@ SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
       MyShape(0, src.n_rows()-r_begin,
               0, 1)
 {
-    int n_el = src.n_rows() - r_begin;
-
-        //! Elementweise Kopie des arrays.
+ 
+   //! Elementweise Kopie des arrays.
     int inc_src = 1;
     int inc_this = 1;
 
@@ -364,6 +382,33 @@ SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
 }
 
 
+// @sect4{Konstruktor: Vector(Matrix,c_begin,r,col)}
+//!
+//! Konstruiert einen Zeilenvektor aus einer Matrix, indem das Startelement angegeben wird
+//! @param src : Pointer auf eine Matrix
+//! @param c_begin : Spaltenindex des der Matrix
+//! @param r : Zeilenindex der Matrix
+//! @param col : Wenn true, dann Zeilenvektor
+
+template<typename T, typename BW>
+SciPAL::Vector<T, BW>::Vector(const Matrix<T, BW> & src,
+                              int c_begin, int r, bool col)
+    :
+      MyShape(0, 1,
+              0, src.n_cols()-c_begin)
+{
+    Assert(col==true,
+           dealii::ExcMessage("Use other constructor for row copy"));
+
+    //! Elementweise Kopie des arrays.
+    int inc_src = src.n_rows();
+    int inc_this = 1;
+
+    const T * start = &(src.data()[c_begin*src.n_cols() + r]);
+
+    //! cublasScopy
+    BW::copy(this->size(), start, inc_src, this->data(), inc_this);
+}
 
 // @sect4{Funktion: reinit}
 //!
@@ -417,7 +462,8 @@ SciPAL::Vector<T, BW>::sum() const
 //! und gibt sie auf der Standardausgabe aus.
 
 template <typename T>
-std::ostream &operator << (std::ostream &ostr,SciPAL::CudaComplex<T> &a ){
+std::ostream &operator << (std::ostream &ostr,SciPAL::CudaComplex<T> &a )
+{
 
     ostr << "(" << a.real() << "," << a.imag() << ")";
     return ostr;
@@ -448,13 +494,20 @@ SciPAL::Vector<T, BW>::print() const
 
 template<typename T, typename BW>
 T
-SciPAL::Vector<T, BW>::operator () (int k) const
+SciPAL::Vector<T, BW>::operator () (size_t k) const
 {
-    std::vector<T> tmp(this->size());
-    T * dst_ptr = &tmp[0];
-
-    BW::GetVector(1, this->data()+k, 1, dst_ptr, 1);
-    return tmp[0];
+#ifdef DEBUG_VECTOR
+    if (k > this->n_elements_active)
+    {
+        std::cerr << "Out of range: Element " << k << " is wanted out of a " << this->n_elements_active << " vector." << std::endl;
+        std::cerr << "line :" << __LINE__ << ", Matrix<T,BW>" << std::endl;
+        //print_expr_info(__PRETTY_FUNCTION__);
+        std::exit(-1);
+    }
+#endif
+    T tmp;
+    BW::GetVector(1, this->data()+k, 1, &tmp, 1);
+    return tmp;
 }
 
 // @sect4{Funktion: Vector::[]}
@@ -468,6 +521,18 @@ T&
 SciPAL::Vector<T, BW>::operator [] (size_t el)
 {
     return this->data_ptr[el];
+}
+
+// @sect4{Funktion: operator () set}
+//!
+//! Elementzugriff auf Vektor - schreibend
+//! @param k : Index des Vectors
+//! @param value : zu schreibender Wert
+template<typename T, typename BW>
+void
+SciPAL::Vector<T, BW>::operator () (size_t k, const T value)
+{
+    this->set(k,value);
 }
 
 // @sect4{Funktion: Vector::set}
@@ -532,6 +597,10 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW> &
 SciPAL::Vector<T, BW>::operator = (const std::vector<T> & other)
 {
+#ifdef DEBUG_VECTOR
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
     size_t new_size = other.size();
     this->reinit(new_size);
 
@@ -550,7 +619,7 @@ template <typename X>
 SciPAL::Vector<T, BW> & SciPAL::Vector<T, BW>::operator =
 (const SciPAL::Expr<X> & e)
 {
-#ifdef DEBUG
+#ifdef DEBUG_VECTOR
     std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
     print_expr_info(__PRETTY_FUNCTION__);
 #endif
@@ -608,8 +677,12 @@ SciPAL::Vector<T, BW>::push_to(dealii::Vector<T2> & dst) const
 template<typename T, typename BW>
 template<typename T_src>
 SciPAL::Vector<T, BW> &
-SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, BW, T_src> & other)
+SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, BW, const T_src> & other)
 {
+#ifdef DEBUG_VECTOR
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
     Assert(this->size() >= other.size(),
            dealii::ExcDimensionMismatch(this->size(), other.size()) );
 
@@ -623,6 +696,45 @@ SciPAL::Vector<T, BW>::operator = (const SubVectorView<T, BW, T_src> & other)
     return *this;
 }
 
+//! @sect4{Operator: =}
+
+template<typename T, typename BW>
+template<typename T_src>
+SciPAL::Vector<T, BW> &
+SciPAL::Vector<T, BW>::operator = (const ColVectorView<T, BW, const T_src> & other)
+{
+#ifdef DEBUG_VECTOR
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
+    this->reinit(other.size());
+
+    int incx = other.stride;
+    int incy = 1;
+    BW::copy(other.size(), other.data(), incx,
+             this->data(), incy);
+
+    return *this;
+}
+
+template<typename T, typename BW>
+template<typename T_src>
+SciPAL::Vector<T, BW> &
+SciPAL::Vector<T, BW>::operator = (const RowVectorView<T, BW, const T_src> & other)
+{
+#ifdef DEBUG_VECTOR
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
+    this->reinit(other.size());
+
+    int incx = other.stride;
+    int incy = 1;
+    BW::copy(other.size(), other.data(), incx,
+             this->data(), incy);
+
+    return *this;
+}
 
 template<typename T, typename BW>
 template<typename T_src>
@@ -660,6 +772,10 @@ template<typename T, typename BW>
 SciPAL::Vector<T, BW> &
 SciPAL::Vector<T, BW>::operator = (const T value)
 {
+#ifdef DEBUG_VECTOR
+    std::cout << "line :" << __LINE__ << ", Vector<T,BW>" << std::endl;
+    print_expr_info(__PRETTY_FUNCTION__);
+#endif
     Vector<T, BW> tmp(1);
     tmp.set(0, value);
     int incx = 0; //! copy the same element all the time
@@ -680,6 +796,35 @@ SciPAL::Vector<T, BW>::operator += (const Vector<T, BW> & other)
 {
     One<T> one;
     BW::axpy(this->size(), one(), other.data(), 1, this->data(), 1);
+
+    return *this;
+}
+
+// @sect4{Operator: +=}
+//!
+//! Addiert zwei Vectoren, wobei einer skaliert wird
+//! @param other : rechte Seite des += ist ein Vector
+
+template<typename T, typename BW>
+SciPAL::Vector<T, BW> &
+SciPAL::Vector<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::Literal<T, BW>, SciPAL::mult, Vector<T, BW>>& expr)
+{
+    const T& a = expr.l;
+    const Vector<T, BW>& X = expr.r;
+    BW::axpy(this->size(), a, X.data(), 1, this->data(), 1);
+
+    return *this;
+}
+
+
+template<typename T, typename BW>
+template<typename T_src>
+SciPAL::Vector<T, BW> &
+SciPAL::Vector<T, BW>::operator += (const SciPAL::BinaryExpr<SciPAL::Literal<T, BW>, SciPAL::mult, ColVectorView<T, BW, T_src>>& expr)
+{
+    const T& a = expr.l;
+    const Vector<T, BW>& X = expr.r;
+    BW::axpy(this->size(), a, X.data(), X.stride, this->data(), this->stride);
 
     return *this;
 }
@@ -797,10 +942,9 @@ SciPAL::Vector<T, BW>::operator /= (const T scale)
 {
     int elem_dist = 1;
 
-    Assert(scale,
-           dealii::ExcMessage("Division by Zero") );
+    Assert(scale!=0.0, dealii::ExcMessage("Division by Zero") );
 
-    BW::scal(this->size(), 1/scale, this->data(), elem_dist);
+    BW::scal(this->size(), 1.0/scale, this->data(), elem_dist);
 
     return *this;
 }
@@ -848,7 +992,7 @@ SciPAL::Vector<T, BW>::sadd (T alpha, const Vector<T, BW> & other)
 
     //! cublasSaxpy
     int incy = 1;
-    BW::axpy(this->size(), 1., other.dev_ptr, 1, this->data(), 1);
+    BW::axpy(this->size(), 1., other.data(), 1, this->data(), 1);
 }
 
 
@@ -857,6 +1001,16 @@ SciPAL::Vector<T, BW>::sadd (T alpha, const Vector<T, BW> & other)
 
 
 // additional functions
+// @sect4{Funktion: get_amax}
+//!
+//! returns the index of the absolutely largest value
+template<typename T, typename BW>
+unsigned int
+SciPAL::Vector<T, BW>::get_amax() const
+{
+    Assert(false, dealii::ExcMessage("This function has been moved to algorithms.hh. and has been renamed to index_of_largest_element"))
+}
+
 template<typename T, typename BW>
 bool
 SciPAL::Vector<T, BW>::all_zero ()

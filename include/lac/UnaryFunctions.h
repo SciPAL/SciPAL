@@ -35,25 +35,25 @@ namespace SciPAL {
 template <typename T1>
 inline
 const UnaryExpr<T1, expr_transpose >
-transpose(const Expr<T1> &dst)
+transpose(const Expr<T1> &src)
 {
-    return UnaryExpr<T1, expr_transpose >(~dst);
+    return UnaryExpr<T1, expr_transpose >(~src);
 }
 
 template <typename T1>
 inline
 const UnaryExpr<T1, expr_adjoint >
-adjoint(const Expr<T1> &dst)
+adjoint(const Expr<T1> &src)
 {
-    return UnaryExpr<T1, expr_adjoint >(~dst);
+    return UnaryExpr<T1, expr_adjoint >(~src);
 }
 
 template <typename T1>
 inline
 const UnaryExpr<T1, expr_diag >
-diag(const Expr<T1> &dst)
+diag(const Expr<T1> &src)
 {
-    return UnaryExpr<T1, expr_diag >(~dst);
+    return UnaryExpr<T1, expr_diag >(~src);
 }
 
 // @sect3{Struct: expr_sin}
@@ -94,15 +94,15 @@ struct expr_sin
 template <typename T1>
 inline
 const UnaryExpr<T1, expr_sin<typename T1::value_type> >
-sin(const Expr<T1> &dst)
+sin(const Expr<T1> &src)
 {
-    return UnaryExpr<T1, expr_sin<typename T1::value_type> >(~dst);
+    return UnaryExpr<T1, expr_sin<typename T1::value_type> >(~src);
 }
 
 // @sect3{Struct: Setter}
 //
-// This stuct is used, when we want to set all elements of a vector or matrix
-// to an given value. Maybe for reinitialization.
+// This struct is used, when we want to set all elements of a vector or matrix
+// to a given value. Maybe for reinitialization.
 
 template <typename T>
 struct Setter
@@ -146,9 +146,9 @@ struct  expr_##fcn \
 template <typename T1> \
 inline \
 const UnaryExpr<T1, expr_##fcn <typename T1::value_type> >\
-   fcn(const Expr<T1> &dst)\
+   fcn(const Expr<T1> &src)\
 { \
-    return UnaryExpr<T1, expr_##fcn <typename T1::value_type> >(~dst);\
+    return UnaryExpr<T1, expr_##fcn <typename T1::value_type> >(~src);\
 }
 
 MAKE_UNARIES(cos);
@@ -164,6 +164,8 @@ MAKE_UNARIES(sqrt);
 // @sect3{Unary: abs}
 // abs has to be defined by hand, since the return value type can differ from
 // the input value type. This is the case for a complex number, the modulus is real-valued.
+
+template <typename T> struct expr_abs;
 
 template <typename T>
 struct expr_abs
@@ -188,12 +190,12 @@ template <typename T1>
 inline
 const UnaryExpr<T1, expr_abs <typename PrecisionTraits<typename T1::value_type,
 gpu_cuda>::NumberType > >
-  abs(const Expr<T1> &dst)
+  abs(const Expr<T1> &src)
 {
    return UnaryExpr<T1,
            expr_abs <typename PrecisionTraits<typename T1::value_type,
                                               gpu_cuda>::NumberType > >
-           (~dst);
+           (~src);
 }
 
 template <typename T>
@@ -219,12 +221,12 @@ template <typename T1>
 inline
 const UnaryExpr<T1, expr_real <typename PrecisionTraits<typename T1::value_type,
 gpu_cuda>::NumberType > >
-  real(const Expr<T1> &dst)
+  real(const Expr<T1> &src)
 {
    return UnaryExpr<T1,
            expr_real <typename PrecisionTraits<typename T1::value_type,
                                               gpu_cuda>::NumberType > >
-           (~dst);
+           (~src);
 }
 
 
@@ -251,21 +253,49 @@ template <typename T1>
 inline
 const UnaryExpr<T1, expr_imag <typename PrecisionTraits<typename T1::value_type,
 gpu_cuda>::NumberType > >
-  imag(const Expr<T1> &dst)
+  imag(const Expr<T1> &src)
 {
    return UnaryExpr<T1,
            expr_imag <typename PrecisionTraits<typename T1::value_type,
                                               gpu_cuda>::NumberType > >
-           (~dst);
+           (~src);
+}
+
+
+template <typename T>
+struct expr_to_complex
+{
+
+   __host__ __device__
+   T operator()(const T val) const
+   {
+       return SciPAL::toNumberType2(val);
+   }
+
+   __host__ __device__
+   T operator()(const typename PrecisionTraits<T, gpu_cuda>::NumberType val) const
+   {
+       return SciPAL::toNumberType2(val);
+   }
+};
+
+// This is the definition of the (mainly) real to complex -operator
+template <typename T1>
+inline
+const UnaryExpr<T1, expr_to_complex <typename PrecisionTraits<typename T1::value_type,
+gpu_cuda>::ComplexType > >
+  to_complex(const Expr<T1> &src)
+{
+   return UnaryExpr<T1,
+           expr_to_complex <typename PrecisionTraits<typename T1::value_type,
+                                              gpu_cuda>::ComplexType > >
+           (~src);
 }
 
 
 ////add all the useful things...
 ////trigon. functions(don't forget hypetbolic fn's), exp, ln,
 ////10^, log, abs, abs^2, powerfunctions? (x^2, x^3...), sqrt
-
-
-
 
 }//End namespace SciPAL
 

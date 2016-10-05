@@ -74,6 +74,7 @@ static void apply(LAO<T, BW> &result,
 //! necessary template specializations in the part of the code which not compiled by the g++. The simplest solution is to
 //! let the linker generate its "unresolved reference" errors which in fact display the exact form of the missing
 //! specializations and to copy the error messages (after cleaning) into the source for the CUDA part of the program.
+//! ==> This is actually done by the python script which is invoked inside the building process.
 //!
 //! @param result: linear algebra object which will contain the result of the expression.
 //! @param parent: expresion object built on the host-side of the program.
@@ -81,6 +82,21 @@ static void apply(LAO<T, BW> &result,
 //! this function compile sometimes to some strange behavior in the development
 //! process thus this directive to disable it
 #ifndef DEV_DEBUGGING
+//! Specialization for views
+template <typename T, //! numbertype
+          typename BW, //! blas type
+          typename T_src, //! source type of view
+          template <typename, typename, typename> class LAO, //! template for result type
+          typename E/*short for Expression*/ >
+static void apply(LAO<T, BW, T_src> &result,
+                  const ::SciPAL::Expr<E> &parent)
+{
+   SciPAL::Kernels<T, BW::arch> bla(4);
+//   result.reinit((~parent).get_l());
+    typename ExprChooser<E::I_am, E>::DevEType child(~parent);
+   bla.apply(result, child);
+}
+
 template <typename T, //! numbertype
           typename BW, //! blas type
           template <typename, typename> class LAO, //! template for result type
@@ -93,6 +109,7 @@ static void apply(LAO<T, BW> &result,
     typename ExprChooser<E::I_am, E>::DevEType child(~parent);
    bla.apply(result, child);
 }
+
 #endif
 
 } // END namespace LAOOperations

@@ -23,6 +23,8 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 #include <omp.h>
 #endif
 //SciPAL includes
+#include <lac/Literal.h>
+#include <lac/UnaryFunctions.h>
 #include <base/ForewardDeclarations.h>
 #include <lac/expression_templates_device.h>
 #include <lac/UnaryFunctions.h>
@@ -49,7 +51,7 @@ public:
 
     template <typename L, typename op, typename R>
     static void apply(SciPAL::ShapeData<T>& d_dst,
-                      const typename ::SciPAL::DevBinaryExpr<L, op, R> & Ax);
+                      const SciPAL::DevBinaryExpr<L, op, R> & Ax);
 
 private:
 };
@@ -66,7 +68,7 @@ public:
 
     template <typename L, typename op, typename R>
     static void apply(SciPAL::ShapeData<T> & d_dst,
-                      const typename ::SciPAL::DevBinaryExpr<L, op, R> & Ax);
+                      const  SciPAL::DevBinaryExpr<L, op, R> & Ax);
 
 
 

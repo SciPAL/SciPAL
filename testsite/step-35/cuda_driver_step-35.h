@@ -42,14 +42,12 @@ Copyright  Lutz Künneke and Jan Lebert 2014-2015, Stephan Kramer, Johannes Hage
 
 //Our stuff
 #include <step-35/cuda_kernel_wrapper_step-35.cu.h>
-#include "cuda_helper.h"
-#include "preprocessor_directives.h"
-#include "ADMMParams.h"
-#include <smre_problem.hh>
+#include <step-35/cuda_helper.h>
+#include <step-35/ADMMParams.h>
+#include <step-35/smre_problem.hh>
 
 // deal.II
 #include <deal.II/base/timer.h>
-#include <thrust/reduce.h>
 
 
 namespace step35 {
@@ -61,8 +59,133 @@ namespace step35 {
 // Main class, sets up an instance of queue and info class. A number of threads is started which
 // each handles a cuda stream and processes items obtained by the queue. The main thread adds items
 // to the queue until everything is processed.
+template<typename NumberType, typename BW >
+class CUDADriver : protected step35::Kernels<NumberType, BW::arch> {
+
+public:
+    //@sect5{Function: dykstra_gauss}
+    //@brief Wrapper around the whole projection procedure
+    //@param rho parameter for the first constraint
+    void dykstra_gauss(const NumberType rho)
+    {
+        // old dykstra_gauss and dykstra_gauss_global_mem merged.
+        // The former was anyway only a wrapper of the latter.
+        convolution.vmult(tmp_d, this->x_d);
+
+        NumberType mean = 0;
+        // $\epsilon = I -  A * x_{k} + \Upsilon_1/\rho$
+        this->writeable_e_d() = Mdouble(1./rho) * lag1 + this->im_d();
+        this->writeable_e_d() -= tmp_d;
+
+//        //substract mean of noise
+//            this->writeable_e_d().push_to(e_h);
+
+//            mean = std::accumulate(e_h.begin(),e_h.end(), 0.)/e_h.size();
+//            this->writeable_e_d() += -mean;
+
+
+        static const int n_scales = 10;
+        static const int min_scale = 0;
+
+        typedef SciPAL::Vector<NumberType, BW> Vc;
+
+        std::vector<NumberType> zero_init(this->e_d().size());
+
+        Vc h_iter (this->e_d().size()); h_iter = zero_init;
+
+        Vc h_old (this->e_d().size()); h_old = zero_init;
+
+        Vc h_init (this->e_d().size()); h_init = zero_init;
+
+        Vc Q_full (this->e_d().size()); Q_full = zero_init;
+        Vc Q_M (this->e_d().size()); Q_M = zero_init;
+
+        // $h_0 = h$;
+        h_init = this->e_d();
+        h_old = h_init;
+
+        NumberType cs_weight =  //9.46624e-07; // 1024x1024, 0.9, c_S
+                9.51511e-07; // 1024x1024, 0.9, c_Ss
+        //9.53509e-07; // 1024x1024, 0.1, c_Ss
+
+        int iter = 0;
+        bool iterate = true;
+
+        // FIXME: arch flag as template parameter in Kernels structure
+        step35::Kernels<NumberType, BW::arch> kernel;
+        NumberType norm = 2*dykstra_Tol;  //norm of residuals
+
+        NumberType time = 0;
+
+        while (iterate)
+        {
+
+            // Start with estimator for whole image
+            h_old -= Q_full;
+            h_init = h_old;
+            h_iter = h_old;
+            // assume single subset for a moment
+            NumberType L2_norm = h_old.l2_norm(); // i.e. sqrt(sum_of_squares)
+
+            // project
+            h_iter *= this->sigma_noise/(L2_norm * std::sqrt(cs_weight) );
+
+            Q_full = h_iter - h_old;
+            h_old = h_iter;
+
+            // Q_0 <- Q_full
+            // initialize : d.h_init with global h_init
+
+
+            dealii::Timer timer;
+            timer.restart();
+            // loop over subsets
+            if(typeid(BW) == typeid(cublas))
+            {
+                this->dyadic_dykstra_fine_scale_part(h_iter.data(), h_old.data(),
+                                                      Q_full.data(),
+                                                      this->sigma_noise,
+                                                      dof_handler.pwidth(),
+                                                      dof_handler.pheight(),
+                                                      dof_handler.pdepth()//,
+//                                                      n_max_dykstra_steps, dykstra_Tol
+                                                      );
+            }
+            else
+            {
+                this->dyadic_dykstra_fine_scale_part_cpu(h_iter.data(), h_old.data(),
+                                                          Q_full.data(),
+                                                          this->sigma_noise,
+                                                          dof_handler.pwidth(),
+                                                          dof_handler.pheight(),
+                                                          dof_handler.pdepth()//,
+                                                          );
+            }
+            time += timer.wall_time();
+
+
+
+            //Convergence control.            {
+                h_init -= h_iter;
+                norm = h_init.l2_norm();
+
+                iterate = ( norm > dykstra_Tol &&
+                            iter < n_max_dykstra_steps);
+
+                iterate ? h_init = h_iter : this->writeable_e_d() = h_iter;
+                iter++;
+            }
+        }// iterate end
+
+        std::cout<<"    n Dykstra steps used : " << iter <<
+                   ", norm of noise increment : "<< norm <<" mean value of noise : "<<mean <<std::endl;
+        std::cout<<"cumulative dykstra time for fine scale sweeps : "<< time<<std::endl;
+    }
+
+
+};
 template<typename Mdouble, typename BW >
-class CUDADriver {
+class CUDADriverMurks {
 
     static const ParallelArch c = BW::arch;
 public:
@@ -77,8 +200,9 @@ private:
     Vector __im_d, __e_d;
 
 public:
-    Vector x_d, x_old;
+    Vector x_d, z_d, x_old;
 
+    dealii::Vector<Mdouble> x_h, e_h, z_h, im_h, generated_noise;
 
     // Access to noise contribution.
     const SciPAL::Vector<Mdouble,BW> & e_d() const { return __e_d; }
@@ -92,7 +216,7 @@ public:
     SciPAL::Vector<Mdouble,BW> & writeable_im_d() { return __im_d; }
 
     // FIXME: For the device side arrays use this:
-    SciPAL::Vector<Mdouble, BW> tmp_d, tmp2_d, lag1, heun_k_2, sol_diff, heun_k_1, tmp_lag1, x_tmp;
+    SciPAL::Vector<Mdouble, BW> tmp_d, tmp2_d, lag1, lag2, tmp_haar2, tmp_lagr, tmp_haar, tmp_lag1, tmp_lag2;
 
 
 
@@ -487,22 +611,28 @@ public:
     // @param dofs DoFHandler, provides information about image size.
     // @param params the list of runtime parameters
     // FIXME: cs_h must some a reference to some decent type not a raw pointer
-    CUDADriver(std::vector<Mdouble> & cs_h,
+    CUDADriverMurks(std::vector<Mdouble> & cs_h,
                // FIXME: use ImageStack class developed for SOFI and ask that for nx, ny, nz, if needed
                const ImageDoFHandler& dofs,
                const ADMMParams& params)
         :
+          x_h(dofs.n_dofs()),
+          e_h(dofs.n_dofs()),
+          z_h(dofs.n_dofs()),
+          im_h(dofs.n_dofs()),
           __e_d(dofs.n_dofs()),
           x_d(dofs.n_dofs()),
+          z_d(dofs.n_dofs()),
           __im_d(dofs.n_dofs()),
           //
           dof_handler(dofs),
           tmp_d(dofs.n_dofs()),
           tmp2_d(  dofs.n_dofs()),
           lag1(  dofs.n_dofs()),
-          heun_k_2(  dofs.n_dofs()),
-          heun_k_1(  dofs.n_dofs()),
-          sol_diff(  dofs.n_dofs()),
+          lag2(  dofs.n_dofs()),
+          tmp_haar2(  dofs.n_dofs()),
+          tmp_haar(  dofs.n_dofs()),
+          tmp_lagr(  dofs.n_dofs()),
           convolution(dofs.pdepth(),  dofs.pwidth(),  dofs.pheight(), params.psf_fwhm),
           n_max_dykstra_steps(params.n_max_dykstra_steps),
           dykstra_Tol(params.dykstra_Tol),
@@ -523,7 +653,7 @@ public:
 
     //@sect5{Destructor: CUDADriver}
     //Signal all threads to end, calls queue destructor
-    ~CUDADriver () {
+    ~CUDADriverMurks () {
 
 
 
@@ -536,23 +666,41 @@ public:
 
     }
 
+    //@sect5{Function: push_data}
+    //@brief Push all data from host to device
+    void push_data() {
+        this->writeable_im_d() = this->im_h;
+        this->x_d = this->x_h;
+        this->z_d = this->z_h;
+        this->writeable_e_d() = this->e_h;
 
+    }
+
+    //@sect5{Function: get_data}
+    //@brief Pull all data from device to host
+    void get_data() {
+        this->im_d().push_to(this->im_h);
+        this->x_d.push_to(this->x_h);
+        this->z_d.push_to(this->z_h);
+        this->e_d().push_to(this->e_h);
+
+    }
 
     // Evaluation of the Euler-Lagrange equation for the minimization w.r.t.
     // to the primal variable, that is the image we want to reconstruct.
     // The mathematical expression is
     // \f{eqnarray}{ \text{dst}
-    //                 & = &
-    //                        A^T*\left\lbrack     \rho_1 \left(I-e-A*x\right) +\Upsilon_1      \right\rbrack
-    //                        -
-    //                        \rho_2 \frac{\delta J}{\delta x}(x_{old}) \,.
+    //       & = &
+    //        A^T*\left\lbrack     \rho_1 \left(I-e-A*x\right) +\Upsilon_1      \right\rbrack
+    //         -
+    //        \rho_2 \frac{\delta J}{\delta x}(x_{old}) \,.
     //             \f}
     void argmin_x_rhs(SciPAL::Vector<Mdouble, BW> & dst,
                       const SciPAL::Vector<Mdouble, BW> & x_old,
                       const SciPAL::Vector<Mdouble, BW> & lag_1,
                       ADMMParams& params)
     {
-        const Mdouble rho1 = params.penalty_weight;
+        const Mdouble rho1 = params.rho1;
 
         const Mdouble reg_strength = params.reg_strength;
 
@@ -568,33 +716,18 @@ public:
 
         // Add regularization
         step35::Kernels<Mdouble, BW::arch> kernel;
-        switch(params.regType){
-        case l1:
-                    kernel.L1_derivative(this->tmp2_d.data(),
-                                         x_old.data(),
-                                         reg_strength,
-                                         dof_handler.pwidth(),
-                                         dof_handler.pheight(), dof_handler.pdepth());
-            break;
-        case l2:
-            tmp2_d = reg_strength * x_old;
-            break;
-        case TV:
-            kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
-                                 this->im_d().data(),
-                                 reg_strength,
-                                 dof_handler.pwidth(),
-                                 dof_handler.pheight(), dof_handler.pdepth());
+//        kernel.L1_derivative(this->tmp2_d.data(),
+//                             x_old.data(),
+//                             reg_strength,
+//                             dof_handler.pwidth(),
+//                             dof_handler.pheight(), dof_handler.pdepth());
+        kernel.tv_derivative(this->tmp2_d.data(), x_old.data(),
+                             this->im_d().data(),
+                             reg_strength,
+                             dof_handler.pwidth(),
+                             dof_handler.pheight(), dof_handler.pdepth());
 
-            break;
-
-        case haar:
-            break;
-
-        default:
-            AssertThrow(false, dealii::ExcMessage("Unknown regularization type. Check parameter file."));
-        }
-
+        this->tmp2_d *= params.rho2;
 
         dst -= this->tmp2_d;
     }
@@ -602,6 +735,18 @@ public:
 
     void x_step_adaptive(ADMMParams & params)
     {
+
+        const Mdouble rho1 = params.rho1;
+
+        const Mdouble reg_strength = params.reg_strength;
+
+
+        SciPAL::Vector<Mdouble, BW> & x_tmp = this->tmp_lag2;
+
+        SciPAL::Vector<Mdouble, BW> & k_1 = this->tmp_haar;
+        SciPAL::Vector<Mdouble, BW> & k_2 = this->tmp_haar2;
+
+        SciPAL::Vector<Mdouble, BW> & sol_diff = this->tmp_lagr;
 
         Mdouble err = 2*params.heun_Tol;
 
@@ -618,7 +763,7 @@ public:
             // Evaluate rhs of Euler-Lagrange for explicit Euler step.
             // This does not change over the course of the timestep adaption.
             // Hence, we have to compute it only once.
-            argmin_x_rhs(heun_k_1, this->x_old, this->lag1, params);
+            argmin_x_rhs(k_1, this->x_old, this->lag1, params);
 
 
             int dt_iter = 1;
@@ -629,20 +774,20 @@ public:
                 delta_t = 1./params.inv_gamma;
 
                 // Euler step for intermediate solution.
-                x_tmp = delta_t * heun_k_1 + x_old;
+                x_tmp = delta_t * k_1 + x_old;
 
                 // Evaluate rhs of Euler-Lagrange
-                argmin_x_rhs(heun_k_2, x_tmp, this->lag1, params);
+                argmin_x_rhs(k_2, x_tmp, this->lag1, params);
 
                 // The difference of the two solutions is given by the differnce of the derivatives
                 // and serves the timestep adaption.
-                sol_diff = heun_k_2;
-                sol_diff -= heun_k_1;
+                sol_diff = k_2;
+                sol_diff -= k_1;
                 sol_diff *= 0.5*delta_t;
 
                 // Heun step
-                heun_k_2 += heun_k_1;
-                this->x_d = Mdouble(0.5*delta_t) * heun_k_2 + x_old;
+                k_2 += k_1;
+                this->x_d = Mdouble(0.5*delta_t) * k_2 + x_old;
 
                 // this->z_d = this->x_d;
 
@@ -677,6 +822,8 @@ public:
         std::cout << "    n Heun steps used : " << n_err_iter <<
                   ", norm of solution increment : "<< err<< std::endl;
 
+
+        this->z_d = this->x_d;
     }
 
 
@@ -755,7 +902,6 @@ public:
             // Q_0 <- Q_full
             // initialize : d.h_init with global h_init
 
-
             dealii::Timer timer;
             timer.restart();
             // loop over subsets
@@ -782,8 +928,6 @@ public:
             }
             time += timer.wall_time();
 
-
-
             //Convergence control.
             {
                 h_init -= h_iter;
@@ -796,16 +940,12 @@ public:
                 iter++;
             }
         }// iterate end
-
         std::cout<<"    n Dykstra steps used : " << iter <<
                    ", norm of noise increment : "<< norm <<" mean value of noise : "<<mean <<std::endl;
         std::cout<<"cumulative dykstra time for fine scale sweeps : "<< time<<std::endl;
     }
 
 
-    //@sect5{Function: m_smoothing}
-    //@brief Smoothing step
-    //@param gamma Strength of the regularization, small choices render the algorithm unstable
 
 };
 } // namespace step35 END

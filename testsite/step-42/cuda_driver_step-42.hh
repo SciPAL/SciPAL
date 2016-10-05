@@ -815,7 +815,7 @@ void step42::CUDADriver::operator_precedence(){
 
     SciPAL::Literal<Number, BW> test(0);
     test = (SciPAL::transpose(vA)) * vB;
-    std::cout<< test << std::endl;
+    std::cout<<"scalar prod of vA and vB "<<test << std::endl;
 }
 
 void step42::CUDADriver::stacks_of_LAOs(){

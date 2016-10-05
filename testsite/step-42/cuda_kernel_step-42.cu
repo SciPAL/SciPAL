@@ -26,5 +26,4 @@ Copyright  S. C. Kramer , J. Hagemann  2010 - 2014
 
 // This file is empty since step42 uses only the kernels provided by SciPAL.
 #include <step-42/cuda_kernel_step-42.cu.c>
-
 #include <step-42/autoInstantiations.h>
